@@ -1,0 +1,252 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --font-sans: "Manrope", "Geist", "Segoe UI", sans-serif;
+  --font-serif: "Georgia", "Times New Roman", serif;
+}
+
+:root {
+  --background: #f7f3ee;
+  --surface: #fffdf9;
+  --sidebar: #fbf7f1;
+  --surface-elevated: #f1e6d2;
+  --text-primary: #2a2522;
+  --text-secondary: #6e655d;
+  --text-muted: #8f8378;
+  --border: #e4ddd5;
+  --accent-primary: #c49a6c;
+  --accent-light: #f1e6d2;
+  --accent-hover: #b88b59;
+  --highlight: #e9d7c3;
+  --success: #6e8b74;
+  --warning: #c4873a;
+  --error: #b85c4a;
+  --radius-panel: 14px;
+  --radius-control: 9px;
+  --motion-fast: 160ms;
+  --motion-base: 240ms;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--background);
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+::selection {
+  background: var(--highlight);
+}
+
+::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+.nav-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: var(--radius-control);
+  padding: 0.7rem 0.85rem;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition:
+    background var(--motion-fast) ease-out,
+    color var(--motion-fast) ease-out;
+}
+
+.nav-item:hover,
+.nav-item-active {
+  background: color-mix(in srgb, var(--highlight) 58%, transparent);
+  color: var(--text-primary);
+}
+
+.conversation-link {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-radius: var(--radius-control);
+  padding: 0.65rem 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  text-align: left;
+  transition:
+    background var(--motion-fast) ease-out,
+    color var(--motion-fast) ease-out;
+}
+
+.conversation-link:hover,
+.conversation-link-active {
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+}
+
+.status-card {
+  border-bottom: 1px solid var(--border);
+  padding: 0 0 1rem;
+}
+
+.markdown-content {
+  font-family: var(--font-serif);
+  line-height: 1.72;
+}
+
+.markdown-content strong {
+  font-weight: 700;
+}
+
+.markdown-heading {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 0.25rem 0 0.6rem;
+}
+
+.markdown-content h1 {
+  font-size: 1.25rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.1rem;
+}
+
+.markdown-content h3 {
+  font-size: 1rem;
+}
+
+.markdown-paragraph {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.markdown-spacer {
+  height: 0.75rem;
+}
+
+.markdown-list {
+  margin: 0.25rem 0 0.75rem 1.25rem;
+  padding: 0;
+}
+
+.markdown-list li {
+  margin: 0.25rem 0;
+  padding-left: 0.25rem;
+}
+
+.markdown-list-ordered {
+  list-style: decimal;
+}
+
+.markdown-list:not(.markdown-list-ordered) {
+  list-style: disc;
+}
+
+.markdown-code {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-family: "Geist Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 0.88em;
+  padding: 0.08rem 0.28rem;
+}
+
+.markdown-quote {
+  border-left: 3px solid var(--accent-primary);
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0.75rem;
+  padding-left: 0.85rem;
+  white-space: pre-wrap;
+}
+
+.latex-expression {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-primary);
+  font-family: "Cambria Math", "STIX Two Math", Georgia, serif;
+  gap: 0.12rem;
+  line-height: 1.35;
+  vertical-align: middle;
+}
+
+.latex-expression-display,
+.latex-display-line {
+  display: flex;
+  justify-content: center;
+}
+
+.latex-display-line {
+  margin: 0.75rem 0 1rem;
+}
+
+.latex-expression-display {
+  font-size: 1.12rem;
+}
+
+.latex-fraction {
+  display: inline-grid;
+  grid-template-rows: auto auto;
+  line-height: 1.08;
+  margin: 0 0.12rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.latex-fraction-top {
+  border-bottom: 1px solid currentColor;
+  padding: 0 0.22rem 0.08rem;
+}
+
+.latex-fraction-bottom {
+  padding: 0.08rem 0.22rem 0;
+}
+
+.latex-root {
+  display: inline-flex;
+  align-items: stretch;
+  margin: 0 0.1rem;
+}
+
+.latex-root-symbol {
+  font-size: 1.15em;
+  line-height: 1.1;
+}
+
+.latex-root-body {
+  border-top: 1px solid currentColor;
+  padding: 0.02rem 0.16rem 0;
+}

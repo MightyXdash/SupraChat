@@ -1,0 +1,231 @@
+# SupraChat Agent Guide
+
+This repository builds **SupraChat**, the centralized desktop application for the SupraLabs ecosystem.
+SupraChat is the primary surface for running and managing SupraLabs models, while also supporting external providers such as **Ollama** and **Unsloth**.
+The product should feel deliberate, premium, technically serious, and calm under sustained use.
+
+## Product Intent
+
+- Treat SupraChat as a flagship desktop product, not a generic chat wrapper.
+- Default experience: SupraLabs models feel first-party, deeply integrated, and ready to use out of the box.
+- External providers such as Ollama and Unsloth should feel well-supported, but visually and structurally secondary to the SupraLabs default path.
+- Optimize for long sessions, model management, thoughtful reading, and low-friction control.
+- Prefer compact, efficient layouts over oversized marketing-style spacing.
+- Every system should be designed to scale cleanly, even when the first implementation is local-only.
+
+## Architecture Rules
+
+- Do not hardcode product-critical values when they can be expressed as configuration, tokens, schemas, or reusable modules.
+- This applies to both frontend and backend code.
+- Colors, spacing, radii, shadows, animation timings, provider labels, model metadata, feature flags, ports, file paths, command templates, and environment-specific behavior should have a defined source of truth.
+- Prefer:
+  - theme tokens over inline color literals
+  - shared constants over repeated magic values
+  - typed config objects over scattered conditionals
+  - provider adapters over provider-specific logic mixed into core flows
+  - platform abstractions over OS-specific branches in UI components
+- Local-first is acceptable. Hardcoded and brittle is not.
+- Build every layer so it can expand without requiring a rewrite of the surrounding system.
+
+## Brand Character
+
+- Tone: warm, precise, composed, premium, technically credible.
+- Avoid hype, jokes, slang, filler, and startup clichés.
+- Do not write UI copy that sounds synthetic, overly enthusiastic, or “AI assistant” generic.
+- Microcopy must be concise and professional.
+- Good copy feels authored by a serious product team, not generated.
+
+## Writing Rules
+
+- Prefer direct labels such as `Models`, `Knowledge`, `Settings`, `New Conversation`, `Pull Model`, `Connect Provider`.
+- Error and warning text must be calm, specific, and actionable.
+- Avoid vague statements like `Something went wrong`.
+- Prefer:
+  - `Unable to pull the selected model. Check the provider connection and try again.`
+  - `SupraChat can make mistakes. Verify important information.`
+- Avoid exclamation marks in product UI unless there is a very strong reason.
+- Avoid anthropomorphic assistant language unless the product explicitly calls for it.
+
+## Visual Direction
+
+- The product aesthetic is inspired by the provided warm/light and dark palettes.
+- The UI should feel similar in refinement to Claude-class desktop software, without directly copying it.
+- Use **glassmorphism** and **frosted glass** selectively.
+- Blur should communicate depth and softness, not novelty.
+- Do not apply heavy blur to every surface. It must not become a gimmick.
+- Maintain strong legibility and separation between layers.
+- Dark mode must not drift into a cold blue-tinted aesthetic.
+- The dark theme should feel lively, premium, and grounded in warm grey and charcoal surfaces rather than dead black or blue-heavy panels.
+
+## Color System
+
+Implement the design system with semantic tokens first, then map tokens to theme values.
+Do not hardcode palette values throughout components when a token can be used instead.
+
+### Dark Theme Reference
+
+- `--background`: `#171511`
+- `--surface`: `#1F1C18`
+- `--surface-elevated`: `#26231E`
+- `--text-primary`: `#F7F4EF`
+- `--text-secondary`: `#A89F91`
+- `--border`: `#2F2B24`
+- `--accent-primary`: `#D4A15D`
+- `--accent-light`: `#E8CFA4`
+- `--accent-hover`: `#C18A4A`
+- `--highlight`: `#3A332A`
+- `--success`: `#6E8B74`
+- `--warning`: `#D09B4C`
+- `--error`: `#C16A5A`
+- `--info`: `#5B7DA8`
+
+### Light Theme Reference
+
+- `--background`: `#F7F3EE`
+- `--surface`: `#FFFDF9`
+- `--text-primary`: `#2A2522`
+- `--text-secondary`: `#6E655D`
+- `--border`: `#E4DDD5`
+- `--accent-primary`: `#C49A6C`
+- `--accent-light`: `#F1E6D2`
+- `--accent-hover`: `#B88B59`
+- `--highlight`: `#E9D7C3`
+- `--success`: `#6E8B74`
+- `--warning`: `#C4873A`
+- `--error`: `#B85C4A`
+
+### Color Usage Rules
+
+- Accent color is warm gold/caramel, not neon orange.
+- Success should remain muted and botanical, not bright green.
+- Warning and error should stay sophisticated and softened, never saturated dashboard colors.
+- Preserve low-glare contrast in dark mode.
+- Avoid introducing unrelated accent families, especially purple-heavy defaults.
+- Do not ship a dark theme built around blue-black surfaces unless a feature explicitly requires a distinct informational state.
+- Dark surfaces should stay in the warm grey / charcoal family and retain enough tonal variation to feel alive.
+- All colors must be tokenized. Do not spread raw hex values across component files unless defining the canonical theme tokens themselves.
+
+## Typography
+
+Preferred font direction:
+
+- UI sans: `Geist`, `Manrope`, or `Sora`
+- AI longform/output serif: a readable editorial serif used selectively for response content
+
+Typography rules:
+
+- Use sans for navigation, controls, settings, metadata, and dense UI.
+- Use the serif only where it improves reading quality, especially model output or long responses.
+- Do not overuse the serif in dashboards, forms, menus, or toolbars.
+- Typography should feel compact and polished, not oversized or airy for its own sake.
+- Avoid default system-looking stacks when a project font is available.
+
+## Layout Principles
+
+- Build for desktop first, but keep layouts responsive and stable on smaller widths.
+- The app should support three common zones cleanly:
+  - navigation/sidebar
+  - primary conversation or work surface
+  - secondary inspector/settings/provider panel
+- Preserve visual hierarchy with restrained borders, soft elevation, and deliberate spacing.
+- Favor compact controls and dense but readable information layouts.
+- Avoid empty decorative space that does not improve comprehension.
+
+## Glass and Surface Rules
+
+- Use frosted or blurred surfaces for elevated panels, drawers, modals, overlays, and selected side panels.
+- Base surfaces can remain mostly solid when clarity is more important than atmosphere.
+- Combine blur with translucent fills and subtle borders.
+- Preferred borders are low-contrast and warm.
+- Shadows should be soft and diffused, not glossy or game-like.
+- If a surface becomes harder to read because of blur, reduce the effect immediately.
+
+## Motion Rules
+
+- Motion should feel continuous, quiet, and high-confidence.
+- Motion must feel smooth in both timing and spatial continuity.
+- Preferred easing: `ease-out` and `ease-in-out`.
+- Add a small, tasteful end bounce only where it creates a natural physical finish.
+- Do not bounce everything.
+- Prioritize transition continuity between panel changes, composer expansion, message entry, hover states, dropdowns, and route-level state changes.
+- Avoid abrupt opacity pops when a subtle slide or blur transition would read better.
+- Motion should support focus, not call attention to itself.
+- Animation durations and easing curves should come from shared motion tokens, not ad hoc per-component values.
+
+## Interaction Design
+
+- Controls should feel precise and tactile.
+- Hover, pressed, selected, and disabled states must be clearly differentiated.
+- Primary actions should use the warm accent and feel intentional.
+- Secondary actions should remain quiet but still legible.
+- Toggles, sliders, badges, menus, and model selectors should feel premium and consistent across themes.
+- Avoid generic default component styling when the brand system can be expressed more clearly.
+
+## Model and Provider UX
+
+- SupraLabs models are the default first-class experience.
+- Ollama and Unsloth integration should be explicit, reliable, and easy to understand.
+- Provider-specific capabilities, errors, and setup states should be surfaced clearly.
+- Model pulling, setup, execution, and status display must be understandable without exposing raw implementation detail to typical users.
+- When designing model controls, prefer language that communicates trust and operational clarity.
+
+## Cross-Platform Engineering Rules
+
+- Any OS-specific behavior must be abstracted behind a stable application interface.
+- Do not scatter raw shell commands, path assumptions, or provider execution details throughout the UI layer.
+- Keep platform differences isolated in dedicated service, adapter, or command modules.
+- Normalize:
+  - command invocation
+  - path handling
+  - model pull/install flows
+  - background process execution
+  - environment detection
+- When implementing model execution or provider setup, design once for Windows, macOS, and Linux rather than patching one-off fixes per platform.
+- Avoid requiring repeated manual code edits for each OS at compile time.
+- Backend flows should be extensible whether the runtime is local, bundled, or later moved behind a service boundary.
+
+## Frontend Implementation Rules
+
+- Use shared theme tokens, CSS variables, or equivalent primitives as the source of truth.
+- Reuse components and patterns rather than creating visually inconsistent one-off widgets.
+- shadcn/ui components should be customized to match SupraChat, not left in stock form.
+- Framer Motion should be used with restraint and purpose.
+- Zustand state should remain structured and domain-oriented, not dumped into a single global store.
+- Prefer explicit UI states for loading, empty, syncing, connected, installing, and failed conditions.
+- Do not hardcode colors, component sizes, radii, animation timings, or layout constants directly in feature components when a shared token or primitive should own them.
+- UI architecture should make theme expansion, provider expansion, and layout evolution straightforward.
+
+## Backend Implementation Rules
+
+- Do not hardcode provider behavior directly into route handlers or process entrypoints.
+- Separate transport, orchestration, provider integration, storage, and platform execution concerns.
+- Command execution, model pulling, provider discovery, and runtime configuration should be implemented through clear interfaces.
+- Treat local execution as one deployment mode, not as an excuse for tightly coupled architecture.
+- Storage schemas and API payloads should be designed to tolerate future providers, model metadata growth, and settings expansion.
+
+## Accessibility and Readability
+
+- Maintain readable contrast in both themes.
+- Ensure text remains legible over translucent or blurred surfaces.
+- Focus states must be visible and keyboard interaction must remain reliable.
+- Do not sacrifice usability for visual atmosphere.
+- Dense UI is acceptable; cramped UI is not.
+
+## What To Avoid
+
+- Do not make the app feel like a template SaaS dashboard.
+- Do not introduce bright blue/purple gradients that fight the warm SupraLabs palette.
+- Do not overuse blur, glow, or glass effects.
+- Do not write cheesy AI copy or overfriendly assistant messaging.
+- Do not make UI text verbose.
+- Do not implement OS-specific hacks directly inside React components when they belong in a platform layer.
+
+## Change Expectations For Agents
+
+When making changes in this repository:
+
+- Preserve the SupraLabs brand direction above.
+- Keep naming, text, spacing, motion, and component styling consistent with this guide.
+- If adding new colors, fonts, or motion patterns, they must fit this system and not dilute it.
+- Prefer incremental refinement over broad, inconsistent redesigns.
+- If a requested change conflicts with this document, ask for clarification before proceeding.

@@ -1,0 +1,22 @@
+
+> suprachat@0.1.0 dev
+> concurrently -k "npm:dev:ui" "npm:dev:electron"
+
+[dev:electron] 
+[dev:electron] > suprachat@0.1.0 dev:electron
+[dev:electron] > wait-on http://127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .
+[dev:electron] 
+[dev:ui] 
+[dev:ui] > suprachat@0.1.0 dev:ui
+[dev:ui] > vite --host 127.0.0.1
+[dev:ui] 
+[dev:ui] 
+[dev:ui]   [32m[1mVITE[22m v7.3.5[39m  [2mready in [0m[1m274[22m[2m[0m ms[22m
+[dev:ui] 
+[dev:ui]   [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/[39m
+[dev:electron] 
+[dev:electron] Node backend listening on http://127.0.0.1:3001
+[dev:electron] SupraChat Ollama model: qwen3.5:4b
+[dev:electron] npm run dev:electron exited with code 0
+--> Sending SIGTERM to other processes..
+[dev:ui] npm run dev:ui exited with code 1
