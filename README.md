@@ -1,5 +1,7 @@
+<div align="center">
+
 # SupraChat
-Try supported SupraLabs models inside SupraChat, plus more awesome tools.
 
+<img width="256" height="256" alt="FINAL_OHNE_TEXT" src="https://github.com/user-attachments/assets/1403120a-1c00-4ec5-aad0-a97040e3e55a" />
 
-(dont edit the readme for now. we are UNDER CONSTRUCTION!!!!)
+</div>
