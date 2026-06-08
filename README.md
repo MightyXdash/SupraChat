@@ -26,3 +26,7 @@
 ㅤ
 
 SupraChat is a professional, cross-platform client application engineered for the seamless deployment and evaluation of SupraLabs models. It provides robust integration with prominent machine learning frameworks and execution environments—such as Ollama and Unsloth—delivering a unified, high-performance interface for efficient model orchestration.
+
+
+_placeholder image_
+<img width="2559" height="1439" alt="image" src="https://github.com/user-attachments/assets/0f334602-425d-470a-8c8c-201aec755d23" />
