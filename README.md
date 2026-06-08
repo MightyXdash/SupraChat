@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="https://huggingface.co/spaces/SupraLabs/Instruct-Demo"><img src="https://img.shields.io/badge/💬%20Demo-Instruct-10B981?labelColor=3A3A3A&color=10B981" alt="Instruct Demo"></a>
+  <a href="https://huggingface.co/spaces/SupraLabs/Supra-50M-Instruct"><img src="https://img.shields.io/badge/💬%20Demo-Instruct-10B981?labelColor=3A3A3A&color=10B981" alt="Instruct Demo"></a>
   <a href="https://huggingface.co/spaces/SupraLabs/Supra-50M-Reasoning-Demo"><img src="https://img.shields.io/badge/🧪%20Demo-Reasoning-00A8E8?labelColor=3A3A3A&color=00A8E8" alt="Reasoning Demo"></a>
   <a href="https://huggingface.co/spaces/SupraLabs/Blog"><img src="https://img.shields.io/badge/📰%20SupraLabs-Blog-F97316?labelColor=3A3A3A&color=F97316" alt="SupraLabs Blog"></a>
   <a href="https://huggingface.co/spaces/SupraLabs/Research"><img src="https://img.shields.io/badge/🔬%20SupraLabs-Research-E11D48?labelColor=3A3A3A&color=E11D48" alt="SupraLabs Research"></a>
