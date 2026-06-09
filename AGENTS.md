@@ -17,6 +17,8 @@ The product should feel deliberate, premium, technically serious, and calm under
 
 - Do not hardcode product-critical values when they can be expressed as configuration, tokens, schemas, or reusable modules.
 - This applies to both frontend and backend code.
+- When adding a new feature, give it proper structure across its service, state, and UI layers instead of collapsing everything into one bloated file.
+- New feature work should be organized into focused modules with clear ownership so the codebase reads like a professional application, not a prototype.
 - Colors, spacing, radii, shadows, animation timings, provider labels, model metadata, feature flags, ports, file paths, command templates, and environment-specific behavior should have a defined source of truth.
 - Prefer:
   - theme tokens over inline color literals
@@ -50,6 +52,9 @@ The product should feel deliberate, premium, technically serious, and calm under
 
 - The product aesthetic is inspired by the provided warm/light and dark palettes.
 - The UI should feel similar in refinement to Claude-class desktop software, without directly copying it.
+- The interface must look professional, composed, and intentional at all times.
+- Do not make the product flashy. Restraint is a requirement, not a preference.
+- Minimalism is a critical rule: keep surfaces, controls, color usage, and composition disciplined and necessary.
 - Use **glassmorphism** and **frosted glass** selectively.
 - Blur should communicate depth and softness, not novelty.
 - Do not apply heavy blur to every surface. It must not become a gimmick.
@@ -123,12 +128,15 @@ Typography rules:
 ## Layout Principles
 
 - Build for desktop first, but keep layouts responsive and stable on smaller widths.
+- Every UI element should remain proportionally scaled across screen sizes and aspect ratios so the interface stays balanced rather than stretched, cramped, or oversized.
 - The app should support three common zones cleanly:
   - navigation/sidebar
   - primary conversation or work surface
   - secondary inspector/settings/provider panel
+- Establish clear visual hierarchy in every screen so attention naturally flows from primary actions and content to secondary controls and metadata.
 - Preserve visual hierarchy with restrained borders, soft elevation, and deliberate spacing.
 - Favor compact controls and dense but readable information layouts.
+- Keep layouts minimal and professional. Remove decorative or redundant elements that do not improve comprehension or task flow.
 - Avoid empty decorative space that does not improve comprehension.
 
 ## Glass and Surface Rules
@@ -188,6 +196,7 @@ Typography rules:
 
 - Use shared theme tokens, CSS variables, or equivalent primitives as the source of truth.
 - Reuse components and patterns rather than creating visually inconsistent one-off widgets.
+- When shipping a new feature, implement the UI in dedicated, organized files instead of letting feature logic, service logic, and rendering accumulate inside one oversized component.
 - shadcn/ui components should be customized to match SupraChat, not left in stock form.
 - Framer Motion should be used with restraint and purpose.
 - Zustand state should remain structured and domain-oriented, not dumped into a single global store.

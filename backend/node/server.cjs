@@ -106,7 +106,7 @@ function createServer() {
           stream: true,
           think: false,
         },
-        { responseType: "stream", timeout: 120_000 },
+        { responseType: "stream", timeout: 600_000 },
       )
 
       res.writeHead(200, {
@@ -117,6 +117,7 @@ function createServer() {
       })
 
       let buffer = ""
+      let providerCompleted = false
       response.data.on("data", (chunk) => {
         buffer += chunk.toString("utf8")
         const lines = buffer.split("\n")
@@ -130,6 +131,10 @@ function createServer() {
           try {
             const payload = JSON.parse(line)
             const content = payload?.message?.content
+
+            if (payload?.done === true) {
+              providerCompleted = true
+            }
 
             if (content) {
               res.write(content)
@@ -146,6 +151,10 @@ function createServer() {
             const payload = JSON.parse(buffer)
             const content = payload?.message?.content
 
+            if (payload?.done === true) {
+              providerCompleted = true
+            }
+
             if (content) {
               res.write(content)
             }
@@ -154,11 +163,16 @@ function createServer() {
           }
         }
 
+        if (!providerCompleted) {
+          res.destroy(new Error("Provider stream ended before completion."))
+          return
+        }
+
         res.end()
       })
 
       response.data.on("error", () => {
-        res.end()
+        res.destroy(new Error("Provider stream failed before completion."))
       })
     } catch (error) {
       const detail =
