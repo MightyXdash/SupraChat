@@ -79,10 +79,11 @@ button:disabled {
   align-items: center;
   gap: 0.75rem;
   border-radius: var(--radius-control);
-  padding: 0.7rem 0.85rem;
-  color: var(--text-secondary);
-  font-size: 0.92rem;
-  font-weight: 600;
+  padding: 0.55rem 0.65rem;
+  color: var(--text-primary);
+  font-size: 0.93rem;
+  font-weight: 500;
+  text-align: left;
   transition:
     background var(--motion-fast) ease-out,
     color var(--motion-fast) ease-out;
@@ -90,20 +91,24 @@ button:disabled {
 
 .nav-item:hover,
 .nav-item-active {
-  background: color-mix(in srgb, var(--highlight) 58%, transparent);
+  background: color-mix(in srgb, var(--highlight) 42%, transparent);
   color: var(--text-primary);
+}
+
+.nav-item svg {
+  color: var(--text-primary);
+  stroke-width: 1.9;
 }
 
 .conversation-link {
   display: flex;
   width: 100%;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
   border-radius: var(--radius-control);
-  padding: 0.65rem 0.75rem;
-  color: var(--text-secondary);
-  font-size: 0.88rem;
+  padding: 0.5rem 0.65rem;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  line-height: 1.35;
   text-align: left;
   transition:
     background var(--motion-fast) ease-out,
@@ -112,8 +117,44 @@ button:disabled {
 
 .conversation-link:hover,
 .conversation-link-active {
-  background: var(--surface-elevated);
+  background: color-mix(in srgb, var(--highlight) 34%, transparent);
   color: var(--text-primary);
+}
+
+.sidebar-icon-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+  display: inline-flex;
+  height: 1.9rem;
+  justify-content: center;
+  width: 1.9rem;
+  transition:
+    background var(--motion-fast) ease-out,
+    color var(--motion-fast) ease-out;
+}
+
+.sidebar-icon-button:hover {
+  background: color-mix(in srgb, var(--highlight) 38%, transparent);
+  color: var(--text-primary);
+}
+
+.sidebar-section {
+  margin-top: 1.35rem;
+}
+
+.sidebar-section:first-child {
+  margin-top: 0;
+}
+
+.sidebar-section-title {
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  font-weight: 700;
+  margin: 0 0 0.55rem;
+  padding: 0 0.65rem;
 }
 
 .status-card {
@@ -176,6 +217,44 @@ button:disabled {
   list-style: disc;
 }
 
+.markdown-rule {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+.markdown-table-wrap {
+  margin: 0.5rem 0 1rem;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.markdown-table {
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  min-width: 100%;
+}
+
+.markdown-table th,
+.markdown-table td {
+  border: 1px solid var(--border);
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-table th {
+  background: color-mix(in srgb, var(--highlight) 52%, transparent);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.markdown-table td {
+  background: color-mix(in srgb, var(--surface) 88%, var(--background));
+}
+
 .markdown-code {
   background: var(--surface-elevated);
   border: 1px solid var(--border);
@@ -215,6 +294,11 @@ button:disabled {
 
 .latex-expression-display {
   font-size: 1.12rem;
+}
+
+.latex-text {
+  font-family: var(--font-serif);
+  line-height: 1.2;
 }
 
 .latex-fraction {
