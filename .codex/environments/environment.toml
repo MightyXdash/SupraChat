@@ -8,4 +8,8 @@ script = ""
 [[actions]]
 name = "run"
 icon = "run"
-command = "npm run dev"
+command = '''
+source ~/.zprofile
+npm run dev
+'''
+platform = "darwin"

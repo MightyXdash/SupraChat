@@ -63,6 +63,387 @@ body {
   overflow: hidden;
 }
 
+.chat-workspace-header {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(18px) saturate(1.18);
+  -webkit-backdrop-filter: blur(18px) saturate(1.18);
+  display: flex;
+  gap: 1rem;
+  height: 4.35rem;
+  justify-content: space-between;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 20;
+}
+
+.chat-workspace-header::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent);
+  content: "";
+  inset: 0;
+  opacity: 0.7;
+  pointer-events: none;
+  position: absolute;
+}
+
+.chat-workspace-header::after {
+  background: rgba(255, 255, 255, 0.34);
+  bottom: 0;
+  content: "";
+  height: 1px;
+  left: 0;
+  position: absolute;
+  right: 0;
+}
+
+.chat-workspace-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.chat-workspace-report {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.chat-workspace-stat {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--text-secondary);
+  display: inline-flex;
+  gap: 0.32rem;
+  height: 1.5rem;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.chat-workspace-stat span {
+  color: var(--text-primary);
+  font-size: 0.76rem;
+  font-weight: 720;
+  line-height: 1;
+}
+
+.chat-workspace-stat small {
+  color: var(--text-secondary);
+  font-size: 0.64rem;
+  font-weight: 720;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.chat-token-usage-wrap {
+  position: relative;
+}
+
+.chat-token-usage-button {
+  align-items: center;
+  background: rgba(255, 253, 249, 0.34);
+  border: 1px solid rgba(123, 112, 101, 0.2);
+  border-radius: 999px;
+  color: var(--text-primary);
+  display: inline-flex;
+  gap: 0.42rem;
+  height: 2rem;
+  padding: 0 0.72rem 0 0.58rem;
+  transition:
+    background var(--motion-fast) ease-out,
+    border-color var(--motion-fast) ease-out,
+    transform var(--motion-fast) ease-out;
+  white-space: nowrap;
+}
+
+.chat-token-usage-button:hover,
+.chat-token-usage-button[aria-expanded="true"] {
+  background: rgba(255, 253, 249, 0.46);
+  border-color: rgba(123, 112, 101, 0.3);
+}
+
+.chat-token-usage-button:active {
+  transform: scale(0.98);
+}
+
+.chat-token-usage-button span:not(.chat-token-usage-dot, .chat-token-usage-meter, .chat-token-usage-meter span) {
+  font-size: 0.76rem;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.chat-token-usage-button small {
+  color: var(--text-secondary);
+  font-size: 0.64rem;
+  font-weight: 720;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.chat-token-usage-dot {
+  background: var(--success);
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 18%, transparent);
+  height: 0.48rem;
+  width: 0.48rem;
+}
+
+.chat-token-usage-button[data-state="warning"] .chat-token-usage-dot {
+  background: var(--warning);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 18%, transparent);
+}
+
+.chat-token-usage-button[data-state="danger"] .chat-token-usage-dot {
+  background: var(--error);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--error) 18%, transparent);
+}
+
+.chat-token-usage-meter {
+  background: rgba(143, 131, 120, 0.16);
+  border-radius: 999px;
+  height: 0.28rem;
+  overflow: hidden;
+  width: 2.8rem;
+}
+
+.chat-token-usage-meter span {
+  background: var(--success);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  min-width: 0.18rem;
+}
+
+.chat-token-usage-button[data-state="warning"] .chat-token-usage-meter span {
+  background: var(--warning);
+}
+
+.chat-token-usage-button[data-state="danger"] .chat-token-usage-meter span {
+  background: var(--error);
+}
+
+.chat-token-popover-layer {
+  pointer-events: none;
+  position: absolute;
+  right: 1.25rem;
+  top: 4.85rem;
+  z-index: 40;
+}
+
+.chat-token-popover {
+  background: rgba(255, 255, 255, 0.36);
+  backdrop-filter: blur(10px) saturate(1.12);
+  -webkit-backdrop-filter: blur(10px) saturate(1.12);
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  border-radius: 22px;
+  box-shadow:
+    0 34px 76px rgba(52, 39, 28, 0.2),
+    0 12px 28px rgba(52, 39, 28, 0.12),
+    0 0 0 1px rgba(255, 255, 255, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.68);
+  min-width: 21rem;
+  overflow: hidden;
+  padding: 1rem;
+  pointer-events: auto;
+  position: relative;
+  transform-origin: top right;
+}
+
+.chat-token-popover::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 42%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.chat-token-popover > * {
+  position: relative;
+}
+
+.chat-token-popover-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.chat-token-popover-header p {
+  font-size: 0.92rem;
+  font-weight: 780;
+  margin: 0;
+}
+
+.chat-token-popover-header span {
+  color: var(--text-secondary);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 650;
+  margin-top: 0.22rem;
+}
+
+.chat-token-popover-header strong {
+  font-size: 1rem;
+}
+
+.chat-token-visual {
+  align-items: center;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  margin-top: 1rem;
+}
+
+.chat-token-ring {
+  align-items: center;
+  background:
+    conic-gradient(
+      #78927f 0 var(--system-angle),
+      #c0a15a var(--system-angle) var(--user-angle),
+      #7f79c8 var(--user-angle) var(--assistant-angle),
+      rgba(143, 131, 120, 0.13) var(--assistant-angle) 360deg
+    );
+  border-radius: 999px;
+  display: flex;
+  flex-direction: column;
+  height: 6.6rem;
+  justify-content: center;
+  position: relative;
+  width: 6.6rem;
+}
+
+.chat-token-ring::before {
+  background: rgba(255, 253, 249, 0.38);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 999px;
+  content: "";
+  inset: 0.78rem;
+  position: absolute;
+}
+
+.chat-token-ring strong,
+.chat-token-ring span {
+  position: relative;
+}
+
+.chat-token-ring strong {
+  font-size: 1.04rem;
+  line-height: 1;
+}
+
+.chat-token-ring span {
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+  font-weight: 760;
+  letter-spacing: 0.06em;
+  margin-top: 0.18rem;
+  text-transform: uppercase;
+}
+
+.chat-token-breakdown {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.chat-token-row {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.18rem 0;
+}
+
+.chat-token-row span {
+  align-items: center;
+  color: var(--text-secondary);
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 680;
+  gap: 0.45rem;
+}
+
+.chat-token-row i {
+  background: #78927f;
+  border-radius: 999px;
+  height: 0.54rem;
+  width: 0.54rem;
+}
+
+.chat-token-row[data-kind="user"] i {
+  background: #c0a15a;
+}
+
+.chat-token-row[data-kind="assistant"] i {
+  background: #7f79c8;
+}
+
+.chat-token-row strong {
+  font-size: 0.82rem;
+}
+
+.chat-token-row-total {
+  border-top: 1px solid rgba(123, 112, 101, 0.14);
+  margin-top: 0.9rem;
+  padding-top: 0.72rem;
+}
+
+.chat-token-note {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.45;
+  margin: 0.75rem 0 0;
+}
+
+@media (max-width: 780px) {
+  .chat-workspace-header {
+    align-items: flex-start;
+    flex-direction: column;
+    height: auto;
+    padding-bottom: 0.8rem;
+    padding-top: 0.8rem;
+  }
+
+  .chat-workspace-report {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .chat-workspace-stat {
+    height: 1.85rem;
+    padding: 0 0.6rem;
+  }
+
+  .chat-token-popover {
+    min-width: min(19rem, calc(100vw - 2rem));
+  }
+
+  .chat-token-popover-layer {
+    left: 1rem;
+    right: 1rem;
+  }
+
+  .chat-token-visual {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .chat-token-breakdown {
+    width: 100%;
+  }
+}
+
 .chat-composer {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 251, 247, 0.58)),

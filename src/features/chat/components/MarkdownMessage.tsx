@@ -29,7 +29,9 @@ const greekSymbols: Record<string, string> = {
 
 const latexSymbols: Record<string, string> = {
   ...greekSymbols,
+  ast: "*",
   cdot: "·",
+  degree: "°",
   times: "×",
   div: "÷",
   pm: "±",
@@ -45,6 +47,28 @@ const latexSymbols: Record<string, string> = {
 
 function renderText(source: string): ReactNode[] {
   return source ? [source] : []
+}
+
+function normalizeMarkdownSource(source: string) {
+  return source
+    .replace(/^(\s*#{1,6})(?=\S)/gm, "$1 ")
+    .replace(/^(\s*#{1,6}\s+)#{1,6}\s+/gm, "$1")
+    .replace(/\\\$/g, "$")
+}
+
+function parseHeading(line: string) {
+  const heading = /^(#{1,6})\s+(.+)$/.exec(line.trimStart())
+
+  if (!heading) {
+    return null
+  }
+
+  heading[2] = heading[2].replace(/^#{1,6}\s+/, "")
+  return heading
+}
+
+function isHeadingLine(line: string) {
+  return parseHeading(line) !== null
 }
 
 function readLatexGroup(source: string, startIndex: number) {
@@ -181,6 +205,52 @@ function MathExpression({ display = false, source }: { display?: boolean; source
   )
 }
 
+function renderPlainChemistry(source: string, offset: number): ReactNode[] {
+  const nodes: ReactNode[] = []
+  const pattern = /\b(?:[A-Z][a-z]?\d*){2,}\b/g
+  let cursor = 0
+  let match: RegExpExecArray | null
+
+  while ((match = pattern.exec(source))) {
+    if (match.index > cursor) {
+      nodes.push(source.slice(cursor, match.index))
+    }
+
+    const formula = match[0]
+    const formulaNodes: ReactNode[] = []
+
+    for (let index = 0; index < formula.length; index += 1) {
+      const character = formula[index]
+
+      if (/\d/.test(character)) {
+        let digits = character
+
+        while (index + 1 < formula.length && /\d/.test(formula[index + 1])) {
+          digits += formula[index + 1]
+          index += 1
+        }
+
+        formulaNodes.push(<sub key={`chem-sub-${offset + match.index}-${index}`}>{digits}</sub>)
+      } else {
+        formulaNodes.push(character)
+      }
+    }
+
+    nodes.push(
+      <span className="latex-expression" key={`chem-${offset + match.index}`}>
+        {formulaNodes}
+      </span>,
+    )
+    cursor = match.index + formula.length
+  }
+
+  if (cursor < source.length) {
+    nodes.push(source.slice(cursor))
+  }
+
+  return nodes
+}
+
 function renderInlineMarkdown(source: string, offset: number): ReactNode[] {
   const nodes: ReactNode[] = []
   const pattern = /(<br\s*\/?>|`[^`]+`|\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\$[^$\n]+\$|\\\([^)]+\\\)|\*\*[^*]+\*\*|\*[^*]+\*)/gi
@@ -189,7 +259,7 @@ function renderInlineMarkdown(source: string, offset: number): ReactNode[] {
 
   while ((match = pattern.exec(source))) {
     if (match.index > cursor) {
-      nodes.push(...renderText(source.slice(cursor, match.index)))
+      nodes.push(...renderPlainChemistry(source.slice(cursor, match.index), offset + cursor))
     }
 
     const token = match[0]
@@ -214,13 +284,13 @@ function renderInlineMarkdown(source: string, offset: number): ReactNode[] {
     } else if (token.startsWith("**")) {
       nodes.push(
         <strong key={`strong-${tokenOffset}`}>
-          {renderText(token.slice(2, -2))}
+          {renderInlineMarkdown(token.slice(2, -2), tokenOffset + 2)}
         </strong>,
       )
     } else {
       nodes.push(
         <em key={`em-${tokenOffset}`}>
-          {renderText(token.slice(1, -1))}
+          {renderInlineMarkdown(token.slice(1, -1), tokenOffset + 1)}
         </em>,
       )
     }
@@ -229,7 +299,7 @@ function renderInlineMarkdown(source: string, offset: number): ReactNode[] {
   }
 
   if (cursor < source.length) {
-    nodes.push(...renderText(source.slice(cursor)))
+    nodes.push(...renderPlainChemistry(source.slice(cursor), offset + cursor))
   }
 
   return nodes
@@ -305,7 +375,8 @@ export function MarkdownMessage({ content }: { content: string }) {
   const [closingTableMenu, setClosingTableMenu] = useState<string | null>(null)
   const closeTimeoutRef = useRef<number | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
-  const lines = content.split("\n")
+  const normalizedContent = normalizeMarkdownSource(content)
+  const lines = normalizedContent.split("\n")
   const blocks: ReactNode[] = []
   let lineIndex = 0
   let offset = 0
@@ -430,7 +501,7 @@ export function MarkdownMessage({ content }: { content: string }) {
       continue
     }
 
-    const heading = /^(#{1,6})\s+(.+)$/.exec(line)
+    const heading = parseHeading(line)
     if (heading) {
       const HeadingTag = `h${Math.min(heading[1].length, 3)}` as "h1" | "h2" | "h3"
       blocks.push(
@@ -637,7 +708,7 @@ export function MarkdownMessage({ content }: { content: string }) {
             if (
               !followingLine ||
               isOrderedListItem(followingLine) ||
-              /^(#{1,6})\s+/.test(followingLine) ||
+              isHeadingLine(followingLine) ||
               /^\s*---+\s*$/.test(followingLine) ||
               /^\s*```/.test(followingLine) ||
               isTableStart(lines, lineIndex) ||
@@ -655,7 +726,7 @@ export function MarkdownMessage({ content }: { content: string }) {
 
           if (
             isOrderedListItem(nextLine) ||
-            /^(#{1,6})\s+/.test(nextLine) ||
+            isHeadingLine(nextLine) ||
             /^\s*---+\s*$/.test(nextLine) ||
             /^\s*```/.test(nextLine) ||
             isTableStart(lines, lineIndex) ||
@@ -672,7 +743,7 @@ export function MarkdownMessage({ content }: { content: string }) {
             lineIndex < lines.length &&
             lines[lineIndex].trim() &&
             !isOrderedListItem(lines[lineIndex]) &&
-            !/^(#{1,6})\s+/.test(lines[lineIndex]) &&
+            !isHeadingLine(lines[lineIndex]) &&
             !/^\s*---+\s*$/.test(lines[lineIndex]) &&
             !/^\s*```/.test(lines[lineIndex]) &&
             !isTableStart(lines, lineIndex) &&
@@ -708,7 +779,7 @@ export function MarkdownMessage({ content }: { content: string }) {
     while (
       lineIndex < lines.length &&
       lines[lineIndex].trim() &&
-      !/^(#{1,6})\s+/.test(lines[lineIndex]) &&
+      !isHeadingLine(lines[lineIndex]) &&
       !/^\s*---+\s*$/.test(lines[lineIndex]) &&
       !/^\s*```/.test(lines[lineIndex]) &&
       !isTableStart(lines, lineIndex) &&

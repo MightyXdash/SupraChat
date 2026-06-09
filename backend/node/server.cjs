@@ -3,7 +3,7 @@ const Database = require("better-sqlite3")
 const axios = require("axios")
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434"
-const CHAT_MODEL = process.env.SUPRACHAT_OLLAMA_MODEL ?? "qwen3.5:4b"
+const CHAT_MODEL = process.env.SUPRACHAT_OLLAMA_MODEL ?? "gemma4:e2b-mlx"
 const PORT = Number(process.env.SUPRACHAT_NODE_PORT ?? 3001)
 const ALLOWED_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173", "null"])
 let serverInstance = null
