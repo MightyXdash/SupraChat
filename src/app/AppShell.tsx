@@ -7,6 +7,7 @@ import { useAutoScroll } from "@/features/chat/hooks/useAutoScroll"
 
 export function AppShell() {
   const [draft, setDraft] = useState("")
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true)
   const scrollRef = useAutoScroll()
   const conversations = useChatStore((state) => state.conversations)
   const activeConversationId = useChatStore((state) => state.activeConversationId)
@@ -33,12 +34,19 @@ export function AppShell() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[var(--background)] text-[var(--text-primary)]">
-      <div className="grid h-screen grid-cols-[280px_minmax(0,1fr)_300px] gap-0 max-[1080px]:grid-cols-[240px_minmax(0,1fr)] max-[780px]:grid-cols-1">
+      <div
+        className="app-shell-grid grid h-screen gap-0 max-[780px]:grid-cols-1"
+        style={{
+          ["--sidebar-width" as "--sidebar-width"]: isSidebarCollapsed ? "72px" : "280px",
+        }}
+      >
         <AppSidebar
           activeConversationId={activeConversationId}
+          collapsed={isSidebarCollapsed}
           conversations={conversations}
           onCreateConversation={createConversation}
           onSelectConversation={setActiveConversation}
+          onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
         />
         <ChatWorkspace
           conversation={activeConversation}

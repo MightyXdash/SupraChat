@@ -28,7 +28,7 @@ export function ChatWorkspace({
   const hasMessages = Boolean(conversation && conversation.messages.length > 0)
 
   return (
-    <section className="flex min-h-0 flex-col bg-[var(--surface)]">
+    <section className="relative flex min-h-0 flex-col bg-[var(--surface)]">
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--border)] px-5">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{conversation?.title}</p>
@@ -36,7 +36,10 @@ export function ChatWorkspace({
         </div>
       </header>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-6 py-8 max-[780px]:px-4">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto px-6 pb-40 pt-8 max-[780px]:px-4 max-[780px]:pb-36"
+      >
         {hasMessages ? (
           <div className="mx-auto flex max-w-3xl flex-col gap-5">
             <AnimatePresence>
@@ -54,13 +57,15 @@ export function ChatWorkspace({
         )}
       </div>
 
-      <ChatComposer
-        draft={draft}
-        error={error}
-        isGenerating={isGenerating}
-        onDraftChange={onDraftChange}
-        onSubmit={onSubmit}
-      />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-5">
+        <ChatComposer
+          draft={draft}
+          error={error}
+          isGenerating={isGenerating}
+          onDraftChange={onDraftChange}
+          onSubmit={onSubmit}
+        />
+      </div>
     </section>
   )
 }

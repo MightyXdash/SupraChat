@@ -1,4 +1,5 @@
-import { ReactNode } from "react"
+import { ReactNode, useEffect, useRef, useState } from "react"
+import { Copy, Download, Ellipsis } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const greekSymbols: Record<string, string> = {
@@ -243,29 +244,136 @@ function splitTableRow(line: string) {
     .map((cell) => cell.trim())
 }
 
+function normalizeTableCells(cells: string[], columnCount: number) {
+  if (cells.length === columnCount) {
+    return cells
+  }
+
+  if (cells.length < columnCount) {
+    return [...cells, ...Array.from({ length: columnCount - cells.length }, () => "")]
+  }
+
+  return [...cells.slice(0, columnCount - 1), cells.slice(columnCount - 1).join(" | ")]
+}
+
+function isTableRow(line: string) {
+  const cells = splitTableRow(line)
+
+  return line.includes("|") && cells.length > 1 && cells.some((cell) => cell.length > 0)
+}
+
+function isDelimitedTableRow(line: string) {
+  const trimmedLine = line.trim()
+
+  return trimmedLine.startsWith("|") && trimmedLine.endsWith("|") && isTableRow(line)
+}
+
 function isTableSeparator(line: string) {
   const cells = splitTableRow(line)
 
-  return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell))
+  return cells.length > 1 && cells.every((cell) => /^:?-{2,}:?$/.test(cell))
 }
 
 function isTableStart(lines: string[], index: number) {
   const line = lines[index]
   const nextLine = lines[index + 1]
 
-  return Boolean(
-    line?.includes("|") &&
-      nextLine &&
-      isTableSeparator(nextLine) &&
-      splitTableRow(line).length === splitTableRow(nextLine).length,
-  )
+  if (!line || !nextLine || !isTableRow(line)) {
+    return false
+  }
+
+  if (isTableSeparator(nextLine)) {
+    const headerCellCount = splitTableRow(line).length
+    const separatorCellCount = splitTableRow(nextLine).length
+
+    return separatorCellCount >= Math.min(headerCellCount, 2)
+  }
+
+  return isDelimitedTableRow(line) && isDelimitedTableRow(nextLine)
+}
+
+function isOrderedListItem(line: string) {
+  return /^\s*\d+\.\s+/.test(line)
+}
+
+function isUnorderedListItem(line: string) {
+  return /^\s*[-*]\s+/.test(line)
 }
 
 export function MarkdownMessage({ content }: { content: string }) {
+  const [openTableMenu, setOpenTableMenu] = useState<string | null>(null)
+  const [closingTableMenu, setClosingTableMenu] = useState<string | null>(null)
+  const closeTimeoutRef = useRef<number | null>(null)
+  const rootRef = useRef<HTMLDivElement | null>(null)
   const lines = content.split("\n")
   const blocks: ReactNode[] = []
   let lineIndex = 0
   let offset = 0
+
+  useEffect(() => {
+    setOpenTableMenu(null)
+    setClosingTableMenu(null)
+  }, [content])
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        window.clearTimeout(closeTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  function closeMenu(menuKey: string) {
+    setClosingTableMenu(menuKey)
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setOpenTableMenu((current) => (current === menuKey ? null : current))
+      setClosingTableMenu((current) => (current === menuKey ? null : current))
+      closeTimeoutRef.current = null
+    }, 200)
+  }
+
+  useEffect(() => {
+    if (!openTableMenu) {
+      return
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        closeMenu(openTableMenu)
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown)
+
+    return () => window.removeEventListener("pointerdown", handlePointerDown)
+  }, [openTableMenu])
+
+  async function copyTableMarkdown(markdown: string) {
+    try {
+      await navigator.clipboard.writeText(markdown)
+      if (openTableMenu) {
+        closeMenu(openTableMenu)
+      }
+    } catch {
+      // Silently ignore clipboard failures for now.
+    }
+  }
+
+  function downloadTableMarkdown(markdown: string, key: string) {
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+
+    link.href = url
+    link.download = `table-${key}.md`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    if (openTableMenu) {
+      closeMenu(openTableMenu)
+    }
+  }
 
   while (lineIndex < lines.length) {
     const line = lines[lineIndex]
@@ -291,6 +399,37 @@ export function MarkdownMessage({ content }: { content: string }) {
       continue
     }
 
+    const codeFence = /^\s*```([\w-]+)?\s*$/.exec(line)
+    if (codeFence) {
+      const language = codeFence[1]?.trim()
+      const codeOffset = currentOffset
+      const codeLines: string[] = []
+
+      lineIndex += 1
+      offset += line.length + 1
+
+      while (lineIndex < lines.length && !/^\s*```\s*$/.test(lines[lineIndex])) {
+        codeLines.push(lines[lineIndex])
+        offset += lines[lineIndex].length + 1
+        lineIndex += 1
+      }
+
+      if (lineIndex < lines.length) {
+        offset += lines[lineIndex].length + 1
+        lineIndex += 1
+      }
+
+      blocks.push(
+        <div className="markdown-code-block" key={`codeblock-${codeOffset}`}>
+          {language ? <div className="markdown-code-block-label">{language}</div> : null}
+          <pre className="markdown-code-block-pre">
+            <code>{codeLines.join("\n")}</code>
+          </pre>
+        </div>,
+      )
+      continue
+    }
+
     const heading = /^(#{1,6})\s+(.+)$/.exec(line)
     if (heading) {
       const HeadingTag = `h${Math.min(heading[1].length, 3)}` as "h1" | "h2" | "h3"
@@ -306,43 +445,110 @@ export function MarkdownMessage({ content }: { content: string }) {
 
     if (isTableStart(lines, lineIndex)) {
       const header = splitTableRow(line)
+      const columnCount = header.length
       const tableOffset = currentOffset
       const rows: { cells: string[]; offset: number }[] = []
+      const tableLines = [line]
 
       offset += line.length + 1
-      lineIndex += 2
-      offset += lines[lineIndex - 1].length + 1
 
-      while (lineIndex < lines.length && lines[lineIndex].includes("|") && lines[lineIndex].trim()) {
-        rows.push({ cells: splitTableRow(lines[lineIndex]), offset })
+      const separatorLine = lines[lineIndex + 1]
+      if (separatorLine && isTableSeparator(separatorLine)) {
+        tableLines.push(separatorLine)
+        lineIndex += 2
+        offset += separatorLine.length + 1
+      } else {
+        lineIndex += 1
+      }
+
+      while (lineIndex < lines.length && isTableRow(lines[lineIndex])) {
+        tableLines.push(lines[lineIndex])
+        rows.push({ cells: normalizeTableCells(splitTableRow(lines[lineIndex]), columnCount), offset })
         offset += lines[lineIndex].length + 1
         lineIndex += 1
       }
 
+      const tableMarkdown = tableLines.join("\n")
+      const tableMenuKey = `table-${tableOffset}`
+
       blocks.push(
-        <div className="markdown-table-wrap" key={`table-${tableOffset}`}>
-          <table className="markdown-table">
-            <thead>
-              <tr>
-                {header.map((cell, cellIndex) => (
-                  <th key={`th-${tableOffset}-${cellIndex}`}>
-                    {renderInlineMarkdown(cell, tableOffset + cellIndex)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={`tr-${row.offset}`}>
-                  {header.map((_, cellIndex) => (
-                    <td key={`td-${row.offset}-${cellIndex}`}>
-                      {renderInlineMarkdown(row.cells[cellIndex] ?? "", row.offset + cellIndex)}
-                    </td>
+        <div className="markdown-table-block" key={`table-${tableOffset}`}>
+          <div className="markdown-table-wrap">
+            <table className="markdown-table">
+              <thead>
+                <tr>
+                  {header.map((cell, cellIndex) => (
+                    <th key={`th-${tableOffset}-${cellIndex}`}>
+                      {renderInlineMarkdown(cell, tableOffset + cellIndex)}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={`tr-${row.offset}`}>
+                    {header.map((_, cellIndex) => (
+                      <td key={`td-${row.offset}-${cellIndex}`}>
+                        {renderInlineMarkdown(row.cells[cellIndex] ?? "", row.offset + cellIndex)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="markdown-table-actions">
+            <button
+              aria-expanded={openTableMenu === tableMenuKey}
+              aria-haspopup="menu"
+              className="markdown-table-menu-trigger"
+              type="button"
+              onClick={() => {
+                if (openTableMenu === tableMenuKey) {
+                  closeMenu(tableMenuKey)
+                  return
+                }
+
+                if (closeTimeoutRef.current) {
+                  window.clearTimeout(closeTimeoutRef.current)
+                  closeTimeoutRef.current = null
+                }
+
+                setClosingTableMenu(null)
+                setOpenTableMenu(tableMenuKey)
+              }}
+            >
+              <Ellipsis className="h-4 w-4" />
+            </button>
+            {openTableMenu === tableMenuKey || closingTableMenu === tableMenuKey ? (
+              <div
+                className={cn(
+                  "markdown-table-menu",
+                  closingTableMenu === tableMenuKey && "markdown-table-menu-closing",
+                )}
+                role="menu"
+              >
+                <button
+                  className="markdown-table-menu-item"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => downloadTableMarkdown(tableMarkdown, `${tableOffset}`)}
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Download as markdown</span>
+                </button>
+                <button
+                  className="markdown-table-menu-item"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => void copyTableMarkdown(tableMarkdown)}
+                >
+                  <Copy className="h-4 w-4" />
+                  <span>Copy to clipboard</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>,
       )
       continue
@@ -380,10 +586,10 @@ export function MarkdownMessage({ content }: { content: string }) {
       continue
     }
 
-    if (/^\s*[-*]\s+/.test(line)) {
+    if (isUnorderedListItem(line)) {
       const items: ReactNode[] = []
 
-      while (lineIndex < lines.length && /^\s*[-*]\s+/.test(lines[lineIndex])) {
+      while (lineIndex < lines.length && isUnorderedListItem(lines[lineIndex])) {
         const item = lines[lineIndex]
         const marker = item.match(/^\s*[-*]\s+/)?.[0] ?? ""
 
@@ -404,24 +610,92 @@ export function MarkdownMessage({ content }: { content: string }) {
       continue
     }
 
-    if (/^\s*\d+\.\s+/.test(line)) {
+    if (isOrderedListItem(line)) {
       const items: ReactNode[] = []
+      const start = Number.parseInt(line.match(/^\s*(\d+)\./)?.[1] ?? "1", 10)
 
-      while (lineIndex < lines.length && /^\s*\d+\.\s+/.test(lines[lineIndex])) {
+      while (lineIndex < lines.length && isOrderedListItem(lines[lineIndex])) {
         const item = lines[lineIndex]
         const marker = item.match(/^\s*\d+\.\s+/)?.[0] ?? ""
+        const itemOffset = offset
+        const itemBlocks: ReactNode[] = [
+          <div key={`oli-title-${itemOffset}`}>{renderInlineMarkdown(item.slice(marker.length), offset + marker.length)}</div>,
+        ]
 
-        items.push(
-          <li key={`oli-${offset}`}>
-            {renderInlineMarkdown(item.slice(marker.length), offset + marker.length)}
-          </li>,
-        )
         offset += item.length + 1
         lineIndex += 1
+
+        while (lineIndex < lines.length) {
+          const nextLine = lines[lineIndex]
+
+          if (!nextLine.trim()) {
+            const followingLine = lines[lineIndex + 1]
+
+            offset += nextLine.length + 1
+            lineIndex += 1
+
+            if (
+              !followingLine ||
+              isOrderedListItem(followingLine) ||
+              /^(#{1,6})\s+/.test(followingLine) ||
+              /^\s*---+\s*$/.test(followingLine) ||
+              /^\s*```/.test(followingLine) ||
+              isTableStart(lines, lineIndex) ||
+              isUnorderedListItem(followingLine) ||
+              /^\s*>\s+/.test(followingLine)
+            ) {
+              break
+            }
+
+            itemBlocks.push(
+              <div aria-hidden="true" className="markdown-spacer" key={`oli-space-${offset}`} />,
+            )
+            continue
+          }
+
+          if (
+            isOrderedListItem(nextLine) ||
+            /^(#{1,6})\s+/.test(nextLine) ||
+            /^\s*---+\s*$/.test(nextLine) ||
+            /^\s*```/.test(nextLine) ||
+            isTableStart(lines, lineIndex) ||
+            isUnorderedListItem(nextLine) ||
+            /^\s*>\s+/.test(nextLine)
+          ) {
+            break
+          }
+
+          const paragraphLines: string[] = []
+          const paragraphOffset = offset
+
+          while (
+            lineIndex < lines.length &&
+            lines[lineIndex].trim() &&
+            !isOrderedListItem(lines[lineIndex]) &&
+            !/^(#{1,6})\s+/.test(lines[lineIndex]) &&
+            !/^\s*---+\s*$/.test(lines[lineIndex]) &&
+            !/^\s*```/.test(lines[lineIndex]) &&
+            !isTableStart(lines, lineIndex) &&
+            !isUnorderedListItem(lines[lineIndex]) &&
+            !/^\s*>\s+/.test(lines[lineIndex])
+          ) {
+            paragraphLines.push(lines[lineIndex])
+            offset += lines[lineIndex].length + 1
+            lineIndex += 1
+          }
+
+          itemBlocks.push(
+            <p className="markdown-paragraph" key={`oli-paragraph-${paragraphOffset}`}>
+              {renderInlineMarkdown(paragraphLines.join("\n"), paragraphOffset)}
+            </p>,
+          )
+        }
+
+        items.push(<li key={`oli-${itemOffset}`}>{itemBlocks}</li>)
       }
 
       blocks.push(
-        <ol className="markdown-list markdown-list-ordered" key={`ol-${currentOffset}`}>
+        <ol className="markdown-list markdown-list-ordered" key={`ol-${currentOffset}`} start={start}>
           {items}
         </ol>,
       )
@@ -436,9 +710,10 @@ export function MarkdownMessage({ content }: { content: string }) {
       lines[lineIndex].trim() &&
       !/^(#{1,6})\s+/.test(lines[lineIndex]) &&
       !/^\s*---+\s*$/.test(lines[lineIndex]) &&
+      !/^\s*```/.test(lines[lineIndex]) &&
       !isTableStart(lines, lineIndex) &&
-      !/^\s*[-*]\s+/.test(lines[lineIndex]) &&
-      !/^\s*\d+\.\s+/.test(lines[lineIndex])
+      !isUnorderedListItem(lines[lineIndex]) &&
+      !isOrderedListItem(lines[lineIndex])
     ) {
       paragraphLines.push(lines[lineIndex])
       offset += lines[lineIndex].length + 1
@@ -452,5 +727,9 @@ export function MarkdownMessage({ content }: { content: string }) {
     )
   }
 
-  return <div className="markdown-content">{blocks}</div>
+  return (
+    <div className="markdown-content" ref={rootRef}>
+      {blocks}
+    </div>
+  )
 }
