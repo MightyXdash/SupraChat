@@ -83,11 +83,7 @@ export function ChatWorkspace({
           <p className="truncate text-sm font-semibold">{conversation?.title}</p>
           <p className="text-xs text-[var(--text-secondary)]">{WORKSPACE_LABEL}</p>
         </div>
-        <div className="chat-workspace-report" aria-label="Session report">
-          <div className="chat-workspace-stat">
-            <span>{messageCount}</span>
-            <small>messages</small>
-          </div>
+        <div className="chat-workspace-report" aria-label="Context usage">
           <div className="chat-token-usage-wrap" ref={usageButtonRef}>
             <button
               aria-expanded={isUsageOpen}
@@ -111,10 +107,10 @@ export function ChatWorkspace({
         {isUsageOpen ? (
           <div className="chat-token-popover-layer" ref={usagePopoverRef}>
             <motion.div
-              animate={{ opacity: 1, scale: 1, y: 0 }}
+              animate={{ opacity: 1, scale: 1 }}
               className="chat-token-popover"
-              exit={{ opacity: 0, scale: 0.96, y: -6 }}
-              initial={{ opacity: 0, scale: 0.94, y: -8 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              initial={{ opacity: 0, scale: 0.94 }}
               transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="chat-token-popover-header">
@@ -165,7 +161,7 @@ export function ChatWorkspace({
 
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto px-6 pb-40 pt-24 max-[780px]:px-4 max-[780px]:pb-36"
+        className="chat-workspace-scroll min-h-0 flex-1 overflow-y-auto px-6 pb-40 max-[780px]:px-4 max-[780px]:pb-36"
       >
         {hasMessages ? (
           <div className="mx-auto flex max-w-3xl flex-col gap-5">
