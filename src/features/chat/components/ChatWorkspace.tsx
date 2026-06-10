@@ -2,9 +2,7 @@ import { CSSProperties, RefObject, useEffect, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ChatBubble } from "@/features/chat/components/ChatBubble"
 import { ChatComposer } from "@/features/chat/components/ChatComposer"
-import { ChatEmptyState } from "@/features/chat/components/ChatEmptyState"
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
-import { WORKSPACE_LABEL } from "@/features/chat/config/ui"
 import { Conversation } from "@/features/chat/types"
 
 type ChatWorkspaceProps = {
@@ -79,10 +77,10 @@ export function ChatWorkspace({
   return (
     <section className="relative flex min-h-0 flex-col bg-[var(--surface)]">
       <header className="chat-workspace-header px-5">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{conversation?.title}</p>
-          <p className="text-xs text-[var(--text-secondary)]">{WORKSPACE_LABEL}</p>
+        <div className="chat-workspace-glass" aria-hidden="true">
+          <span className="chat-workspace-glass-layer" />
         </div>
+        <div aria-hidden="true" />
         <div className="chat-workspace-report" aria-label="Context usage">
           <div className="chat-token-usage-wrap" ref={usageButtonRef}>
             <button
@@ -92,12 +90,13 @@ export function ChatWorkspace({
               type="button"
               onClick={() => setIsUsageOpen((value) => !value)}
             >
-              <span className="chat-token-usage-dot" aria-hidden="true" />
+              <span
+                className="chat-token-usage-ring"
+                style={{ "--usage": `${contextUsage}%` } as CSSProperties}
+                aria-hidden="true"
+              />
               <span>{estimatedTokens.toLocaleString()}</span>
               <small>{contextUsage}% ctx</small>
-              <span className="chat-token-usage-meter" aria-hidden="true">
-                <span style={{ width: `${contextUsage}%` }} />
-              </span>
             </button>
           </div>
         </div>
@@ -110,7 +109,7 @@ export function ChatWorkspace({
               animate={{ opacity: 1, scale: 1 }}
               className="chat-token-popover"
               exit={{ opacity: 0, scale: 0.96 }}
-              initial={{ opacity: 0, scale: 0.94 }}
+              initial={{ opacity: 0, scale: 0.88 }}
               transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="chat-token-popover-header">
@@ -162,8 +161,9 @@ export function ChatWorkspace({
       <div
         ref={scrollRef}
         className="chat-workspace-scroll min-h-0 flex-1 overflow-y-auto px-6 pb-40 max-[780px]:px-4 max-[780px]:pb-36"
+        data-empty={!hasMessages}
       >
-        {hasMessages ? (
+        {hasMessages && (
           <div className="mx-auto flex max-w-3xl flex-col gap-5">
             <AnimatePresence>
               {conversation?.messages.map((message) => <ChatBubble key={message.id} message={message} />)}
@@ -175,12 +175,17 @@ export function ChatWorkspace({
               </div>
             )}
           </div>
-        ) : (
-          <ChatEmptyState onPromptSelect={onDraftChange} />
         )}
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-5">
+      <div className="chat-workspace-bottom-glass" data-hidden={!hasMessages} aria-hidden="true">
+        <span className="chat-workspace-bottom-glass-layer" />
+      </div>
+
+      <div
+        className="chat-composer-dock pointer-events-none absolute inset-x-0 px-5"
+        data-position={hasMessages ? "bottom" : "center"}
+      >
         <ChatComposer
           draft={draft}
           error={error}

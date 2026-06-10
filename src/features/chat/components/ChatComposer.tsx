@@ -1,5 +1,5 @@
-import { FormEvent, KeyboardEvent, useLayoutEffect, useRef } from "react"
-import { ArrowUp, ChevronDown, Plus } from "lucide-react"
+import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { ArrowUp, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 type ChatComposerProps = {
@@ -18,6 +18,27 @@ export function ChatComposer({
   onSubmit,
 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const [composerSize, setComposerSize] = useState<"small" | "small-medium" | "medium-long" | "long">("small")
+
+  useEffect(() => {
+    const textarea = textareaRef.current
+
+    if (!textarea) {
+      return
+    }
+
+    function syncDraftFromTextarea() {
+      onDraftChange(textarea?.value ?? "")
+    }
+
+    textarea.addEventListener("input", syncDraftFromTextarea)
+    textarea.addEventListener("keyup", syncDraftFromTextarea)
+
+    return () => {
+      textarea.removeEventListener("input", syncDraftFromTextarea)
+      textarea.removeEventListener("keyup", syncDraftFromTextarea)
+    }
+  }, [onDraftChange])
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current
@@ -29,23 +50,41 @@ export function ChatComposer({
     textarea.style.height = "0px"
 
     const computed = window.getComputedStyle(textarea)
-    const lineHeight = Number.parseFloat(computed.lineHeight) || 24
+    const fontSize = Number.parseFloat(computed.fontSize) || 16
+    const rawLineHeight = Number.parseFloat(computed.lineHeight)
+    const lineHeight = Number.isFinite(rawLineHeight)
+      ? rawLineHeight <= 4
+        ? rawLineHeight * fontSize
+        : rawLineHeight
+      : fontSize * 1.55
     const verticalPadding =
       Number.parseFloat(computed.paddingTop) + Number.parseFloat(computed.paddingBottom)
     const firstStep = Math.round(lineHeight + verticalPadding)
     const secondStep = Math.round(lineHeight * 2 + verticalPadding)
     const thirdStep = Math.round(lineHeight * 3 + verticalPadding)
+    const fourthStep = Math.round(lineHeight * 4 + verticalPadding)
     const scrollHeight = textarea.scrollHeight
+    const isEmptyDraft = draft.length === 0
+    const hasExpandedContent = !isEmptyDraft && (draft.includes("\n") || scrollHeight > firstStep)
 
-    const nextHeight = !draft.trim()
-      ? firstStep
-      : scrollHeight <= firstStep
+    const nextSize = isEmptyDraft || !hasExpandedContent
+      ? "small"
+      : scrollHeight <= secondStep
+        ? "small-medium"
+        : scrollHeight <= thirdStep
+          ? "medium-long"
+          : "long"
+    const nextHeight =
+      nextSize === "small"
         ? firstStep
-        : scrollHeight <= secondStep
+      : nextSize === "small-medium"
           ? secondStep
-          : Math.min(scrollHeight, thirdStep)
+          : nextSize === "medium-long"
+            ? thirdStep
+            : Math.min(scrollHeight, fourthStep)
 
     textarea.style.height = `${nextHeight}px`
+    setComposerSize(nextSize)
   }, [draft])
 
   function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
@@ -67,7 +106,7 @@ export function ChatComposer({
           {error}
         </p>
       )}
-      <form className="chat-composer" onSubmit={handleFormSubmit}>
+      <form className="chat-composer" data-size={composerSize} onSubmit={handleFormSubmit}>
         <div className="chat-composer-main">
           <textarea
             ref={textareaRef}
@@ -77,7 +116,9 @@ export function ChatComposer({
             rows={1}
             value={draft}
             onChange={(event) => onDraftChange(event.target.value)}
+            onInput={(event) => onDraftChange(event.currentTarget.value)}
             onKeyDown={handleKeyDown}
+            onKeyUp={(event) => onDraftChange(event.currentTarget.value)}
           />
         </div>
 
@@ -86,10 +127,6 @@ export function ChatComposer({
             <Button aria-label="Add attachment" className="chat-composer-round-button" size="icon" type="button" variant="ghost">
               <Plus className="h-5 w-5" />
             </Button>
-            <button className="chat-composer-pill" type="button">
-              <span>Smart</span>
-              <ChevronDown className="h-4 w-4" />
-            </button>
           </div>
 
           <Button

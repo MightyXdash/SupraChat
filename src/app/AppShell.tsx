@@ -1,6 +1,5 @@
 import { useState } from "react"
 import { AppSidebar } from "@/app/components/AppSidebar"
-import { SessionPanel } from "@/app/components/SessionPanel"
 import { useChatStore } from "@/features/chat/store/use-chat-store"
 import { ChatWorkspace } from "@/features/chat/components/ChatWorkspace"
 import { useAutoScroll } from "@/features/chat/hooks/useAutoScroll"
@@ -8,7 +7,7 @@ import { useAutoScroll } from "@/features/chat/hooks/useAutoScroll"
 export function AppShell() {
   const [draft, setDraft] = useState("")
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true)
-  const scrollRef = useAutoScroll()
+  const { lockToBottom, scrollRef } = useAutoScroll()
   const conversations = useChatStore((state) => state.conversations)
   const activeConversationId = useChatStore((state) => state.activeConversationId)
   const createConversation = useChatStore((state) => state.createConversation)
@@ -29,6 +28,7 @@ export function AppShell() {
     }
 
     setDraft("")
+    lockToBottom("auto")
     await sendMessage(message)
   }
 
@@ -36,9 +36,7 @@ export function AppShell() {
     <main className="min-h-screen overflow-hidden bg-[var(--background)] text-[var(--text-primary)]">
       <div
         className="app-shell-grid grid h-screen gap-0 max-[780px]:grid-cols-1"
-        style={{
-          ["--sidebar-width" as "--sidebar-width"]: isSidebarCollapsed ? "72px" : "280px",
-        }}
+        data-sidebar-state={isSidebarCollapsed ? "collapsed" : "expanded"}
       >
         <AppSidebar
           activeConversationId={activeConversationId}
@@ -57,7 +55,6 @@ export function AppShell() {
           onDraftChange={setDraft}
           onSubmit={handleSubmit}
         />
-        <SessionPanel messageCount={activeConversation?.messages.length ?? 0} />
       </div>
     </main>
   )
