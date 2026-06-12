@@ -80,7 +80,9 @@ export function ChatWorkspace({
         <div className="chat-workspace-glass" aria-hidden="true">
           <span className="chat-workspace-glass-layer" />
         </div>
-        <div aria-hidden="true" />
+        <div className="chat-title-badge">
+          <span>{conversation?.title || "New Conversation"}</span>
+        </div>
         <div className="chat-workspace-report" aria-label="Context usage">
           <div className="chat-token-usage-wrap" ref={usageButtonRef}>
             <button

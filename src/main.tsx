@@ -2,6 +2,7 @@ import React from "react"
 import ReactDOM from "react-dom/client"
 import "@fontsource/source-serif-4/400.css"
 import "@fontsource/source-serif-4/400-italic.css"
+// @ts-ignore: allow side-effect CSS import without type declarations
 import "@fontsource/source-serif-4/600.css"
 import "@fontsource/source-serif-4/600-italic.css"
 import "@fontsource/source-serif-4/700.css"

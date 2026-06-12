@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { AppSidebar } from "@/app/components/AppSidebar"
 import { useChatStore } from "@/features/chat/store/use-chat-store"
 import { ChatWorkspace } from "@/features/chat/components/ChatWorkspace"
@@ -10,11 +10,19 @@ export function AppShell() {
   const { lockToBottom, scrollRef } = useAutoScroll()
   const conversations = useChatStore((state) => state.conversations)
   const activeConversationId = useChatStore((state) => state.activeConversationId)
+  const initialize = useChatStore((state) => state.initialize)
   const createConversation = useChatStore((state) => state.createConversation)
+  const renameConversation = useChatStore((state) => state.renameConversation)
+  const deleteConversation = useChatStore((state) => state.deleteConversation)
   const setActiveConversation = useChatStore((state) => state.setActiveConversation)
   const sendMessage = useChatStore((state) => state.sendMessage)
+  const isLoading = useChatStore((state) => state.isLoading)
   const isGenerating = useChatStore((state) => state.isGenerating)
   const error = useChatStore((state) => state.error)
+
+  useEffect(() => {
+    void initialize()
+  }, [initialize])
 
   const activeConversation = conversations.find(
     (conversation) => conversation.id === activeConversationId,
@@ -42,7 +50,11 @@ export function AppShell() {
           activeConversationId={activeConversationId}
           collapsed={isSidebarCollapsed}
           conversations={conversations}
+          isBusy={isGenerating}
+          isLoading={isLoading}
           onCreateConversation={createConversation}
+          onDeleteConversation={deleteConversation}
+          onRenameConversation={renameConversation}
           onSelectConversation={setActiveConversation}
           onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
         />

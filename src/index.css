@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@theme {
+:root {
   --font-sans: "Manrope", "Geist", "Segoe UI", sans-serif;
   --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
 }
@@ -26,6 +26,7 @@
   --radius-control: 9px;
   --motion-fast: 160ms;
   --motion-base: 240ms;
+  --motion-stream-character: 3000ms;
   --motion-sidebar-text-exit: 400ms;
   --motion-slow: 420ms;
   --ease-sidebar: cubic-bezier(0.22, 1, 0.36, 1);
@@ -132,6 +133,31 @@ body {
 .chat-workspace-header > *:not(.chat-workspace-glass) {
   position: relative;
   z-index: 1;
+}
+
+.chat-title-badge {
+  background: var(--ctx-popover-bg);
+  backdrop-filter: blur(10px) saturate(1.12);
+  -webkit-backdrop-filter: blur(10px) saturate(1.12);
+  border: 1px solid rgba(120, 112, 104, 0.14);
+  border-radius: 999px;
+  box-shadow:
+    0 10px 30px rgba(52, 39, 28, 0.08),
+    0 0 0 1px rgba(255, 253, 249, 0.1),
+    inset 0 1px 0 rgba(255, 253, 249, 0.26);
+  padding: 0.28rem 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  max-width: 20rem;
+}
+
+.chat-title-badge span {
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-workspace-scroll {
@@ -823,10 +849,137 @@ button:disabled {
     color var(--motion-fast) ease-out;
 }
 
+.conversation-title-loading {
+  align-items: center;
+  display: flex;
+  gap: 0.34rem;
+  min-height: 0.95rem;
+  width: 100%;
+}
+
+.conversation-title-loading span {
+  animation: conversation-title-pulse 1180ms ease-in-out infinite;
+  background: color-mix(in srgb, var(--accent-light) 42%, var(--border));
+  border-radius: 999px;
+  display: block;
+  height: 0.42rem;
+}
+
+.conversation-title-loading span:first-child {
+  width: 58%;
+}
+
+.conversation-title-loading span:last-child {
+  animation-delay: 140ms;
+  opacity: 0.72;
+  width: 22%;
+}
+
+@keyframes conversation-title-pulse {
+  0%,
+  100% {
+    opacity: 0.38;
+    transform: scaleX(0.96);
+  }
+
+  50% {
+    opacity: 0.88;
+    transform: scaleX(1);
+  }
+}
+
 .conversation-link:hover,
 .conversation-link-active {
   background: color-mix(in srgb, var(--highlight) 34%, transparent);
   color: var(--text-primary);
+}
+
+.conversation-row {
+  position: relative;
+}
+
+.conversation-rename-form {
+  width: 100%;
+}
+
+.conversation-rename-input {
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 36%, var(--border));
+  border-radius: var(--radius-control);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  outline: none;
+  padding: 0.45rem 0.58rem;
+  transition:
+    border-color var(--motion-fast) ease-out,
+    box-shadow var(--motion-fast) ease-out,
+    background var(--motion-fast) ease-out;
+  width: 100%;
+}
+
+.conversation-rename-input:focus {
+  border-color: color-mix(in srgb, var(--accent-primary) 72%, white);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-light) 54%, transparent);
+}
+
+.conversation-context-menu {
+  background: color-mix(in srgb, var(--surface) 90%, rgba(255, 253, 249, 0.7));
+  backdrop-filter: blur(14px) saturate(1.04);
+  -webkit-backdrop-filter: blur(14px) saturate(1.04);
+  border: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+  border-radius: 10px;
+  box-shadow:
+    0 12px 26px rgba(52, 39, 28, 0.12),
+    0 2px 8px rgba(52, 39, 28, 0.08),
+    inset 0 1px 0 rgba(255, 253, 249, 0.66);
+  min-width: 8.25rem;
+  padding: 0.22rem;
+  position: fixed;
+  z-index: 70;
+}
+
+.conversation-context-action {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: var(--text-primary);
+  display: flex;
+  font-size: 0.73rem;
+  font-weight: 640;
+  gap: 0.44rem;
+  min-height: 1.95rem;
+  padding: 0.36rem 0.48rem;
+  text-align: left;
+  transition:
+    background var(--motion-fast) ease-out,
+    color var(--motion-fast) ease-out;
+  width: 100%;
+}
+
+.conversation-context-action:hover {
+  background: color-mix(in srgb, var(--highlight) 42%, transparent);
+}
+
+.conversation-context-action-danger {
+  color: var(--error);
+}
+
+.conversation-context-action:disabled {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.conversation-context-action:disabled:hover {
+  background: transparent;
+}
+
+.sidebar-empty-state {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.4;
+  padding: 0.45rem 0.58rem;
 }
 
 .sidebar-icon-button {
@@ -940,6 +1093,20 @@ button:disabled {
 .markdown-paragraph {
   margin: 0;
   white-space: pre-wrap;
+}
+
+.markdown-stream-character {
+  animation: markdown-stream-character-fade var(--motion-stream-character) ease-out both;
+}
+
+@keyframes markdown-stream-character-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .markdown-spacer {

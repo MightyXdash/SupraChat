@@ -10,6 +10,7 @@ export type ChatMessage = {
 export type Conversation = {
   id: string
   title: string
+  titleStatus?: "idle" | "generating" | "complete" | "failed"
   messages: ChatMessage[]
   createdAt: string
   updatedAt: string

@@ -45,8 +45,20 @@ const latexSymbols: Record<string, string> = {
   leftrightarrow: "↔",
 }
 
-function renderText(source: string): ReactNode[] {
-  return source ? [source] : []
+function renderText(source: string, offset = 0, animatedFrom = Number.POSITIVE_INFINITY): ReactNode[] {
+  if (!source) {
+    return []
+  }
+
+  return Array.from(source).map((character, index) =>
+    offset + index >= animatedFrom ? (
+      <span className="markdown-stream-character" key={`stream-char-${offset + index}`}>
+        {character}
+      </span>
+    ) : (
+      character
+    ),
+  )
 }
 
 function normalizeMarkdownSource(source: string) {
@@ -205,7 +217,7 @@ function MathExpression({ display = false, source }: { display?: boolean; source
   )
 }
 
-function renderPlainChemistry(source: string, offset: number): ReactNode[] {
+function renderPlainChemistry(source: string, offset: number, animatedFrom: number): ReactNode[] {
   const nodes: ReactNode[] = []
   const pattern = /\b(?:[A-Z][a-z]?\d*){2,}\b/g
   let cursor = 0
@@ -213,7 +225,7 @@ function renderPlainChemistry(source: string, offset: number): ReactNode[] {
 
   while ((match = pattern.exec(source))) {
     if (match.index > cursor) {
-      nodes.push(source.slice(cursor, match.index))
+      nodes.push(...renderText(source.slice(cursor, match.index), offset + cursor, animatedFrom))
     }
 
     const formula = match[0]
@@ -245,13 +257,17 @@ function renderPlainChemistry(source: string, offset: number): ReactNode[] {
   }
 
   if (cursor < source.length) {
-    nodes.push(source.slice(cursor))
+    nodes.push(...renderText(source.slice(cursor), offset + cursor, animatedFrom))
   }
 
   return nodes
 }
 
-function renderInlineMarkdown(source: string, offset: number): ReactNode[] {
+function renderInlineMarkdown(
+  source: string,
+  offset: number,
+  animatedFrom = Number.POSITIVE_INFINITY,
+): ReactNode[] {
   const nodes: ReactNode[] = []
   const pattern = /(<br\s*\/?>|`[^`]+`|\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\$[^$\n]+\$|\\\([^)]+\\\)|\*\*[^*]+\*\*|\*[^*]+\*)/gi
   let cursor = 0
@@ -259,7 +275,7 @@ function renderInlineMarkdown(source: string, offset: number): ReactNode[] {
 
   while ((match = pattern.exec(source))) {
     if (match.index > cursor) {
-      nodes.push(...renderPlainChemistry(source.slice(cursor, match.index), offset + cursor))
+      nodes.push(...renderPlainChemistry(source.slice(cursor, match.index), offset + cursor, animatedFrom))
     }
 
     const token = match[0]
@@ -270,7 +286,7 @@ function renderInlineMarkdown(source: string, offset: number): ReactNode[] {
     } else if (token.startsWith("`")) {
       nodes.push(
         <code className="markdown-code" key={`code-${tokenOffset}`}>
-          {renderText(token.slice(1, -1))}
+          {renderText(token.slice(1, -1), tokenOffset + 1, animatedFrom)}
         </code>,
       )
     } else if (token.startsWith("$$")) {
@@ -284,13 +300,13 @@ function renderInlineMarkdown(source: string, offset: number): ReactNode[] {
     } else if (token.startsWith("**")) {
       nodes.push(
         <strong key={`strong-${tokenOffset}`}>
-          {renderInlineMarkdown(token.slice(2, -2), tokenOffset + 2)}
+          {renderInlineMarkdown(token.slice(2, -2), tokenOffset + 2, animatedFrom)}
         </strong>,
       )
     } else {
       nodes.push(
         <em key={`em-${tokenOffset}`}>
-          {renderInlineMarkdown(token.slice(1, -1), tokenOffset + 1)}
+          {renderInlineMarkdown(token.slice(1, -1), tokenOffset + 1, animatedFrom)}
         </em>,
       )
     }
@@ -299,7 +315,7 @@ function renderInlineMarkdown(source: string, offset: number): ReactNode[] {
   }
 
   if (cursor < source.length) {
-    nodes.push(...renderPlainChemistry(source.slice(cursor), offset + cursor))
+    nodes.push(...renderPlainChemistry(source.slice(cursor), offset + cursor, animatedFrom))
   }
 
   return nodes
@@ -375,7 +391,12 @@ export function MarkdownMessage({ content }: { content: string }) {
   const [closingTableMenu, setClosingTableMenu] = useState<string | null>(null)
   const closeTimeoutRef = useRef<number | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const previousContentLengthRef = useRef(content.length)
   const normalizedContent = normalizeMarkdownSource(content)
+  const animatedFrom =
+    content.length > previousContentLengthRef.current
+      ? previousContentLengthRef.current
+      : Number.POSITIVE_INFINITY
   const lines = normalizedContent.split("\n")
   const blocks: ReactNode[] = []
   let lineIndex = 0
@@ -384,6 +405,10 @@ export function MarkdownMessage({ content }: { content: string }) {
   useEffect(() => {
     setOpenTableMenu(null)
     setClosingTableMenu(null)
+  }, [content])
+
+  useEffect(() => {
+    previousContentLengthRef.current = content.length
   }, [content])
 
   useEffect(() => {
@@ -506,7 +531,7 @@ export function MarkdownMessage({ content }: { content: string }) {
       const HeadingTag = `h${Math.min(heading[1].length, 3)}` as "h1" | "h2" | "h3"
       blocks.push(
         <HeadingTag className="markdown-heading" key={`heading-${currentOffset}`}>
-          {renderInlineMarkdown(heading[2], currentOffset + heading[1].length + 1)}
+          {renderInlineMarkdown(heading[2], currentOffset + heading[1].length + 1, animatedFrom)}
         </HeadingTag>,
       )
       lineIndex += 1
@@ -550,7 +575,7 @@ export function MarkdownMessage({ content }: { content: string }) {
                 <tr>
                   {header.map((cell, cellIndex) => (
                     <th key={`th-${tableOffset}-${cellIndex}`}>
-                      {renderInlineMarkdown(cell, tableOffset + cellIndex)}
+                      {renderInlineMarkdown(cell, tableOffset + cellIndex, animatedFrom)}
                     </th>
                   ))}
                 </tr>
@@ -560,7 +585,7 @@ export function MarkdownMessage({ content }: { content: string }) {
                   <tr key={`tr-${row.offset}`}>
                     {header.map((_, cellIndex) => (
                       <td key={`td-${row.offset}-${cellIndex}`}>
-                        {renderInlineMarkdown(row.cells[cellIndex] ?? "", row.offset + cellIndex)}
+                        {renderInlineMarkdown(row.cells[cellIndex] ?? "", row.offset + cellIndex, animatedFrom)}
                       </td>
                     ))}
                   </tr>
@@ -651,7 +676,7 @@ export function MarkdownMessage({ content }: { content: string }) {
 
       blocks.push(
         <blockquote className="markdown-quote" key={`quote-${quoteOffset}`}>
-          {renderInlineMarkdown(quoteLines.join("\n"), quoteOffset)}
+          {renderInlineMarkdown(quoteLines.join("\n"), quoteOffset, animatedFrom)}
         </blockquote>,
       )
       continue
@@ -666,7 +691,7 @@ export function MarkdownMessage({ content }: { content: string }) {
 
         items.push(
           <li key={`li-${offset}`}>
-            {renderInlineMarkdown(item.slice(marker.length), offset + marker.length)}
+            {renderInlineMarkdown(item.slice(marker.length), offset + marker.length, animatedFrom)}
           </li>,
         )
         offset += item.length + 1
@@ -690,7 +715,7 @@ export function MarkdownMessage({ content }: { content: string }) {
         const marker = item.match(/^\s*\d+\.\s+/)?.[0] ?? ""
         const itemOffset = offset
         const itemBlocks: ReactNode[] = [
-          <div key={`oli-title-${itemOffset}`}>{renderInlineMarkdown(item.slice(marker.length), offset + marker.length)}</div>,
+          <div key={`oli-title-${itemOffset}`}>{renderInlineMarkdown(item.slice(marker.length), offset + marker.length, animatedFrom)}</div>,
         ]
 
         offset += item.length + 1
@@ -757,7 +782,7 @@ export function MarkdownMessage({ content }: { content: string }) {
 
           itemBlocks.push(
             <p className="markdown-paragraph" key={`oli-paragraph-${paragraphOffset}`}>
-              {renderInlineMarkdown(paragraphLines.join("\n"), paragraphOffset)}
+              {renderInlineMarkdown(paragraphLines.join("\n"), paragraphOffset, animatedFrom)}
             </p>,
           )
         }
@@ -793,7 +818,7 @@ export function MarkdownMessage({ content }: { content: string }) {
 
     blocks.push(
       <p className="markdown-paragraph" key={`p-${paragraphOffset}`}>
-        {renderInlineMarkdown(paragraphLines.join("\n"), paragraphOffset)}
+        {renderInlineMarkdown(paragraphLines.join("\n"), paragraphOffset, animatedFrom)}
       </p>,
     )
   }

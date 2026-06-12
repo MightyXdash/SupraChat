@@ -1,4 +1,6 @@
 export const DEFAULT_CONVERSATION_TITLE = "New Conversation"
+export const TITLE_PENDING_LABEL = "Naming conversation"
+export const TITLE_MAX_VISIBLE_CHARACTERS = 34
 
 export const QUICK_PROMPTS = [
   "Summarize a technical note",
@@ -12,7 +14,7 @@ export const EMPTY_STATE_DESCRIPTION =
 export const WORKSPACE_LABEL = "Local chat workspace"
 export const LOCAL_PROVIDER_NAME = "Ollama"
 export const LOCAL_PROVIDER_DESCRIPTION = "Local generation is active for this workspace."
-export const TITLE_GENERATION_NOTE = "Titles use the first three words of the first user message."
+export const TITLE_GENERATION_NOTE = "Titles are generated locally after the first message."
 export const CHAT_READING_NOTE = "SupraChat can make mistakes. Verify important information."
 export const GENERATION_ERROR_MESSAGE =
   "Generation stopped before the response completed. Check the provider connection and try again."
