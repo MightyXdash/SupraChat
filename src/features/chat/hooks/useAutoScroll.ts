@@ -31,7 +31,18 @@ export function useAutoScroll() {
       return
     }
 
-    scrollElement.style.paddingBottom = previousPaddingBottomRef.current
+    const restoredPaddingBottom = previousPaddingBottomRef.current
+    const currentPaddingBottom = window.getComputedStyle(scrollElement).paddingBottom
+    const currentPaddingBottomPx = Number.parseFloat(currentPaddingBottom) || 0
+    const restoredPaddingBottomPx = Number.parseFloat(restoredPaddingBottom) || 0
+    const reducedScrollHeight = scrollElement.scrollHeight - currentPaddingBottomPx + restoredPaddingBottomPx
+    const restoredMaxScrollTop = Math.max(0, reducedScrollHeight - scrollElement.clientHeight)
+
+    if (scrollElement.scrollTop > restoredMaxScrollTop) {
+      return
+    }
+
+    scrollElement.style.paddingBottom = restoredPaddingBottom
     previousPaddingBottomRef.current = null
   }, [])
 
