@@ -275,11 +275,11 @@ function createLlamaCppProvider() {
     },
     async streamTitle(message, temperature) {
       try {
-        const temp = typeof temperature === "number" ? temperature : this.model.temperature
+        const temp = typeof temperature === "number" ? temperature : TITLE_MODEL.temperature
         return await titleWorker.streamChat([
           {
             role: "user",
-            content: `Generate a concise conversation title for this message. Return only the title.\n\n${message}`,
+            content: message,
           },
         ], temp)
       } catch (error) {

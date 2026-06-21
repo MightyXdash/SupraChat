@@ -18,23 +18,47 @@ import {
 } from "@/features/chat/services/chat-service"
 import { ChatMessage, Conversation } from "@/features/chat/types"
 
-const TITLE_RETRY_MAX_ATTEMPTS = 3
-const TITLE_RETRY_BASE_TEMPERATURE = 0.85
-const TITLE_RETRY_TEMPERATURE_INCREMENT = 0.1
+const TITLE_RETRY_MAX_ATTEMPTS = 12
+const TITLE_RETRY_TEMPERATURE = 1
 const TITLE_CONTENT_MAX_WORDS = 2000
+const TITLE_COPY_UNIGRAM_THRESHOLD = 0.9
+
+function letterUnigrams(content: string) {
+  return Array.from(content.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, ""))
+}
 
 function isTitleCopiedFromUserText(title: string, userMessage: string): boolean {
-  const titleWords = title.trim().toLowerCase().split(/\s+/).filter(Boolean)
-  const userWords = userMessage.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const titleLetters = letterUnigrams(title)
+  const userLetters = letterUnigrams(userMessage)
 
-  if (titleWords.length === 0 || userWords.length === 0) {
+  if (titleLetters.length === 0 || userLetters.length === 0) {
     return false
   }
 
-  const userPrefix = userWords.slice(0, Math.min(titleWords.length, userWords.length)).join(" ")
-  const titleText = titleWords.join(" ")
+  const normalizedTitle = titleLetters.join("")
+  const normalizedUser = userLetters.join("")
 
-  return titleText === userPrefix
+  if (normalizedUser.includes(normalizedTitle)) {
+    return true
+  }
+
+  const userLetterCounts = new Map<string, number>()
+  userLetters.forEach((letter) => {
+    userLetterCounts.set(letter, (userLetterCounts.get(letter) ?? 0) + 1)
+  })
+
+  const sharedLetterCount = titleLetters.reduce((count, letter) => {
+    const remaining = userLetterCounts.get(letter) ?? 0
+
+    if (remaining <= 0) {
+      return count
+    }
+
+    userLetterCounts.set(letter, remaining - 1)
+    return count + 1
+  }, 0)
+
+  return sharedLetterCount / titleLetters.length >= TITLE_COPY_UNIGRAM_THRESHOLD
 }
 
 function trimContentToWordLimit(content: string, maxWords: number): string {
@@ -43,6 +67,28 @@ function trimContentToWordLimit(content: string, maxWords: number): string {
     return content.trim()
   }
   return words.slice(0, maxWords).join(" ")
+}
+
+function titleContextFromTurns(messages: ChatMessage[], maxTurns: number) {
+  const selectedMessages: ChatMessage[] = []
+  let userTurns = 0
+
+  for (const message of messages) {
+    selectedMessages.push(message)
+
+    if (message.role === "user") {
+      userTurns += 1
+    }
+
+    if (userTurns >= maxTurns && message.role === "assistant") {
+      break
+    }
+  }
+
+  return selectedMessages
+    .map((message) => message.content.trim())
+    .filter(Boolean)
+    .join("\n\n")
 }
 
 type ChatState = {
@@ -493,57 +539,65 @@ export const useChatStore = create<ChatState>((set) => ({
             || conversationAfterResponse.title
 
           if (isTitleCopiedFromUserText(currentTitle, trimmedContent)) {
-            const assistantMsg = conversationAfterResponse.messages.find(
-              (m) => m.role === "assistant" && m.id !== assistantMessage.id,
-            )
-            const combinedContent = `${trimmedContent}\n\n${assistantMsg?.content ?? ""}`
-            const trimmedCombined = trimContentToWordLimit(combinedContent, TITLE_CONTENT_MAX_WORDS)
-
             let lastTitle = currentTitle
-            let temperature = TITLE_RETRY_BASE_TEMPERATURE
 
-            for (let attempt = 0; attempt < TITLE_RETRY_MAX_ATTEMPTS; attempt += 1) {
-              let retryPayload = ""
+            const tryTitleRetries = async (content: string) => {
+              const trimmedRetryContent = trimContentToWordLimit(content, TITLE_CONTENT_MAX_WORDS)
 
-              try {
-                await streamConversationTitle({
-                  userMessage: trimmedCombined,
-                  temperature,
-                  onChunk: (chunk) => {
-                    retryPayload = `${retryPayload}${chunk}`
-                  },
-                })
+              for (let attempt = 0; attempt < TITLE_RETRY_MAX_ATTEMPTS; attempt += 1) {
+                let retryPayload = ""
 
-                const retryTitle = titleFromGeneratedPayload(retryPayload)
+                try {
+                  await streamConversationTitle({
+                    userMessage: trimmedRetryContent,
+                    temperature: TITLE_RETRY_TEMPERATURE,
+                    onChunk: (chunk) => {
+                      retryPayload = `${retryPayload}${chunk}`
+                    },
+                  })
 
-                if (retryTitle && !isTitleCopiedFromUserText(retryTitle, trimmedContent) && retryTitle !== lastTitle) {
-                  set((state) => ({
-                    conversations: sortConversationsByUpdatedAt(
-                      updateConversationById(state.conversations, conversationId, (conversation) => ({
-                        ...conversation,
-                        title: retryTitle,
-                        titleStatus: "complete",
-                      })),
-                    ),
-                  }))
+                  const retryTitle = titleFromGeneratedPayload(retryPayload)
 
-                  const retriedConversation = useChatStore
-                    .getState()
-                    .conversations.find((c) => c.id === conversationId)
+                  if (retryTitle && !isTitleCopiedFromUserText(retryTitle, trimmedContent) && retryTitle !== lastTitle) {
+                    set((state) => ({
+                      conversations: sortConversationsByUpdatedAt(
+                        updateConversationById(state.conversations, conversationId, (conversation) => ({
+                          ...conversation,
+                          title: retryTitle,
+                          titleStatus: "complete",
+                        })),
+                      ),
+                    }))
 
-                  if (retriedConversation) {
-                    await persistConversation(retriedConversation)
+                    const retriedConversation = useChatStore
+                      .getState()
+                      .conversations.find((c) => c.id === conversationId)
+
+                    if (retriedConversation) {
+                      await persistConversation(retriedConversation)
+                    }
+
+                    return retryTitle
                   }
 
-                  break
+                  lastTitle = retryTitle || lastTitle
+                } catch {
+                  // Retry title generation is best-effort; continue to next attempt.
                 }
-
-                lastTitle = retryTitle || lastTitle
-              } catch {
-                // Retry title generation is best-effort; continue to next attempt.
               }
 
-              temperature += TITLE_RETRY_TEMPERATURE_INCREMENT
+              return lastTitle
+            }
+
+            const firstTurnContext = titleContextFromTurns(conversationAfterResponse.messages, 1)
+            const firstRetryTitle = await tryTitleRetries(firstTurnContext || trimmedContent)
+
+            if (isTitleCopiedFromUserText(firstRetryTitle, trimmedContent)) {
+              const threeTurnContext = titleContextFromTurns(conversationAfterResponse.messages, 3)
+
+              if (threeTurnContext && threeTurnContext !== firstTurnContext) {
+                await tryTitleRetries(threeTurnContext)
+              }
             }
           }
         }
