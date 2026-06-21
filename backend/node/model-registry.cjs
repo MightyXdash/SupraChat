@@ -35,10 +35,14 @@ function getPlatformKey(platform = process.platform, arch = process.arch) {
   }
 
   if (platform === "win32") {
-    return "win32-x64"
+    return arch === "arm64" ? "win32-arm64" : "win32-x64"
   }
 
-  return "linux-x64"
+  if (platform === "linux") {
+    return arch === "arm64" ? "linux-arm64" : "linux-x64"
+  }
+
+  return `${platform}-${arch}`
 }
 
 function getLlamaServerName(platform = process.platform) {
@@ -106,7 +110,9 @@ module.exports = {
   CHAT_MODEL,
   TITLE_MODEL,
   getHardwareAccelerationArgs,
+  getPlatformKey,
   getThreadCount,
+  getLlamaServerName,
   resolveLlamaServerPath,
   resolveModelPath,
   resolveResourceRoot,

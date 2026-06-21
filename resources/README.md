@@ -10,8 +10,12 @@ resources/
     darwin-arm64/llama-server
     darwin-x64/llama-server
     win32-x64/llama-server.exe
+    win32-arm64/llama-server.exe
     linux-x64/llama-server
+    linux-arm64/llama-server
     lib/*.dylib
+    lib/*.so
+    lib/*.dll
   models/
     chat/LFM2.5-350M-Q6_K.gguf
     title/LiquidAI_LFM2.5-350M-Base_1781204855.Q4_K_M.gguf
@@ -25,6 +29,8 @@ npm run models:download
 
 `llama-server` binaries still need to be supplied per platform from the
 `llama.cpp` build/release that matches the target acceleration backend.
+Run `npm run runtime:check` to verify the current machine and
+`npm run runtime:check:all` before packaging cross-platform releases.
 
 Chat model:
 

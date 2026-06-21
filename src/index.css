@@ -1154,14 +1154,6 @@ button:disabled {
   transform: translateY(-1px);
 }
 
-.sidebar-icon-button svg {
-  transition: transform var(--motion-slow) var(--ease-sidebar);
-}
-
-.app-sidebar[data-collapsed="true"] .sidebar-icon-button svg {
-  transform: rotate(180deg);
-}
-
 .sidebar-section {
   margin-top: 1rem;
 }

@@ -19,9 +19,9 @@ export const chatRuntimeConfig = {
   apiBaseUrl,
   endpoint: `${apiBaseUrl}/chat`,
   titleEndpoint: `${apiBaseUrl}/chat/title`,
-  model: "qwen3.5:4b-mlx",
-  titleModel: "gemma4:e2b-mlx",
-  contextWindowTokens: 16384,
+  model: "lfm2.5-350m-q6",
+  titleModel: "supra-title-350m-q4",
+  contextWindowTokens: 8192,
   stream: {
     characterFrameMs: 5,
     characterBatchSize: 1,

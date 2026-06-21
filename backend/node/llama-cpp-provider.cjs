@@ -10,6 +10,7 @@ const {
   resolveLlamaServerPath,
   resolveModelPath,
 } = require("./model-registry.cjs")
+const { buildRuntimeEnvironment } = require("./runtime-preflight.cjs")
 
 function findAvailablePort(startPort) {
   return new Promise((resolve, reject) => {
@@ -41,6 +42,16 @@ function assertReadableFile(filePath, label) {
     const error = new Error(`${label} is missing at ${filePath}.`)
     error.code = "SUPRACHAT_MISSING_RUNTIME_FILE"
     throw error
+  }
+
+  if (label.includes("server binary") && process.platform !== "win32") {
+    try {
+      fs.accessSync(filePath, fs.constants.X_OK)
+    } catch {
+      const error = new Error(`${label} is present but is not executable at ${filePath}.`)
+      error.code = "SUPRACHAT_RUNTIME_NOT_EXECUTABLE"
+      throw error
+    }
   }
 }
 
@@ -111,7 +122,7 @@ class LlamaCppWorker {
     ]
 
     this.process = spawn(llamaServerPath, args, {
-      env: process.env,
+      env: buildRuntimeEnvironment(process.env),
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     })
@@ -176,25 +187,6 @@ class LlamaCppWorker {
         max_tokens: this.model.maxTokens,
       },
       { responseType: "stream", timeout: 600_000 },
-    )
-  }
-
-  async streamCompletion(prompt) {
-    await this.ensureReady()
-
-    return axios.post(
-      `${this.baseUrl}/v1/completions`,
-      {
-        model: this.model.filename,
-        prompt,
-        stream: true,
-        temperature: this.model.temperature,
-        top_k: this.model.topK,
-        repeat_penalty: this.model.repeatPenalty,
-        max_tokens: this.model.maxTokens,
-        stop: ["\n"],
-      },
-      { responseType: "stream", timeout: 120_000 },
     )
   }
 

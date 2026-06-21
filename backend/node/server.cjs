@@ -1,129 +1,13 @@
 const http = require("node:http")
 const fs = require("node:fs")
 const path = require("node:path")
-const axios = require("axios")
 const { createChatDatabase } = require("./chat-database.cjs")
 const {
   createLlamaCppProvider,
   pipeOpenAiSseStream,
 } = require("./llama-cpp-provider.cjs")
+const { checkCurrentRuntime } = require("./runtime-preflight.cjs")
 const { resolveRuntimeConfig } = require("./runtime-config.cjs")
-
-const TITLE_SYSTEM_PROMPT = `You are a conversation title generator.
-
-Your task is to generate a concise title based ONLY on the user's first message.
-
-Rules:
-- Output valid JSON only.
-- No markdown.
-- No explanations.
-- No thinking.
-- No extra fields.
-- Capture the main intent, topic, or goal.
-- Prefer 2-4 words.
-- Maximum 50 characters.
-- Use natural human wording.
-- Avoid generic titles like "Question", "Help", "Discussion", "Chat", or "Conversation".
-- Avoid clickbait.
-- Do not repeat unnecessary details.
-- Use title Case.
-- The title should sound like something a real user would expect to see in their chat history.
-
-Output schema:
-
-{
-  "short": "2-3 words",
-  "medium": "3-5 words",
-  "long": "descriptive title"
-}
-
-Examples:
-
-User: "How do I train a 7B model on my RTX 4090?"
-{
-  "short": "7B Training",
-  "medium": "Training A 7B Model",
-  "long": "Training A 7B Model On RTX 4090"
-}
-
-User: "My Chrome keeps crashing on macOS"
-{
-  "short": "Chrome Crashes",
-  "medium": "Chrome On macOS",
-  "long": "Fixing Chrome Crashes On macOS"
-}
-
-User: "Can you make me a workout plan for building muscle?"
-{
-  "short": "Muscle Building",
-  "medium": "Muscle Workout Plan",
-  "long": "Workout Plan For Building Muscle"
-}
-
-User: "What's the best way to learn Python as a beginner?"
-{
-  "short": "Learn Python",
-  "medium": "Python For Beginners",
-  "long": "Best Way To Learn Python"
-}
-
-User: "My laptop battery drains really fast"
-{
-  "short": "Battery Drain",
-  "medium": "Laptop Battery Issues",
-  "long": "Fixing Fast Laptop Battery Drain"
-}
-
-User: "Can you explain quantum computing simply?"
-{
-  "short": "Quantum Computing",
-  "medium": "Quantum Computing Basics",
-  "long": "Simple Quantum Computing Explanation"
-}
-
-User: "I need ideas for a modern portfolio website"
-{
-  "short": "Portfolio Ideas",
-  "medium": "Modern Portfolio Design",
-  "long": "Ideas For A Modern Portfolio Website"
-}
-
-User: "How do I prepare for a math exam in one week?"
-{
-  "short": "Math Exam",
-  "medium": "Math Exam Prep",
-  "long": "Preparing For A Math Exam"
-}
-
-User: "Help me write a professional email to my teacher"
-{
-  "short": "Teacher Email",
-  "medium": "Professional Teacher Email",
-  "long": "Writing A Professional Teacher Email"
-}
-
-User: "Should I buy a MacBook Air or a Windows laptop?"
-{
-  "short": "Laptop Choice",
-  "medium": "MacBook Or Windows",
-  "long": "Choosing Between MacBook And Windows"
-}
-
-User: "I want to start a YouTube channel about programming"
-{
-  "short": "Programming Channel",
-  "medium": "Starting A Tech Channel",
-  "long": "Starting A Programming YouTube Channel"
-}
-
-User: "Can you help debug this PyTorch training script?"
-{
-  "short": "PyTorch Debugging",
-  "medium": "Debug Training Script",
-  "long": "Debugging A PyTorch Training Script"
-}
-
-Generate the JSON now.`
 
 function getSystemPrompt() {
   const possiblePaths = [
@@ -235,7 +119,10 @@ function createGenerationProvider() {
 }
 
 function providerErrorDetail(error, config, task) {
-  if (error?.code === "SUPRACHAT_MISSING_RUNTIME_FILE") {
+  if (
+    error?.code === "SUPRACHAT_MISSING_RUNTIME_FILE" ||
+    error?.code === "SUPRACHAT_RUNTIME_NOT_EXECUTABLE"
+  ) {
     return error.message
   }
 
@@ -256,19 +143,11 @@ function createServer(database, config, provider) {
   if (req.method === "GET" && url.pathname === "/health") {
     database.recordHealthCheck()
 
-    let python = { ok: false }
-    try {
-      const response = await axios.get("http://127.0.0.1:8000/health", { timeout: 1200 })
-      python = response.data
-    } catch {
-      python = { ok: false, service: "python-backend", detail: "unreachable" }
-    }
-
     sendJson(req, res, 200, {
       ok: true,
       service: "node-backend",
-      python,
       runtime: "llama.cpp",
+      runtimePreflight: checkCurrentRuntime(),
       model: provider.chatModel.label,
       titleModel: provider.titleModel.label,
     })

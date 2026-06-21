@@ -27,6 +27,27 @@
 
 SupraChat is a professional, cross-platform client application engineered for seamless local SupraLabs model execution. It uses a packaged `llama.cpp` runtime for fast, resource-conscious desktop inference.
 
+## Local runtime
+
+After cloning, install dependencies and verify the local runtime contract:
+
+```bash
+npm install
+npm run models:download
+npm run runtime:check
+```
+
+Cross-platform packages require a matching `llama-server` binary in
+`resources/llama.cpp/<platform>-<arch>/`. Before releasing builds for macOS,
+Windows, or Linux, run:
+
+```bash
+npm run runtime:check:all
+```
+
+The Electron app runs the Node backend inside Electron's bundled Node runtime,
+so packaged builds do not require a separate system Node installation.
+
 
 _placeholder image_
 <img width="2559" height="1439" alt="image" src="https://github.com/user-attachments/assets/0f334602-425d-470a-8c8c-201aec755d23" />

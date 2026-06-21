@@ -124,15 +124,16 @@ export function AppSidebar({
           <h1 className="text-lg font-semibold tracking-[-0.01em]">SupraChat</h1>
         </div>
         <div className="sidebar-header-actions">
-          <button
-            className="sidebar-icon-button"
-            type="button"
-            aria-label={theme === "light" ? "Use dark theme" : "Use light theme"}
-            onClick={onToggleTheme}
-            title={collapsed ? "Theme" : undefined}
-          >
-            {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-          </button>
+          {!collapsed ? (
+            <button
+              className="sidebar-icon-button"
+              type="button"
+              aria-label={theme === "light" ? "Use dark theme" : "Use light theme"}
+              onClick={onToggleTheme}
+            >
+              {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            </button>
+          ) : null}
           <button
             className="sidebar-icon-button"
             type="button"

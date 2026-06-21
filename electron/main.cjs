@@ -1,9 +1,8 @@
 const { app, BrowserWindow, Menu, ipcMain } = require("electron")
-const { spawn } = require("node:child_process")
 const net = require("node:net")
 const path = require("node:path")
+const { startServer, stopServer } = require("../backend/node/server.cjs")
 
-let backendProcess = null
 let backendPort = null
 
 function findAvailablePort(startPort) {
@@ -32,7 +31,7 @@ function findAvailablePort(startPort) {
 }
 
 async function startBackend() {
-  if (backendProcess && backendPort) {
+  if (backendPort) {
     return backendPort
   }
 
@@ -40,24 +39,14 @@ async function startBackend() {
   const resourceDirectory = app.isPackaged
     ? path.join(process.resourcesPath, "resources")
     : path.join(__dirname, "..", "resources")
-  backendProcess = spawn(process.env.SUPRACHAT_NODE_RUNTIME ?? "node", [
-    path.join(__dirname, "..", "backend", "node", "server.cjs"),
-  ], {
-    cwd: path.join(__dirname, ".."),
-    env: {
-      ...process.env,
-      SUPRACHAT_DATA_DIR: app.getPath("userData"),
-      SUPRACHAT_NODE_PORT: String(backendPort),
-      SUPRACHAT_RESOURCE_DIR: resourceDirectory,
-    },
-    stdio: "inherit",
-    windowsHide: true,
+
+  Object.assign(process.env, {
+    SUPRACHAT_DATA_DIR: app.getPath("userData"),
+    SUPRACHAT_NODE_PORT: String(backendPort),
+    SUPRACHAT_RESOURCE_DIR: resourceDirectory,
   })
 
-  backendProcess.on("exit", () => {
-    backendProcess = null
-    backendPort = null
-  })
+  startServer({ dataDir: app.getPath("userData"), port: backendPort })
 
   return backendPort
 }
@@ -121,10 +110,8 @@ ipcMain.handle("window:close", () => {
 })
 
 function stopBackend() {
-  if (backendProcess) {
-    backendProcess.kill()
-    backendProcess = null
-  }
+  stopServer()
+  backendPort = null
 }
 
 app.whenReady().then(async () => {
