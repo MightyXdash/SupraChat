@@ -19,7 +19,7 @@ import {
 import { ChatMessage, Conversation } from "@/features/chat/types"
 
 const TITLE_RETRY_MAX_ATTEMPTS = 12
-const TITLE_RETRY_TEMPERATURE = 1
+const TITLE_RETRY_TEMPERATURE = 0.35
 const TITLE_CONTENT_MAX_WORDS = 2000
 const TITLE_COPY_UNIGRAM_THRESHOLD = 0.9
 
@@ -61,6 +61,14 @@ function isTitleCopiedFromUserText(title: string, userMessage: string): boolean 
   return sharedLetterCount / titleLetters.length >= TITLE_COPY_UNIGRAM_THRESHOLD
 }
 
+function isTitleTooShort(title: string): boolean {
+  return title.trim().split(/\s+/).filter(Boolean).length <= 1
+}
+
+function shouldRetryGeneratedTitle(title: string, userMessage: string): boolean {
+  return isTitleTooShort(title) || isTitleCopiedFromUserText(title, userMessage)
+}
+
 function trimContentToWordLimit(content: string, maxWords: number): string {
   const words = content.trim().split(/\s+/).filter(Boolean)
   if (words.length <= maxWords) {
@@ -89,6 +97,14 @@ function titleContextFromTurns(messages: ChatMessage[], maxTurns: number) {
     .map((message) => message.content.trim())
     .filter(Boolean)
     .join("\n\n")
+}
+
+function userTurnCount(messages: ChatMessage[]) {
+  return messages.filter((message) => message.role === "user").length
+}
+
+function firstUserMessageContent(messages: ChatMessage[]) {
+  return messages.find((message) => message.role === "user")?.content.trim() ?? ""
 }
 
 type ChatState = {
@@ -529,75 +545,77 @@ export const useChatStore = create<ChatState>((set) => ({
 
       finalizeAssistantMessage(cleanIncompleteMarkdown)
 
-      if (shouldGenerateTitle) {
-        const conversationAfterResponse = useChatStore
-          .getState()
-          .conversations.find((c) => c.id === conversationId)
+      const conversationAfterResponse = useChatStore
+        .getState()
+        .conversations.find((c) => c.id === conversationId)
 
-        if (conversationAfterResponse) {
-          const currentTitle = titleFromGeneratedPayload(generatedTitlePayload)
-            || conversationAfterResponse.title
+      if (conversationAfterResponse) {
+        const titleReferenceText = firstUserMessageContent(conversationAfterResponse.messages) || trimmedContent
+        const currentTitle = shouldGenerateTitle
+          ? titleFromGeneratedPayload(generatedTitlePayload) || conversationAfterResponse.title
+          : conversationAfterResponse.title
 
-          if (isTitleCopiedFromUserText(currentTitle, trimmedContent)) {
-            let lastTitle = currentTitle
+        if (shouldRetryGeneratedTitle(currentTitle, titleReferenceText)) {
+          let lastTitle = currentTitle
 
-            const tryTitleRetries = async (content: string) => {
-              const trimmedRetryContent = trimContentToWordLimit(content, TITLE_CONTENT_MAX_WORDS)
+          const tryTitleRetries = async (content: string) => {
+            const trimmedRetryContent = trimContentToWordLimit(content, TITLE_CONTENT_MAX_WORDS)
 
-              for (let attempt = 0; attempt < TITLE_RETRY_MAX_ATTEMPTS; attempt += 1) {
-                let retryPayload = ""
+            for (let attempt = 0; attempt < TITLE_RETRY_MAX_ATTEMPTS; attempt += 1) {
+              let retryPayload = ""
 
-                try {
-                  await streamConversationTitle({
-                    userMessage: trimmedRetryContent,
-                    temperature: TITLE_RETRY_TEMPERATURE,
-                    onChunk: (chunk) => {
-                      retryPayload = `${retryPayload}${chunk}`
-                    },
-                  })
+              try {
+                await streamConversationTitle({
+                  userMessage: trimmedRetryContent,
+                  temperature: TITLE_RETRY_TEMPERATURE,
+                  onChunk: (chunk) => {
+                    retryPayload = `${retryPayload}${chunk}`
+                  },
+                })
 
-                  const retryTitle = titleFromGeneratedPayload(retryPayload)
+                const retryTitle = titleFromGeneratedPayload(retryPayload)
 
-                  if (retryTitle && !isTitleCopiedFromUserText(retryTitle, trimmedContent) && retryTitle !== lastTitle) {
-                    set((state) => ({
-                      conversations: sortConversationsByUpdatedAt(
-                        updateConversationById(state.conversations, conversationId, (conversation) => ({
-                          ...conversation,
-                          title: retryTitle,
-                          titleStatus: "complete",
-                        })),
-                      ),
-                    }))
+                if (retryTitle && !shouldRetryGeneratedTitle(retryTitle, titleReferenceText) && retryTitle !== lastTitle) {
+                  set((state) => ({
+                    conversations: sortConversationsByUpdatedAt(
+                      updateConversationById(state.conversations, conversationId, (conversation) => ({
+                        ...conversation,
+                        title: retryTitle,
+                        titleStatus: "complete",
+                      })),
+                    ),
+                  }))
 
-                    const retriedConversation = useChatStore
-                      .getState()
-                      .conversations.find((c) => c.id === conversationId)
+                  const retriedConversation = useChatStore
+                    .getState()
+                    .conversations.find((c) => c.id === conversationId)
 
-                    if (retriedConversation) {
-                      await persistConversation(retriedConversation)
-                    }
-
-                    return retryTitle
+                  if (retriedConversation) {
+                    await persistConversation(retriedConversation)
                   }
 
-                  lastTitle = retryTitle || lastTitle
-                } catch {
-                  // Retry title generation is best-effort; continue to next attempt.
+                  return retryTitle
                 }
-              }
 
-              return lastTitle
+                lastTitle = retryTitle || lastTitle
+              } catch {
+                // Retry title generation is best-effort; continue to next attempt.
+              }
             }
 
-            const firstTurnContext = titleContextFromTurns(conversationAfterResponse.messages, 1)
-            const firstRetryTitle = await tryTitleRetries(firstTurnContext || trimmedContent)
+            return lastTitle
+          }
 
-            if (isTitleCopiedFromUserText(firstRetryTitle, trimmedContent)) {
-              const threeTurnContext = titleContextFromTurns(conversationAfterResponse.messages, 3)
+          const firstTurnContext = titleContextFromTurns(conversationAfterResponse.messages, 1)
+          const firstRetryTitle = shouldGenerateTitle
+            ? await tryTitleRetries(firstTurnContext || trimmedContent)
+            : currentTitle
 
-              if (threeTurnContext && threeTurnContext !== firstTurnContext) {
-                await tryTitleRetries(threeTurnContext)
-              }
+          if (shouldRetryGeneratedTitle(firstRetryTitle, titleReferenceText) && userTurnCount(conversationAfterResponse.messages) > 1) {
+            const threeTurnContext = titleContextFromTurns(conversationAfterResponse.messages, 3)
+
+            if (threeTurnContext && threeTurnContext !== firstTurnContext) {
+              await tryTitleRetries(threeTurnContext)
             }
           }
         }
