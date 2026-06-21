@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain } = require("electron")
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron")
 const net = require("node:net")
 const path = require("node:path")
 const { startServer, stopServer } = require("../backend/node/server.cjs")
@@ -120,6 +120,12 @@ app.whenReady().then(async () => {
     await startBackend()
   } catch (error) {
     console.error("Unable to start SupraChat backend.", error)
+    dialog.showErrorBox(
+      "Unable to start SupraChat",
+      "The local SupraChat backend could not start. Run npm run rebuild:electron, then restart the app.",
+    )
+    app.quit()
+    return
   }
   createWindow()
 

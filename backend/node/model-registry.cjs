@@ -16,12 +16,12 @@ const CHAT_MODEL = {
 }
 
 const TITLE_MODEL = {
-  id: "supra-title-350m-q4",
+  id: "supra-title-50m-q5",
   role: "title",
   provider: "llama.cpp",
-  label: "Supra Title 350M Q4",
-  repo: "SupraLabs/Supra-Title-350M-exp-GGUF",
-  filename: "LiquidAI_LFM2.5-350M-Base_1781204855.Q4_K_M.gguf",
+  label: "Supra Title 50M Q5",
+  repo: "SupraLabs/supra-title-50M-pre-gguf",
+  filename: "SupraTitle-50M-Q5_K_M.gguf",
   contextWindowTokens: 1024,
   maxTokens: 24,
   temperature: 0.1,

@@ -20,7 +20,7 @@ export const chatRuntimeConfig = {
   endpoint: `${apiBaseUrl}/chat`,
   titleEndpoint: `${apiBaseUrl}/chat/title`,
   model: "lfm2.5-350m-q6",
-  titleModel: "supra-title-350m-q4",
+  titleModel: "supra-title-50m-q5",
   contextWindowTokens: 8192,
   stream: {
     characterFrameMs: 5,

@@ -172,7 +172,7 @@ class LlamaCppWorker {
     return `http://127.0.0.1:${this.port}`
   }
 
-  async streamChat(messages) {
+  async streamChat(messages, temperatureOverride) {
     await this.ensureReady()
 
     return axios.post(
@@ -181,7 +181,7 @@ class LlamaCppWorker {
         model: this.model.filename,
         messages,
         stream: true,
-        temperature: this.model.temperature,
+        temperature: typeof temperatureOverride === "number" ? temperatureOverride : this.model.temperature,
         top_k: this.model.topK,
         repeat_penalty: this.model.repeatPenalty,
         max_tokens: this.model.maxTokens,
@@ -273,14 +273,15 @@ function createLlamaCppProvider() {
         throw normalizeLlamaError(error)
       }
     },
-    async streamTitle(message) {
+    async streamTitle(message, temperature) {
       try {
+        const temp = typeof temperature === "number" ? temperature : this.model.temperature
         return await titleWorker.streamChat([
           {
             role: "user",
             content: `Generate a concise conversation title for this message. Return only the title.\n\n${message}`,
           },
-        ])
+        ], temp)
       } catch (error) {
         throw normalizeLlamaError(error)
       }

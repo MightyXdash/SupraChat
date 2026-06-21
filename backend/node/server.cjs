@@ -27,7 +27,7 @@ function getSystemPrompt() {
       }
     }
   }
-  return "You are a helpful, precise, and composed AI assistant.";
+  return "You are Supra";
 }
 
 let serverInstance = null
@@ -181,16 +181,20 @@ function createServer(database, config, provider) {
         return
       }
 
+      if (database.hasConversation(conversation.id)) {
+        database.replaceConversation(conversation)
+        sendJson(req, res, 200, { ok: true, conversation })
+        return
+      }
+
       database.saveConversation(conversation)
       sendJson(req, res, 201, { ok: true, conversation })
     } catch (error) {
-      const detail =
-        error?.code === "SQLITE_CONSTRAINT_PRIMARYKEY"
-          ? "A conversation with this id already exists."
-          : "Unable to store the conversation."
-      const statusCode = error?.code === "SQLITE_CONSTRAINT_PRIMARYKEY" ? 409 : 500
-
-      sendJson(req, res, statusCode, { ok: false, error: "conversation_create_failed", detail })
+      sendJson(req, res, 500, {
+        ok: false,
+        error: "conversation_create_failed",
+        detail: "Unable to store the conversation.",
+      })
     }
 
     return
@@ -300,6 +304,7 @@ function createServer(database, config, provider) {
     try {
       const body = await readJsonBody(req)
       const message = String(body.message ?? "").trim()
+      const temperature = typeof body.temperature === "number" ? body.temperature : undefined
 
       if (!message) {
         sendJson(req, res, 400, {
@@ -310,7 +315,7 @@ function createServer(database, config, provider) {
         return
       }
 
-      const response = await provider.streamTitle(message)
+      const response = await provider.streamTitle(message, temperature)
 
       writeStreamHeaders(req, res, config)
       provider.pipeStream(response.data, res)

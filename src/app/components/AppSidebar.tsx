@@ -4,6 +4,7 @@ import { appNavigationItems, sidebarControlIcon as SidebarControlIcon } from "@/
 import { type AppTheme } from "@/app/config/theme"
 import { cn } from "@/lib/utils"
 import { TITLE_PENDING_LABEL } from "@/features/chat/config/ui"
+import { useScrollVisibility } from "@/features/chat/hooks/useScrollVisibility"
 import { truncateConversationTitle } from "@/features/chat/lib/chat-records"
 import { Conversation } from "@/features/chat/types"
 
@@ -46,6 +47,8 @@ export function AppSidebar({
   const [renamingConversationId, setRenamingConversationId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState("")
   const renameInputRef = useRef<HTMLInputElement | null>(null)
+  const recentsScrollRef = useRef<HTMLDivElement | null>(null)
+  const isRecentsScrolling = useScrollVisibility(recentsScrollRef)
   const displayedConversations = isLoading
     ? []
     : conversations.filter((conversation) => conversation.messages.length > 0)
@@ -121,7 +124,7 @@ export function AppSidebar({
     >
       <div className="sidebar-header">
         <div className="sidebar-brand-wrap" aria-hidden={collapsed}>
-          <h1 className="text-lg font-semibold tracking-[-0.01em]">SupraChat</h1>
+          <h1 className="text-[0.96rem] font-semibold">SupraChat</h1>
         </div>
         <div className="sidebar-header-actions">
           {!collapsed ? (
@@ -162,7 +165,12 @@ export function AppSidebar({
         ))}
       </nav>
 
-      <div className="sidebar-recents mt-5 min-h-0 flex-1 overflow-y-auto px-2.5 pb-4" aria-hidden={collapsed}>
+      <div
+        className="sidebar-recents scrollbar-reveal mt-5 min-h-0 flex-1 overflow-y-auto px-2.5 pb-4"
+        aria-hidden={collapsed}
+        data-scrolling={isRecentsScrolling}
+        ref={recentsScrollRef}
+      >
         <section className="sidebar-section">
           <p className="sidebar-section-title">Recents</p>
           <div className="space-y-0.5">

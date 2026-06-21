@@ -4,11 +4,11 @@ import {
   cleanIncompleteMarkdown,
   createConversationRecord,
   createMessage,
-  sanitizeGeneratedTitle,
   titleFromGeneratedPayload,
   titleFromMessage,
 } from "@/features/chat/lib/chat-records"
 import {
+  ChatServiceError,
   createStoredConversation,
   deleteStoredConversation,
   fetchConversations,
@@ -17,6 +17,33 @@ import {
   updateStoredConversation,
 } from "@/features/chat/services/chat-service"
 import { ChatMessage, Conversation } from "@/features/chat/types"
+
+const TITLE_RETRY_MAX_ATTEMPTS = 3
+const TITLE_RETRY_BASE_TEMPERATURE = 0.85
+const TITLE_RETRY_TEMPERATURE_INCREMENT = 0.1
+const TITLE_CONTENT_MAX_WORDS = 2000
+
+function isTitleCopiedFromUserText(title: string, userMessage: string): boolean {
+  const titleWords = title.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const userWords = userMessage.trim().toLowerCase().split(/\s+/).filter(Boolean)
+
+  if (titleWords.length === 0 || userWords.length === 0) {
+    return false
+  }
+
+  const userPrefix = userWords.slice(0, Math.min(titleWords.length, userWords.length)).join(" ")
+  const titleText = titleWords.join(" ")
+
+  return titleText === userPrefix
+}
+
+function trimContentToWordLimit(content: string, maxWords: number): string {
+  const words = content.trim().split(/\s+/).filter(Boolean)
+  if (words.length <= maxWords) {
+    return content.trim()
+  }
+  return words.slice(0, maxWords).join(" ")
+}
 
 type ChatState = {
   conversations: Conversation[]
@@ -28,14 +55,18 @@ type ChatState = {
   createConversation: () => Promise<string>
   renameConversation: (conversationId: string, title: string) => Promise<boolean>
   deleteConversation: (conversationId: string) => Promise<boolean>
-  sendMessage: (content: string) => Promise<void>
+  sendMessage: (content: string, options?: { beforeGeneration?: () => Promise<void> | void }) => Promise<void>
   setActiveConversation: (conversationId: string) => void
 }
 
 async function persistConversation(conversation: Conversation) {
   try {
     await updateStoredConversation(conversation)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof ChatServiceError) || error.status !== 404) {
+      throw error
+    }
+
     await createStoredConversation(conversation)
   }
 }
@@ -94,7 +125,19 @@ export const useChatStore = create<ChatState>((set) => ({
           (conversation) => conversation.messages.length > 0,
         )
 
-        if (savedConversations.length === 0) {
+        const recoveredConversations = savedConversations.map((conversation) => {
+          if (conversation.title.trim().length === 0 && conversation.messages.length > 0) {
+            const firstUserMessage = conversation.messages.find((m) => m.role === "user")
+            return {
+              ...conversation,
+              title: firstUserMessage ? titleFromMessage(firstUserMessage.content) : conversation.title,
+              titleStatus: "failed" as const,
+            }
+          }
+          return conversation
+        })
+
+        if (recoveredConversations.length === 0) {
           const conversation = createConversationRecord()
           set({
             conversations: [conversation],
@@ -106,12 +149,25 @@ export const useChatStore = create<ChatState>((set) => ({
         }
 
         set({
-          conversations: sortConversationsByUpdatedAt(savedConversations),
-          activeConversationId: savedConversations[0].id,
+          conversations: sortConversationsByUpdatedAt(recoveredConversations),
+          activeConversationId: recoveredConversations[0].id,
           isLoading: false,
           error: null,
         })
+
+        const needsRecovery = savedConversations.some(
+          (c) => c.title.trim().length === 0 && c.messages.length > 0,
+        )
+
+        if (needsRecovery) {
+          await Promise.allSettled(
+            recoveredConversations
+              .filter((c) => c.titleStatus === "failed")
+              .map((c) => persistConversation(c)),
+          )
+        }
       } catch {
+        initializationPromise = null
         set({
           isLoading: false,
           error: "Unable to load saved conversations. Check the local database connection and try again.",
@@ -248,7 +304,7 @@ export const useChatStore = create<ChatState>((set) => ({
   setActiveConversation: (conversationId) => {
     set({ activeConversationId: conversationId, error: null })
   },
-  sendMessage: async (content) => {
+  sendMessage: async (content, options) => {
     const trimmedContent = content.trim()
 
     if (!trimmedContent) {
@@ -281,12 +337,27 @@ export const useChatStore = create<ChatState>((set) => ({
             ...conversation,
             title: shouldGenerateTitle ? "" : conversation.title,
             titleStatus: shouldGenerateTitle ? "generating" : conversation.titleStatus,
-            messages: [...conversation.messages, userMessage, assistantMessage],
+            messages: [...conversation.messages, userMessage],
             updatedAt: userMessage.createdAt,
           })),
         ),
       }
     })
+
+    try {
+      await options?.beforeGeneration?.()
+    } catch {
+      // Scroll preparation should not prevent local generation from starting.
+    }
+
+    set((state) => ({
+      conversations: sortConversationsByUpdatedAt(
+        updateConversationById(state.conversations, conversationId, (conversation) => ({
+          ...conversation,
+          messages: [...conversation.messages, assistantMessage],
+        })),
+      ),
+    }))
 
     try {
       const conversationAfterPrompt = useChatStore
@@ -343,20 +414,32 @@ export const useChatStore = create<ChatState>((set) => ({
       }))
     }
 
-    const finalizeTitle = (status: "complete" | "failed") => {
+    const finalizeTitle = async (status: "complete" | "failed") => {
       set((state) => ({
         conversations: sortConversationsByUpdatedAt(
           updateConversationById(state.conversations, conversationId, (conversation) => {
-            const title = titleFromGeneratedPayload(generatedTitlePayload) || sanitizeGeneratedTitle(conversation.title)
+            const title = titleFromGeneratedPayload(generatedTitlePayload) || titleFromMessage(trimmedContent)
 
             return {
               ...conversation,
-              title: title || titleFromMessage(trimmedContent),
+              title,
               titleStatus: status,
             }
           }),
         ),
       }))
+
+      const updatedConversation = useChatStore
+        .getState()
+        .conversations.find((c) => c.id === conversationId)
+
+      if (updatedConversation) {
+        try {
+          await persistConversation(updatedConversation)
+        } catch {
+          // Title persistence failure is non-critical; the chat response is already saved.
+        }
+      }
     }
 
     const finalizeAssistantMessage = (formatter: (content: string) => string) => {
@@ -399,6 +482,73 @@ export const useChatStore = create<ChatState>((set) => ({
       await Promise.all([responseStream, titleStream])
 
       finalizeAssistantMessage(cleanIncompleteMarkdown)
+
+      if (shouldGenerateTitle) {
+        const conversationAfterResponse = useChatStore
+          .getState()
+          .conversations.find((c) => c.id === conversationId)
+
+        if (conversationAfterResponse) {
+          const currentTitle = titleFromGeneratedPayload(generatedTitlePayload)
+            || conversationAfterResponse.title
+
+          if (isTitleCopiedFromUserText(currentTitle, trimmedContent)) {
+            const assistantMsg = conversationAfterResponse.messages.find(
+              (m) => m.role === "assistant" && m.id !== assistantMessage.id,
+            )
+            const combinedContent = `${trimmedContent}\n\n${assistantMsg?.content ?? ""}`
+            const trimmedCombined = trimContentToWordLimit(combinedContent, TITLE_CONTENT_MAX_WORDS)
+
+            let lastTitle = currentTitle
+            let temperature = TITLE_RETRY_BASE_TEMPERATURE
+
+            for (let attempt = 0; attempt < TITLE_RETRY_MAX_ATTEMPTS; attempt += 1) {
+              let retryPayload = ""
+
+              try {
+                await streamConversationTitle({
+                  userMessage: trimmedCombined,
+                  temperature,
+                  onChunk: (chunk) => {
+                    retryPayload = `${retryPayload}${chunk}`
+                  },
+                })
+
+                const retryTitle = titleFromGeneratedPayload(retryPayload)
+
+                if (retryTitle && !isTitleCopiedFromUserText(retryTitle, trimmedContent) && retryTitle !== lastTitle) {
+                  set((state) => ({
+                    conversations: sortConversationsByUpdatedAt(
+                      updateConversationById(state.conversations, conversationId, (conversation) => ({
+                        ...conversation,
+                        title: retryTitle,
+                        titleStatus: "complete",
+                      })),
+                    ),
+                  }))
+
+                  const retriedConversation = useChatStore
+                    .getState()
+                    .conversations.find((c) => c.id === conversationId)
+
+                  if (retriedConversation) {
+                    await persistConversation(retriedConversation)
+                  }
+
+                  break
+                }
+
+                lastTitle = retryTitle || lastTitle
+              } catch {
+                // Retry title generation is best-effort; continue to next attempt.
+              }
+
+              temperature += TITLE_RETRY_TEMPERATURE_INCREMENT
+            }
+          }
+        }
+      }
+
       const completedConversation = useChatStore
         .getState()
         .conversations.find((conversation) => conversation.id === conversationId)

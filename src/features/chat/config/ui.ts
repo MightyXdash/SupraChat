@@ -18,3 +18,6 @@ export const TITLE_GENERATION_NOTE = "Titles are generated locally after the fir
 export const CHAT_READING_NOTE = "SupraChat can make mistakes. Verify important information."
 export const GENERATION_ERROR_MESSAGE =
   "Generation stopped before the response completed. Check the local model runtime and try again."
+export const SUBMIT_SCROLL_TOP_OFFSET_PX = 24
+export const SUBMIT_SCROLL_SETTLE_MS = 420
+export const SUBMIT_SCROLL_MIN_BOTTOM_SPACE_PX = 160

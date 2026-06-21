@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { ChatBubble } from "@/features/chat/components/ChatBubble"
 import { ChatComposer } from "@/features/chat/components/ChatComposer"
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
+import { useScrollVisibility } from "@/features/chat/hooks/useScrollVisibility"
 import { Conversation } from "@/features/chat/types"
 
 type ChatWorkspaceProps = {
@@ -27,6 +28,7 @@ export function ChatWorkspace({
   const [isUsageOpen, setIsUsageOpen] = useState(false)
   const usageButtonRef = useRef<HTMLDivElement | null>(null)
   const usagePopoverRef = useRef<HTMLDivElement | null>(null)
+  const isChatScrolling = useScrollVisibility(scrollRef)
   const hasMessages = Boolean(conversation && conversation.messages.length > 0)
   const messageCount = conversation?.messages.length ?? 0
   const userTokens =
@@ -77,9 +79,6 @@ export function ChatWorkspace({
   return (
     <section className="relative flex min-h-0 flex-col bg-[var(--surface)]">
       <header className="chat-workspace-header px-5">
-        <div className="chat-workspace-glass" aria-hidden="true">
-          <span className="chat-workspace-glass-layer" />
-        </div>
         <div className="chat-workspace-report" aria-label="Context usage">
           <div className="chat-token-usage-wrap" ref={usageButtonRef}>
             <button
@@ -159,8 +158,9 @@ export function ChatWorkspace({
 
       <div
         ref={scrollRef}
-        className="chat-workspace-scroll min-h-0 flex-1 overflow-y-auto px-6 pb-40 max-[780px]:px-4 max-[780px]:pb-36"
+        className="chat-workspace-scroll scrollbar-reveal min-h-0 flex-1 overflow-y-auto px-6 pb-40 max-[780px]:px-4 max-[780px]:pb-36"
         data-empty={!hasMessages}
+        data-scrolling={isChatScrolling}
       >
         {hasMessages && (
           <div className="mx-auto flex max-w-3xl flex-col gap-5">

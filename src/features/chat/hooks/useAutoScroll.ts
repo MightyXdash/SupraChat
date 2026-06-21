@@ -1,68 +1,90 @@
-import { useCallback, useEffect, useMemo, useRef } from "react"
-import { useChatStore } from "@/features/chat/store/use-chat-store"
+import { useCallback, useRef } from "react"
+import {
+  SUBMIT_SCROLL_MIN_BOTTOM_SPACE_PX,
+  SUBMIT_SCROLL_SETTLE_MS,
+  SUBMIT_SCROLL_TOP_OFFSET_PX,
+} from "@/features/chat/config/ui"
 
-const SCROLL_LOCK_THRESHOLD_PX = 96
+function waitForScrollSettle(scrollElement: HTMLElement) {
+  return new Promise<void>((resolve) => {
+    let fallbackTimeout: number | undefined
+
+    function finish() {
+      window.clearTimeout(fallbackTimeout)
+      scrollElement.removeEventListener("scrollend", finish)
+      resolve()
+    }
+
+    scrollElement.addEventListener("scrollend", finish, { once: true })
+    fallbackTimeout = window.setTimeout(finish, SUBMIT_SCROLL_SETTLE_MS)
+  })
+}
 
 export function useAutoScroll() {
   const scrollRef = useRef<HTMLDivElement>(null)
-  const isAutoScrollLockedRef = useRef(true)
-  const activeConversationId = useChatStore((state) => state.activeConversationId)
-  const conversations = useChatStore((state) => state.conversations)
-  const isGenerating = useChatStore((state) => state.isGenerating)
+  const previousPaddingBottomRef = useRef<string | null>(null)
 
-  const activeConversation = conversations.find(
-    (conversation) => conversation.id === activeConversationId,
-  )
-
-  const scrollSignal = useMemo(() => {
-    const messages = activeConversation?.messages ?? []
-    const lastMessage = messages.at(-1)
-
-    return `${activeConversationId}:${messages.length}:${lastMessage?.id ?? ""}:${lastMessage?.content.length ?? 0}`
-  }, [activeConversation?.messages, activeConversationId])
-
-  const lockToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+  const clearSubmitScrollSpace = useCallback(() => {
     const scrollElement = scrollRef.current
 
-    isAutoScrollLockedRef.current = true
+    if (!scrollElement || previousPaddingBottomRef.current === null) {
+      return
+    }
+
+    scrollElement.style.paddingBottom = previousPaddingBottomRef.current
+    previousPaddingBottomRef.current = null
+  }, [])
+
+  const scrollLatestUserTurnIntoView = useCallback(async () => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(resolve)
+      })
+    })
+
+    const scrollElement = scrollRef.current
 
     if (!scrollElement) {
+      return
+    }
+
+    if (previousPaddingBottomRef.current === null) {
+      previousPaddingBottomRef.current = scrollElement.style.paddingBottom
+    }
+
+    const bottomSpace = Math.max(
+      SUBMIT_SCROLL_MIN_BOTTOM_SPACE_PX,
+      scrollElement.clientHeight - SUBMIT_SCROLL_TOP_OFFSET_PX,
+    )
+
+    scrollElement.style.paddingBottom = `${bottomSpace}px`
+
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(resolve)
+    })
+
+    const userMessages = scrollElement.querySelectorAll<HTMLElement>('[data-message-role="user"]')
+    const latestUserMessage = userMessages.item(userMessages.length - 1)
+
+    if (!latestUserMessage) {
+      return
+    }
+
+    const maxScrollTop = Math.max(0, scrollElement.scrollHeight - scrollElement.clientHeight)
+    const targetScrollTop = Math.max(0, latestUserMessage.offsetTop - SUBMIT_SCROLL_TOP_OFFSET_PX)
+    const nextScrollTop = Math.min(targetScrollTop, maxScrollTop)
+
+    if (Math.abs(scrollElement.scrollTop - nextScrollTop) < 1) {
       return
     }
 
     scrollElement.scrollTo({
-      top: scrollElement.scrollHeight,
-      behavior,
+      top: nextScrollTop,
+      behavior: "smooth",
     })
+
+    await waitForScrollSettle(scrollElement)
   }, [])
 
-  useEffect(() => {
-    const scrollElement = scrollRef.current
-
-    if (!scrollElement) {
-      return
-    }
-
-    function handleScroll() {
-      const distanceFromBottom =
-        scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight
-
-      isAutoScrollLockedRef.current = distanceFromBottom <= SCROLL_LOCK_THRESHOLD_PX
-    }
-
-    scrollElement.addEventListener("scroll", handleScroll, { passive: true })
-    handleScroll()
-
-    return () => scrollElement.removeEventListener("scroll", handleScroll)
-  }, [activeConversationId])
-
-  useEffect(() => {
-    if (!isAutoScrollLockedRef.current) {
-      return
-    }
-
-    lockToBottom("smooth")
-  }, [isGenerating, lockToBottom, scrollSignal])
-
-  return { lockToBottom, scrollRef }
+  return { clearSubmitScrollSpace, scrollLatestUserTurnIntoView, scrollRef }
 }

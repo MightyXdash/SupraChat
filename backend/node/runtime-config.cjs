@@ -3,7 +3,7 @@ const path = require("node:path")
 
 const DEFAULT_APP_DATA_DIRECTORY = "SupraChat"
 const DEFAULT_CHAT_MODEL = "lfm2.5-350m-q6"
-const DEFAULT_TITLE_MODEL = "supra-title-350m-q4"
+const DEFAULT_TITLE_MODEL = "supra-title-50m-q5"
 const DEFAULT_NODE_PORT = 3001
 
 function resolvePlatformDataDir(appDirectoryName = DEFAULT_APP_DATA_DIRECTORY) {

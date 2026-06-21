@@ -13,10 +13,11 @@ export const ChatBubble = memo(function ChatBubble({ message }: { message: ChatM
       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
       transition={{ duration: 0.24, ease: "easeOut" }}
       className={cn("flex", isUser ? "justify-end" : "w-full")}
+      data-message-role={message.role}
     >
       <div
         className={cn(
-          "rounded-[var(--radius-panel)] border px-4 py-3 text-[0.95rem] leading-7",
+          "chat-message-surface rounded-[var(--radius-panel)] border px-4 py-3 text-[0.95rem] leading-7",
           isUser
             ? "max-w-[74ch] border-[var(--border)] bg-[var(--highlight)] text-[var(--text-primary)]"
             : "min-w-0 flex-1 border-transparent bg-[var(--surface)] text-[var(--text-primary)]",

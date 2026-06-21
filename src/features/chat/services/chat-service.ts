@@ -9,6 +9,17 @@ type StreamChatCompletionOptions = {
 type StreamConversationTitleOptions = {
   userMessage: string
   onChunk: (chunk: string) => void
+  temperature?: number
+}
+
+export class ChatServiceError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = "ChatServiceError"
+    this.status = status
+  }
 }
 
 async function delay(ms: number) {
@@ -19,7 +30,7 @@ async function readErrorDetail(response: Response) {
   let detail = "Unable to generate a response."
 
   try {
-    const data = await response.json()
+    const data = await response.clone().json()
     detail = data.detail ?? detail
   } catch {
     const responseText = await response.text()
@@ -49,7 +60,7 @@ async function fetchWithRetry(input: RequestInfo | URL, init?: RequestInit) {
 
 async function readJson<T>(response: Response) {
   if (!response.ok) {
-    throw new Error(await readErrorDetail(response))
+    throw new ChatServiceError(await readErrorDetail(response), response.status)
   }
 
   return (await response.json()) as T
@@ -172,13 +183,14 @@ export async function streamChatCompletion({
 export async function streamConversationTitle({
   userMessage,
   onChunk,
+  temperature,
 }: StreamConversationTitleOptions) {
   const response = await fetchWithRetry(chatRuntimeConfig.titleEndpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ message: userMessage }),
+    body: JSON.stringify({ message: userMessage, temperature }),
   })
 
   if (!response.ok || !response.body) {

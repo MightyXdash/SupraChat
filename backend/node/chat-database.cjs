@@ -22,6 +22,7 @@ function createChatDatabase(databasePath) {
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
+      title_status TEXT NOT NULL DEFAULT 'idle',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -43,10 +44,18 @@ function createChatDatabase(databasePath) {
       ON messages(conversation_id, position);
   `)
 
+  const tableInfo = db.prepare("PRAGMA table_info(conversations)").all()
+  const hasTitleStatus = tableInfo.some((col) => col.name === "title_status")
+
+  if (!hasTitleStatus) {
+    db.exec(`ALTER TABLE conversations ADD COLUMN title_status TEXT NOT NULL DEFAULT 'idle'`)
+  }
+
   const listConversationsStatement = db.prepare(`
     SELECT
       conversations.id AS conversation_id,
       conversations.title AS conversation_title,
+      conversations.title_status AS conversation_title_status,
       conversations.created_at AS conversation_created_at,
       conversations.updated_at AS conversation_updated_at,
       messages.id AS message_id,
@@ -60,8 +69,8 @@ function createChatDatabase(databasePath) {
   `)
 
   const insertConversationStatement = db.prepare(`
-    INSERT INTO conversations (id, title, created_at, updated_at)
-    VALUES (@id, @title, @created_at, @updated_at)
+    INSERT INTO conversations (id, title, title_status, created_at, updated_at)
+    VALUES (@id, @title, @title_status, @created_at, @updated_at)
   `)
 
   const deleteConversationMessagesStatement = db.prepare(`
@@ -76,7 +85,7 @@ function createChatDatabase(databasePath) {
 
   const updateConversationStatement = db.prepare(`
     UPDATE conversations
-    SET title = @title, updated_at = @updated_at
+    SET title = @title, title_status = @title_status, updated_at = @updated_at
     WHERE id = @id
   `)
 
@@ -100,6 +109,7 @@ function createChatDatabase(databasePath) {
     insertConversationStatement.run({
       id: conversation.id,
       title: conversation.title,
+      title_status: conversation.titleStatus || "idle",
       created_at: conversation.createdAt,
       updated_at: conversation.updatedAt,
     })
@@ -120,6 +130,7 @@ function createChatDatabase(databasePath) {
     updateConversationStatement.run({
       id: conversation.id,
       title: conversation.title,
+      title_status: conversation.titleStatus || "idle",
       updated_at: conversation.updatedAt,
     })
     deleteConversationMessagesStatement.run(conversation.id)
@@ -148,6 +159,7 @@ function createChatDatabase(databasePath) {
         conversation = {
           id: row.conversation_id,
           title: row.conversation_title,
+          titleStatus: row.conversation_title_status || "idle",
           createdAt: row.conversation_created_at,
           updatedAt: row.conversation_updated_at,
           messages: [],

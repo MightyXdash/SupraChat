@@ -18,7 +18,7 @@ resources/
     lib/*.dll
   models/
     chat/LFM2.5-350M-Q6_K.gguf
-    title/LiquidAI_LFM2.5-350M-Base_1781204855.Q4_K_M.gguf
+    title/SupraTitle-50M-Q5_K_M.gguf
 ```
 
 Download the default GGUF model files:
@@ -39,8 +39,8 @@ Chat model:
 
 Title model:
 
-- Repository: `SupraLabs/Supra-Title-350M-exp-GGUF`
-- Default file: `LiquidAI_LFM2.5-350M-Base_1781204855.Q4_K_M.gguf`
+- Repository: `SupraLabs/supra-title-50M-pre-gguf`
+- Default file: `SupraTitle-50M-Q5_K_M.gguf`
 
 Development overrides:
 

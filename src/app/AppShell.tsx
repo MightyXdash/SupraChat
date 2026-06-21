@@ -17,7 +17,7 @@ export function AppShell() {
   const [draft, setDraft] = useState("")
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true)
   const [theme, setTheme] = useState<AppTheme>(() => getStoredTheme() ?? getSystemTheme())
-  const { lockToBottom, scrollRef } = useAutoScroll()
+  const { clearSubmitScrollSpace, scrollLatestUserTurnIntoView, scrollRef } = useAutoScroll()
   const conversations = useChatStore((state) => state.conversations)
   const activeConversationId = useChatStore((state) => state.activeConversationId)
   const initialize = useChatStore((state) => state.initialize)
@@ -55,8 +55,11 @@ export function AppShell() {
     }
 
     setDraft("")
-    lockToBottom("auto")
-    await sendMessage(message)
+    try {
+      await sendMessage(message, { beforeGeneration: scrollLatestUserTurnIntoView })
+    } finally {
+      clearSubmitScrollSpace()
+    }
   }
 
   return (
