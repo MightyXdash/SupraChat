@@ -8,3 +8,8 @@ __pycache__/
 build/
 release/
 .DS_Store
+
+# Generated local runtime assets.
+resources/models/**/*.gguf
+resources/llama.cpp/**/llama-server
+resources/llama.cpp/**/*.dylib

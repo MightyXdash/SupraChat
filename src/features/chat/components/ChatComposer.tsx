@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react"
-import { ArrowUp, Plus } from "lucide-react"
+import { ArrowUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 type ChatComposerProps = {
@@ -112,7 +112,7 @@ export function ChatComposer({
             ref={textareaRef}
             aria-label="Message SupraChat"
             className="chat-composer-textarea"
-            placeholder="Message SupraChat..."
+            placeholder="Message Supra..."
             rows={1}
             value={draft}
             onChange={(event) => onDraftChange(event.target.value)}
@@ -123,12 +123,6 @@ export function ChatComposer({
         </div>
 
         <div className="chat-composer-footer">
-          <div className="chat-composer-footer-group">
-            <Button aria-label="Add attachment" className="chat-composer-round-button" size="icon" type="button" variant="ghost">
-              <Plus className="h-5 w-5" />
-            </Button>
-          </div>
-
           <Button
             aria-label="Send message"
             className="chat-composer-voice-button"

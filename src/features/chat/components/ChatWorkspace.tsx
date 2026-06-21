@@ -80,9 +80,6 @@ export function ChatWorkspace({
         <div className="chat-workspace-glass" aria-hidden="true">
           <span className="chat-workspace-glass-layer" />
         </div>
-        <div className="chat-title-badge">
-          <span>{conversation?.title || "New Conversation"}</span>
-        </div>
         <div className="chat-workspace-report" aria-label="Context usage">
           <div className="chat-token-usage-wrap" ref={usageButtonRef}>
             <button
@@ -154,7 +151,7 @@ export function ChatWorkspace({
                 <span>Total estimate</span>
                 <strong>{estimatedTokens.toLocaleString()}</strong>
               </div>
-              <p className="chat-token-note">Estimated from conversation text. Provider token accounting can replace this later.</p>
+              <p className="chat-token-note">Estimated from conversation text. Runtime token accounting can replace this later.</p>
             </motion.div>
           </div>
         ) : null}

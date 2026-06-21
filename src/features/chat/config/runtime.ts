@@ -3,6 +3,11 @@ declare global {
     suprachat?: {
       backendPort?: number
       platform?: string
+      windowControls?: {
+        close: () => Promise<void>
+        minimize: () => Promise<void>
+        toggleMaximize: () => Promise<void>
+      }
     }
   }
 }

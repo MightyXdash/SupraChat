@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu } = require("electron")
+const { app, BrowserWindow, Menu, ipcMain } = require("electron")
 const { spawn } = require("node:child_process")
 const net = require("node:net")
 const path = require("node:path")
@@ -37,6 +37,9 @@ async function startBackend() {
   }
 
   backendPort = await findAvailablePort(3001)
+  const resourceDirectory = app.isPackaged
+    ? path.join(process.resourcesPath, "resources")
+    : path.join(__dirname, "..", "resources")
   backendProcess = spawn(process.env.SUPRACHAT_NODE_RUNTIME ?? "node", [
     path.join(__dirname, "..", "backend", "node", "server.cjs"),
   ], {
@@ -45,6 +48,7 @@ async function startBackend() {
       ...process.env,
       SUPRACHAT_DATA_DIR: app.getPath("userData"),
       SUPRACHAT_NODE_PORT: String(backendPort),
+      SUPRACHAT_RESOURCE_DIR: resourceDirectory,
     },
     stdio: "inherit",
     windowsHide: true,
@@ -59,6 +63,7 @@ async function startBackend() {
 }
 
 function createWindow() {
+  const isMac = process.platform === "darwin"
   const window = new BrowserWindow({
     width: 1500,
     height: 940,
@@ -67,6 +72,10 @@ function createWindow() {
     title: "SupraChat",
     backgroundColor: "#F7F3EE",
     autoHideMenuBar: true,
+    frame: isMac,
+    fullSizeContentView: isMac,
+    titleBarStyle: "hidden",
+    trafficLightPosition: isMac ? { x: 13, y: 10 } : undefined,
     webPreferences: {
       additionalArguments: [`--suprachat-backend-port=${backendPort ?? 3001}`],
       preload: path.join(__dirname, "preload.cjs"),
@@ -83,6 +92,33 @@ function createWindow() {
     window.show()
   })
 }
+
+function getFocusedWindow() {
+  return BrowserWindow.getFocusedWindow()
+}
+
+ipcMain.handle("window:minimize", () => {
+  getFocusedWindow()?.minimize()
+})
+
+ipcMain.handle("window:toggle-maximize", () => {
+  const window = getFocusedWindow()
+
+  if (!window) {
+    return
+  }
+
+  if (window.isMaximized()) {
+    window.unmaximize()
+    return
+  }
+
+  window.maximize()
+})
+
+ipcMain.handle("window:close", () => {
+  getFocusedWindow()?.close()
+})
 
 function stopBackend() {
   if (backendProcess) {

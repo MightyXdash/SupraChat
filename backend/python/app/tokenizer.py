@@ -21,7 +21,7 @@ def get_tokenizer() -> PreTrainedTokenizerBase:
 
 
 def build_prompt(history: list[dict[str, str]]) -> str:
-    """Apply chat template if available, fallback to manual format."""
+    """Apply chat template if available, otherwise use the manual format."""
     tok = get_tokenizer()
     messages = [{"role": "system", "content": config.SYSTEM_PROMPT}] + history
     if hasattr(tok, "apply_chat_template") and tok.chat_template:
@@ -30,7 +30,7 @@ def build_prompt(history: list[dict[str, str]]) -> str:
             tokenize=False,
             add_generation_prompt=True,
         )
-    # Manual fallback (instruction-tuned models without a template)
+    # Manual format for instruction-tuned models without a template.
     parts: list[str] = [f"System: {config.SYSTEM_PROMPT}\n"]
     for msg in history:
         role = "User" if msg["role"] == "user" else "Assistant"

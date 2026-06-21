@@ -408,7 +408,7 @@ export const useChatStore = create<ChatState>((set) => ({
       }
 
       set({ isGenerating: false })
-    } catch {
+    } catch (error) {
       finalizeAssistantMessage(cleanIncompleteMarkdown)
       const interruptedConversation = useChatStore
         .getState()
@@ -424,7 +424,7 @@ export const useChatStore = create<ChatState>((set) => ({
 
       set({
         isGenerating: false,
-        error: GENERATION_ERROR_MESSAGE,
+        error: error instanceof Error ? error.message : GENERATION_ERROR_MESSAGE,
       })
     }
   },

@@ -1,4 +1,4 @@
-const { contextBridge } = require("electron")
+const { contextBridge, ipcRenderer } = require("electron")
 
 function getBackendPort() {
   const backendArgument = process.argv.find((argument) =>
@@ -14,4 +14,9 @@ function getBackendPort() {
 contextBridge.exposeInMainWorld("suprachat", {
   backendPort: getBackendPort(),
   platform: process.platform,
+  windowControls: {
+    close: () => ipcRenderer.invoke("window:close"),
+    minimize: () => ipcRenderer.invoke("window:minimize"),
+    toggleMaximize: () => ipcRenderer.invoke("window:toggle-maximize"),
+  },
 })

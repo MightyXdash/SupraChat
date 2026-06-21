@@ -10,11 +10,11 @@ export const QUICK_PROMPTS = [
 
 export const EMPTY_STATE_TITLE = "Start a focused conversation."
 export const EMPTY_STATE_DESCRIPTION =
-  "SupraChat is using the local Ollama model configured for this workspace."
+  "SupraChat is using the packaged local llama.cpp runtime configured for this workspace."
 export const WORKSPACE_LABEL = "Local chat workspace"
-export const LOCAL_PROVIDER_NAME = "Ollama"
-export const LOCAL_PROVIDER_DESCRIPTION = "Local generation is active for this workspace."
+export const LOCAL_RUNTIME_NAME = "llama.cpp"
+export const LOCAL_RUNTIME_DESCRIPTION = "Local generation is active for this workspace."
 export const TITLE_GENERATION_NOTE = "Titles are generated locally after the first message."
 export const CHAT_READING_NOTE = "SupraChat can make mistakes. Verify important information."
 export const GENERATION_ERROR_MESSAGE =
-  "Generation stopped before the response completed. Check the provider connection and try again."
+  "Generation stopped before the response completed. Check the local model runtime and try again."

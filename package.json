@@ -14,6 +14,7 @@
     "build:python": "node scripts/python-runner.cjs -m PyInstaller backend/python/app/main.py --name suprachat-ai --onefile",
     "rebuild:electron": "electron-builder install-app-deps",
     "build:electron": "npm run rebuild:electron && vite build && electron-builder",
+    "models:download": "node scripts/download-llama-models.cjs",
     "preview": "vite preview",
     "postinstall": "node -e \"console.log('Skipping Electron native rebuild on install; run npm run rebuild:electron before packaging.')\""
   },
@@ -55,7 +56,17 @@
       "dist/**/*",
       "electron/**/*",
       "backend/node/**/*",
+      "resources/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "directories": {
       "buildResources": "build"

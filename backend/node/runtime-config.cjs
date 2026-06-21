@@ -2,9 +2,8 @@ const os = require("node:os")
 const path = require("node:path")
 
 const DEFAULT_APP_DATA_DIRECTORY = "SupraChat"
-const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
-const DEFAULT_CHAT_MODEL = "qwen3.5:4b-mlx"
-const DEFAULT_TITLE_MODEL = "gemma4:e2b-mlx"
+const DEFAULT_CHAT_MODEL = "lfm2.5-350m-q6"
+const DEFAULT_TITLE_MODEL = "supra-title-350m-q4"
 const DEFAULT_NODE_PORT = 3001
 
 function resolvePlatformDataDir(appDirectoryName = DEFAULT_APP_DATA_DIRECTORY) {
@@ -26,9 +25,9 @@ function resolvePlatformDataDir(appDirectoryName = DEFAULT_APP_DATA_DIRECTORY) {
   )
 }
 
-function parsePort(value, fallback = DEFAULT_NODE_PORT) {
+function parsePort(value, defaultPort = DEFAULT_NODE_PORT) {
   const port = Number(value)
-  return Number.isInteger(port) && port >= 0 ? port : fallback
+  return Number.isInteger(port) && port >= 0 ? port : defaultPort
 }
 
 function resolveRuntimeConfig(options = {}) {
@@ -42,12 +41,10 @@ function resolveRuntimeConfig(options = {}) {
       "http://localhost:5173",
       "null",
     ]),
-    chatModel: options.chatModel ?? process.env.SUPRACHAT_OLLAMA_MODEL ?? DEFAULT_CHAT_MODEL,
+    chatModel: options.chatModel ?? process.env.SUPRACHAT_CHAT_MODEL ?? DEFAULT_CHAT_MODEL,
     titleModel:
       options.titleModel ?? process.env.SUPRACHAT_TITLE_MODEL ?? DEFAULT_TITLE_MODEL,
     databasePath,
-    ollamaBaseUrl:
-      options.ollamaBaseUrl ?? process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_BASE_URL,
     port: parsePort(options.port ?? process.env.SUPRACHAT_NODE_PORT),
   }
 }

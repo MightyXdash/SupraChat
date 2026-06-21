@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react"
-import { Pencil, Trash2 } from "lucide-react"
+import { Moon, Pencil, Sun, Trash2 } from "lucide-react"
 import { appNavigationItems, sidebarControlIcon as SidebarControlIcon } from "@/app/config/navigation"
+import { type AppTheme } from "@/app/config/theme"
 import { cn } from "@/lib/utils"
 import { TITLE_PENDING_LABEL } from "@/features/chat/config/ui"
 import { truncateConversationTitle } from "@/features/chat/lib/chat-records"
@@ -12,10 +13,12 @@ type AppSidebarProps = {
   conversations: Conversation[]
   isBusy: boolean
   isLoading: boolean
+  theme: AppTheme
   onCreateConversation: () => Promise<string>
   onDeleteConversation: (conversationId: string) => Promise<boolean>
   onRenameConversation: (conversationId: string, title: string) => Promise<boolean>
   onSelectConversation: (conversationId: string) => void
+  onToggleTheme: () => void
   onToggleCollapsed: () => void
 }
 
@@ -31,10 +34,12 @@ export function AppSidebar({
   conversations,
   isBusy,
   isLoading,
+  theme,
   onCreateConversation,
   onDeleteConversation,
   onRenameConversation,
   onSelectConversation,
+  onToggleTheme,
   onToggleCollapsed,
 }: AppSidebarProps) {
   const [conversationMenu, setConversationMenu] = useState<ConversationMenuState | null>(null)
@@ -118,15 +123,26 @@ export function AppSidebar({
         <div className="sidebar-brand-wrap" aria-hidden={collapsed}>
           <h1 className="text-lg font-semibold tracking-[-0.01em]">SupraChat</h1>
         </div>
-        <button
-          className="sidebar-icon-button"
-          type="button"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-expanded={!collapsed}
-          onClick={onToggleCollapsed}
-        >
-          <SidebarControlIcon className="h-4 w-4" />
-        </button>
+        <div className="sidebar-header-actions">
+          <button
+            className="sidebar-icon-button"
+            type="button"
+            aria-label={theme === "light" ? "Use dark theme" : "Use light theme"}
+            onClick={onToggleTheme}
+            title={collapsed ? "Theme" : undefined}
+          >
+            {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          </button>
+          <button
+            className="sidebar-icon-button"
+            type="button"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            onClick={onToggleCollapsed}
+          >
+            <SidebarControlIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <nav className="sidebar-nav space-y-1">

@@ -3,6 +3,10 @@ const fs = require("node:fs")
 const path = require("node:path")
 const axios = require("axios")
 const { createChatDatabase } = require("./chat-database.cjs")
+const {
+  createLlamaCppProvider,
+  pipeOpenAiSseStream,
+} = require("./llama-cpp-provider.cjs")
 const { resolveRuntimeConfig } = require("./runtime-config.cjs")
 
 const TITLE_SYSTEM_PROMPT = `You are a conversation title generator.
@@ -145,6 +149,7 @@ function getSystemPrompt() {
 let serverInstance = null
 let databaseInstance = null
 let runtimeConfig = null
+let generationProvider = null
 
 function getAllowedOrigin(req, config) {
   const origin = req.headers.origin
@@ -220,69 +225,26 @@ function writeStreamHeaders(req, res, config) {
   })
 }
 
-function pipeOllamaChatStream(providerStream, res) {
-  let buffer = ""
-  let providerCompleted = false
+function createGenerationProvider() {
+  const provider = createLlamaCppProvider()
 
-  providerStream.on("data", (chunk) => {
-    buffer += chunk.toString("utf8")
-    const lines = buffer.split("\n")
-    buffer = lines.pop() ?? ""
-
-    for (const line of lines) {
-      if (!line.trim()) {
-        continue
-      }
-
-      try {
-        const payload = JSON.parse(line)
-        const content = payload?.message?.content
-
-        if (payload?.done === true) {
-          providerCompleted = true
-        }
-
-        if (content) {
-          res.write(content)
-        }
-      } catch {
-        // Ignore malformed provider chunks without ending a valid stream.
-      }
-    }
-  })
-
-  providerStream.on("end", () => {
-    if (buffer.trim()) {
-      try {
-        const payload = JSON.parse(buffer)
-        const content = payload?.message?.content
-
-        if (payload?.done === true) {
-          providerCompleted = true
-        }
-
-        if (content) {
-          res.write(content)
-        }
-      } catch {
-        // The stream is complete; incomplete provider metadata can be ignored.
-      }
-    }
-
-    if (!providerCompleted) {
-      res.destroy(new Error("Provider stream ended before completion."))
-      return
-    }
-
-    res.end()
-  })
-
-  providerStream.on("error", () => {
-    res.destroy(new Error("Provider stream failed before completion."))
-  })
+  return {
+    ...provider,
+    pipeStream: pipeOpenAiSseStream,
+  }
 }
 
-function createServer(database, config) {
+function providerErrorDetail(error, config, task) {
+  if (error?.code === "SUPRACHAT_MISSING_RUNTIME_FILE") {
+    return error.message
+  }
+
+  return task === "title"
+    ? "Unable to generate a conversation title. Check the local model runtime and try again."
+    : "Unable to generate a response. Check the local model runtime and try again."
+}
+
+function createServer(database, config, provider) {
   return http.createServer(async (req, res) => {
   const url = buildUrl(req)
 
@@ -306,7 +268,9 @@ function createServer(database, config) {
       ok: true,
       service: "node-backend",
       python,
-      model: config.chatModel,
+      runtime: "llama.cpp",
+      model: provider.chatModel.label,
+      titleModel: provider.titleModel.label,
     })
     return
   }
@@ -438,29 +402,15 @@ function createServer(database, config) {
         })),
       ]
 
-      const response = await axios.post(
-        `${config.ollamaBaseUrl}/api/chat`,
-        {
-          model: config.chatModel,
-          messages: formattedMessages,
-          stream: true,
-          think: false,
-        },
-        { responseType: "stream", timeout: 600_000 },
-      )
+      const response = await provider.streamChat(formattedMessages)
 
       writeStreamHeaders(req, res, config)
-      pipeOllamaChatStream(response.data, res)
+      provider.pipeStream(response.data, res)
     } catch (error) {
-      const detail =
-        error?.code === "ECONNREFUSED"
-          ? `Ollama is not reachable at ${config.ollamaBaseUrl}.`
-          : "Unable to generate a response. Check the provider connection and try again."
-
       sendJson(req, res, 502, {
         ok: false,
-        error: "ollama_generation_failed",
-        detail,
+        error: "generation_failed",
+        detail: providerErrorDetail(error, config, "chat"),
       })
     }
 
@@ -481,37 +431,15 @@ function createServer(database, config) {
         return
       }
 
-      const response = await axios.post(
-        `${config.ollamaBaseUrl}/api/chat`,
-        {
-          model: config.titleModel,
-          messages: [
-            { role: "system", content: TITLE_SYSTEM_PROMPT },
-            { role: "user", content: message },
-          ],
-          stream: true,
-          think: false,
-          keep_alive: 0,
-          options: {
-            temperature: 0.2,
-            num_predict: 96,
-          },
-        },
-        { responseType: "stream", timeout: 120_000 },
-      )
+      const response = await provider.streamTitle(message)
 
       writeStreamHeaders(req, res, config)
-      pipeOllamaChatStream(response.data, res)
+      provider.pipeStream(response.data, res)
     } catch (error) {
-      const detail =
-        error?.code === "ECONNREFUSED"
-          ? `Ollama is not reachable at ${config.ollamaBaseUrl}.`
-          : "Unable to generate a conversation title. Check the provider connection and try again."
-
       sendJson(req, res, 502, {
         ok: false,
-        error: "ollama_title_generation_failed",
-        detail,
+        error: "title_generation_failed",
+        detail: providerErrorDetail(error, config, "title"),
       })
     }
 
@@ -529,10 +457,15 @@ function startServer(options = {}) {
 
   runtimeConfig = resolveRuntimeConfig(options)
   databaseInstance = createChatDatabase(runtimeConfig.databasePath)
-  serverInstance = createServer(databaseInstance, runtimeConfig)
+  generationProvider = createGenerationProvider()
+  serverInstance = createServer(databaseInstance, runtimeConfig, generationProvider)
   serverInstance.on("error", (error) => {
     if (error.code === "EADDRINUSE") {
       console.log(`Node backend already available on http://127.0.0.1:${runtimeConfig.port}`)
+      if (generationProvider) {
+        generationProvider.stop()
+        generationProvider = null
+      }
       if (databaseInstance) {
         databaseInstance.close()
         databaseInstance = null
@@ -545,6 +478,11 @@ function startServer(options = {}) {
     throw error
   })
   serverInstance.on("close", () => {
+    if (generationProvider) {
+      generationProvider.stop()
+      generationProvider = null
+    }
+
     if (databaseInstance) {
       databaseInstance.close()
       databaseInstance = null
@@ -561,17 +499,46 @@ function startServer(options = {}) {
 
     console.log(`Node backend listening on http://127.0.0.1:${boundPort}`)
     console.log(`SupraChat database: ${runtimeConfig.databasePath}`)
-    console.log(`SupraChat Ollama model: ${runtimeConfig.chatModel}`)
-    console.log(`SupraChat title model: ${runtimeConfig.titleModel}`)
+    console.log("SupraChat runtime: llama.cpp")
+    console.log(`SupraChat chat model: ${generationProvider.chatModel.label}`)
+    console.log(`SupraChat title model: ${generationProvider.titleModel.label}`)
   })
 
   return serverInstance
 }
 
+function stopServer() {
+  if (serverInstance) {
+    serverInstance.close()
+    return
+  }
+
+  if (generationProvider) {
+    generationProvider.stop()
+    generationProvider = null
+  }
+
+  if (databaseInstance) {
+    databaseInstance.close()
+    databaseInstance = null
+  }
+}
+
 if (require.main === module) {
   startServer()
+
+  process.on("SIGINT", () => {
+    stopServer()
+    process.exit(0)
+  })
+
+  process.on("SIGTERM", () => {
+    stopServer()
+    process.exit(0)
+  })
 }
 
 module.exports = {
   startServer,
+  stopServer,
 }

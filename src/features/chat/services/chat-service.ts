@@ -22,8 +22,8 @@ async function readErrorDetail(response: Response) {
     const data = await response.json()
     detail = data.detail ?? detail
   } catch {
-    const fallback = await response.text()
-    detail = fallback || detail
+    const responseText = await response.text()
+    detail = responseText || detail
   }
 
   return detail

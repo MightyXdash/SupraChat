@@ -1,14 +1,14 @@
 # SupraChat Agent Guide
 
 This repository builds **SupraChat**, the centralized desktop application for the SupraLabs ecosystem.
-SupraChat is the primary surface for running and managing SupraLabs models, while also supporting external providers such as **Ollama** and **Unsloth**.
+SupraChat is the primary surface for running and managing SupraLabs models through a packaged, hardware-accelerated `llama.cpp` runtime.
 The product should feel deliberate, premium, technically serious, and calm under sustained use.
 
 ## Product Intent
 
 - Treat SupraChat as a flagship desktop product, not a generic chat wrapper.
 - Default experience: SupraLabs models feel first-party, deeply integrated, and ready to use out of the box.
-- External providers such as Ollama and Unsloth should feel well-supported, but visually and structurally secondary to the SupraLabs default path.
+- Local inference must be first-party, bundled, and optimized through `llama.cpp`; do not add external runtime dependencies.
 - Optimize for long sessions, model management, thoughtful reading, and low-friction control.
 - Prefer compact, efficient layouts over oversized marketing-style spacing.
 - Every system should be designed to scale cleanly, even when the first implementation is local-only.
@@ -19,12 +19,12 @@ The product should feel deliberate, premium, technically serious, and calm under
 - This applies to both frontend and backend code.
 - When adding a new feature, give it proper structure across its service, state, and UI layers instead of collapsing everything into one bloated file.
 - New feature work should be organized into focused modules with clear ownership so the codebase reads like a professional application, not a prototype.
-- Colors, spacing, radii, shadows, animation timings, provider labels, model metadata, feature flags, ports, file paths, command templates, and environment-specific behavior should have a defined source of truth.
+- Colors, spacing, radii, shadows, animation timings, runtime labels, model metadata, feature flags, ports, file paths, command templates, and environment-specific behavior should have a defined source of truth.
 - Prefer:
   - theme tokens over inline color literals
   - shared constants over repeated magic values
   - typed config objects over scattered conditionals
-  - provider adapters over provider-specific logic mixed into core flows
+  - runtime adapters over runtime-specific logic mixed into core flows
   - platform abstractions over OS-specific branches in UI components
 - Local-first is acceptable. Hardcoded and brittle is not.
 - Build every layer so it can expand without requiring a rewrite of the surrounding system.
@@ -39,11 +39,11 @@ The product should feel deliberate, premium, technically serious, and calm under
 
 ## Writing Rules
 
-- Prefer direct labels such as `Models`, `Knowledge`, `Settings`, `New Conversation`, `Pull Model`, `Connect Provider`.
+- Prefer direct labels such as `Models`, `Knowledge`, `Settings`, `New Conversation`, `Load Model`, `Runtime`.
 - Error and warning text must be calm, specific, and actionable.
 - Avoid vague statements like `Something went wrong`.
 - Prefer:
-  - `Unable to pull the selected model. Check the provider connection and try again.`
+  - `Unable to load the selected model. Check the local runtime files and try again.`
   - `SupraChat can make mistakes. Verify important information.`
 - Avoid exclamation marks in product UI unless there is a very strong reason.
 - Avoid anthropomorphic assistant language unless the product explicitly calls for it.
@@ -61,35 +61,43 @@ The product should feel deliberate, premium, technically serious, and calm under
 - Maintain strong legibility and separation between layers.
 - Dark mode must not drift into a cold blue-tinted aesthetic.
 - The dark theme should feel lively, premium, and grounded in warm grey and charcoal surfaces rather than dead black or blue-heavy panels.
+- SupraChat must support both a clean white/warm-light theme and a warm charcoal dark theme across the entire app.
+- Theme choice should be user-controllable, persisted locally, and initialized from the OS preference when no saved preference exists.
 
 ## Color System
 
 Implement the design system with semantic tokens first, then map tokens to theme values.
 Do not hardcode palette values throughout components when a token can be used instead.
+Light and dark themes must be expressed through CSS custom properties on the document root. Feature components should consume semantic tokens, not choose theme-specific values directly.
 
 ### Dark Theme Reference
 
 - `--background`: `#171511`
 - `--surface`: `#1F1C18`
+- `--sidebar`: `#1B1814`
 - `--surface-elevated`: `#26231E`
 - `--text-primary`: `#F7F4EF`
-- `--text-secondary`: `#A89F91`
-- `--border`: `#2F2B24`
+- `--text-secondary`: `#B8AFA2`
+- `--text-muted`: `#8F8578`
+- `--border`: `#332E27`
 - `--accent-primary`: `#D4A15D`
-- `--accent-light`: `#E8CFA4`
-- `--accent-hover`: `#C18A4A`
+- `--accent-light`: `#3A332A`
+- `--accent-hover`: `#E8CFA4`
 - `--highlight`: `#3A332A`
-- `--success`: `#6E8B74`
+- `--success`: `#7D987F`
 - `--warning`: `#D09B4C`
 - `--error`: `#C16A5A`
-- `--info`: `#5B7DA8`
+- `--info`: `#7290B8`
 
 ### Light Theme Reference
 
-- `--background`: `#F7F3EE`
-- `--surface`: `#FFFDF9`
+- `--background`: `#FCFBF8`
+- `--surface`: `#FFFFFF`
+- `--sidebar`: `#F8F5EF`
+- `--surface-elevated`: `#F1E6D2`
 - `--text-primary`: `#2A2522`
 - `--text-secondary`: `#6E655D`
+- `--text-muted`: `#8F8378`
 - `--border`: `#E4DDD5`
 - `--accent-primary`: `#C49A6C`
 - `--accent-light`: `#F1E6D2`
@@ -98,6 +106,14 @@ Do not hardcode palette values throughout components when a token can be used in
 - `--success`: `#6E8B74`
 - `--warning`: `#C4873A`
 - `--error`: `#B85C4A`
+- `--info`: `#5B7DA8`
+
+### Theme Surface Tokens
+
+- Use semantic glass and shadow tokens for translucent surfaces, popovers, composer chrome, and drag/titlebar surfaces.
+- Required shared tokens include `--glass-top`, `--glass-bottom`, `--glass-panel`, `--glass-border`, `--glass-inset`, `--glass-sheen`, `--shadow-soft`, `--shadow-strong`, and composer-specific tokens such as `--composer-border` and `--composer-ring`.
+- Context visualization colors must also be theme-aware tokens, including `--ctx-system`, `--ctx-user`, `--ctx-assistant`, `--ctx-unused`, `--ctx-ring-center`, and `--ctx-popover-bg`.
+- Do not use fixed light-only RGBA shadows, white overlays, or pale borders outside canonical theme token definitions.
 
 ### Color Usage Rules
 
@@ -109,6 +125,7 @@ Do not hardcode palette values throughout components when a token can be used in
 - Do not ship a dark theme built around blue-black surfaces unless a feature explicitly requires a distinct informational state.
 - Dark surfaces should stay in the warm grey / charcoal family and retain enough tonal variation to feel alive.
 - All colors must be tokenized. Do not spread raw hex values across component files unless defining the canonical theme tokens themselves.
+- Any new UI must be checked in both light and dark themes before handoff.
 
 ## Typography
 
@@ -132,7 +149,7 @@ Typography rules:
 - The app should support three common zones cleanly:
   - navigation/sidebar
   - primary conversation or work surface
-  - secondary inspector/settings/provider panel
+  - secondary inspector/settings/runtime panel
 - Establish clear visual hierarchy in every screen so attention naturally flows from primary actions and content to secondary controls and metadata.
 - Preserve visual hierarchy with restrained borders, soft elevation, and deliberate spacing.
 - Favor compact controls and dense but readable information layouts.
@@ -169,26 +186,26 @@ Typography rules:
 - Toggles, sliders, badges, menus, and model selectors should feel premium and consistent across themes.
 - Avoid generic default component styling when the brand system can be expressed more clearly.
 
-## Model and Provider UX
+## Model and Runtime UX
 
 - SupraLabs models are the default first-class experience.
-- Ollama and Unsloth integration should be explicit, reliable, and easy to understand.
-- Provider-specific capabilities, errors, and setup states should be surfaced clearly.
-- Model pulling, setup, execution, and status display must be understandable without exposing raw implementation detail to typical users.
+- The packaged `llama.cpp` runtime is the only supported model execution path.
+- Runtime-specific capabilities, errors, and setup states should be surfaced clearly.
+- Model setup, execution, and status display must be understandable without exposing raw implementation detail to typical users.
 - When designing model controls, prefer language that communicates trust and operational clarity.
 
 ## Cross-Platform Engineering Rules
 
 - Any OS-specific behavior must be abstracted behind a stable application interface.
-- Do not scatter raw shell commands, path assumptions, or provider execution details throughout the UI layer.
+- Do not scatter raw shell commands, path assumptions, or runtime execution details throughout the UI layer.
 - Keep platform differences isolated in dedicated service, adapter, or command modules.
 - Normalize:
   - command invocation
   - path handling
-  - model pull/install flows
+  - model install and loading flows
   - background process execution
   - environment detection
-- When implementing model execution or provider setup, design once for Windows, macOS, and Linux rather than patching one-off fixes per platform.
+- When implementing model execution or runtime setup, design once for Windows, macOS, and Linux rather than patching one-off fixes per platform.
 - Avoid requiring repeated manual code edits for each OS at compile time.
 - Backend flows should be extensible whether the runtime is local, bundled, or later moved behind a service boundary.
 
@@ -202,15 +219,15 @@ Typography rules:
 - Zustand state should remain structured and domain-oriented, not dumped into a single global store.
 - Prefer explicit UI states for loading, empty, syncing, connected, installing, and failed conditions.
 - Do not hardcode colors, component sizes, radii, animation timings, or layout constants directly in feature components when a shared token or primitive should own them.
-- UI architecture should make theme expansion, provider expansion, and layout evolution straightforward.
+- UI architecture should make theme expansion, model expansion, and layout evolution straightforward.
 
 ## Backend Implementation Rules
 
-- Do not hardcode provider behavior directly into route handlers or process entrypoints.
-- Separate transport, orchestration, provider integration, storage, and platform execution concerns.
-- Command execution, model pulling, provider discovery, and runtime configuration should be implemented through clear interfaces.
+- Do not hardcode runtime behavior directly into route handlers or process entrypoints.
+- Separate transport, orchestration, runtime integration, storage, and platform execution concerns.
+- Command execution, model loading, runtime discovery, and runtime configuration should be implemented through clear interfaces.
 - Treat local execution as one deployment mode, not as an excuse for tightly coupled architecture.
-- Storage schemas and API payloads should be designed to tolerate future providers, model metadata growth, and settings expansion.
+- Storage schemas and API payloads should be designed to tolerate model metadata growth and settings expansion.
 
 ## Accessibility and Readability
 
