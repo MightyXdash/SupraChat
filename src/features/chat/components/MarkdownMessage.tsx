@@ -52,7 +52,10 @@ function renderText(source: string, offset = 0, animatedFrom = Number.POSITIVE_I
 
   return Array.from(source).map((character, index) =>
     offset + index >= animatedFrom ? (
-      <span className="markdown-stream-character" key={`stream-char-${offset + index}`}>
+      <span
+        className="markdown-stream-character"
+        key={`stream-char-${offset + index}`}
+      >
         {character}
       </span>
     ) : (

@@ -136,12 +136,10 @@ export async function streamChatCompletion({
 
   const displayComplete = new Promise<void>((resolve) => {
     displayTimer = window.setInterval(() => {
-      if (pendingCharacters.length > 0) {
-        const batchSize = Math.min(
-          chatRuntimeConfig.stream.characterBatchSize,
-          pendingCharacters.length,
-        )
-        onChunk(pendingCharacters.splice(0, batchSize).join(""))
+      const nextCharacter = pendingCharacters.shift()
+
+      if (nextCharacter !== undefined) {
+        onChunk(nextCharacter)
         return
       }
 
@@ -154,6 +152,14 @@ export async function streamChatCompletion({
     }, chatRuntimeConfig.stream.characterFrameMs)
   })
 
+  const queueChunk = (chunk: string) => {
+    if (!chunk) {
+      return
+    }
+
+    pendingCharacters.push(...Array.from(chunk))
+  }
+
   try {
     while (true) {
       const { done, value } = await reader.read()
@@ -163,13 +169,11 @@ export async function streamChatCompletion({
       }
 
       const chunk = decoder.decode(value, { stream: true })
-      pendingCharacters.push(...Array.from(chunk))
+      queueChunk(chunk)
     }
 
     const remaining = decoder.decode()
-    if (remaining) {
-      pendingCharacters.push(...Array.from(remaining))
-    }
+    queueChunk(remaining)
 
     streamFinished = true
     await displayComplete

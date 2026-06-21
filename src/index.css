@@ -52,7 +52,7 @@
   --radius-control: 9px;
   --motion-fast: 160ms;
   --motion-base: 240ms;
-  --motion-stream-character: 3000ms;
+  --motion-stream-character: 550ms;
   --motion-sidebar-text-exit: 180ms;
   --motion-slow: 420ms;
   --ease-sidebar: cubic-bezier(0.22, 1, 0.36, 1);

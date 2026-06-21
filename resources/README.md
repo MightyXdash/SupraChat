@@ -18,7 +18,7 @@ resources/
     lib/*.dll
   models/
     chat/LFM2.5-350M-Q6_K.gguf
-    title/SupraTitle-50M-Q5_K_M.gguf
+    title/SupraTitle-50M-Q8_0.gguf
 ```
 
 Download the default GGUF model files:
@@ -40,7 +40,7 @@ Chat model:
 Title model:
 
 - Repository: `SupraLabs/supra-title-50M-pre-gguf`
-- Default file: `SupraTitle-50M-Q5_K_M.gguf`
+- Default file: `SupraTitle-50M-Q8_0.gguf`
 
 Development overrides:
 
