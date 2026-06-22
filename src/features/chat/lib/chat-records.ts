@@ -31,7 +31,13 @@ export function createConversationRecord(): Conversation {
 }
 
 export function titleFromMessage(content: string) {
-  const words = content.trim().split(/\s+/).filter(Boolean).slice(0, 3)
+  const words = content
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, ""))
+    .filter((word) => /[A-Za-z]/.test(word))
+    .slice(0, 3)
+
   return words.length > 0 ? words.join(" ") : DEFAULT_CONVERSATION_TITLE
 }
 

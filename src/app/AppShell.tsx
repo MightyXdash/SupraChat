@@ -10,11 +10,13 @@ import {
 } from "@/app/config/theme"
 import { appWindowConfig } from "@/app/config/window"
 import { useChatStore } from "@/features/chat/store/use-chat-store"
+import { ConversationSearchDialog } from "@/features/chat/components/ConversationSearchDialog"
 import { ChatWorkspace } from "@/features/chat/components/ChatWorkspace"
 import { useAutoScroll } from "@/features/chat/hooks/useAutoScroll"
 
 export function AppShell() {
   const [draft, setDraft] = useState("")
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true)
   const [theme, setTheme] = useState<AppTheme>(() => getStoredTheme() ?? getSystemTheme())
   const { clearSubmitScrollSpace, scrollLatestUserTurnIntoView, scrollRef } = useAutoScroll()
@@ -83,6 +85,7 @@ export function AppShell() {
           onDeleteConversation={deleteConversation}
           onRenameConversation={renameConversation}
           onSelectConversation={setActiveConversation}
+          onOpenSearch={() => setIsSearchOpen(true)}
           onToggleTheme={toggleTheme}
           onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
         />
@@ -96,6 +99,13 @@ export function AppShell() {
           onSubmit={handleSubmit}
         />
       </div>
+      <ConversationSearchDialog
+        conversations={conversations}
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onCreateConversation={createConversation}
+        onSelectConversation={setActiveConversation}
+      />
     </main>
   )
 }

@@ -19,6 +19,7 @@ type AppSidebarProps = {
   onDeleteConversation: (conversationId: string) => Promise<boolean>
   onRenameConversation: (conversationId: string, title: string) => Promise<boolean>
   onSelectConversation: (conversationId: string) => void
+  onOpenSearch: () => void
   onToggleTheme: () => void
   onToggleCollapsed: () => void
 }
@@ -40,6 +41,7 @@ export function AppSidebar({
   onDeleteConversation,
   onRenameConversation,
   onSelectConversation,
+  onOpenSearch,
   onToggleTheme,
   onToggleCollapsed,
 }: AppSidebarProps) {
@@ -156,7 +158,13 @@ export function AppSidebar({
             className={cn("nav-item", item.isActive && "nav-item-active")}
             type="button"
             aria-label={item.label}
-            onClick={item.action === "create-conversation" ? () => void onCreateConversation() : undefined}
+            onClick={
+              item.action === "create-conversation"
+                ? () => void onCreateConversation()
+                : item.action === "search-conversations"
+                  ? onOpenSearch
+                  : undefined
+            }
             title={collapsed ? item.label : undefined}
           >
             <item.icon className="h-4 w-4" />

@@ -21,10 +21,16 @@ import { ChatMessage, Conversation } from "@/features/chat/types"
 const TITLE_RETRY_MAX_ATTEMPTS = 12
 const TITLE_RETRY_TEMPERATURE = 0.35
 const TITLE_CONTENT_MAX_WORDS = 2000
+const TITLE_DEFERRED_FIRST_MESSAGE_MAX_CHARACTERS = 40
 const TITLE_COPY_UNIGRAM_THRESHOLD = 0.9
+const TITLE_MIN_ENGLISH_LETTER_RATIO = 0.6
 
 function letterUnigrams(content: string) {
   return Array.from(content.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, ""))
+}
+
+function englishLetters(content: string) {
+  return content.match(/[A-Za-z]/g) ?? []
 }
 
 function isTitleCopiedFromUserText(title: string, userMessage: string): boolean {
@@ -38,12 +44,13 @@ function isTitleCopiedFromUserText(title: string, userMessage: string): boolean 
   const normalizedTitle = titleLetters.join("")
   const normalizedUser = userLetters.join("")
 
-  if (normalizedUser.includes(normalizedTitle)) {
+  if (normalizedUser.startsWith(normalizedTitle)) {
     return true
   }
 
+  const userPrefixLetters = userLetters.slice(0, titleLetters.length)
   const userLetterCounts = new Map<string, number>()
-  userLetters.forEach((letter) => {
+  userPrefixLetters.forEach((letter) => {
     userLetterCounts.set(letter, (userLetterCounts.get(letter) ?? 0) + 1)
   })
 
@@ -61,12 +68,28 @@ function isTitleCopiedFromUserText(title: string, userMessage: string): boolean 
   return sharedLetterCount / titleLetters.length >= TITLE_COPY_UNIGRAM_THRESHOLD
 }
 
+function isTitleEnglish(title: string): boolean {
+  const letters = title.match(/\p{L}/gu) ?? []
+
+  if (letters.length === 0) {
+    return false
+  }
+
+  return englishLetters(title).length / letters.length >= TITLE_MIN_ENGLISH_LETTER_RATIO
+}
+
 function isTitleTooShort(title: string): boolean {
   return title.trim().split(/\s+/).filter(Boolean).length <= 1
 }
 
 function shouldRetryGeneratedTitle(title: string, userMessage: string): boolean {
-  return isTitleTooShort(title) || isTitleCopiedFromUserText(title, userMessage)
+  return !isTitleEnglish(title) || isTitleTooShort(title) || isTitleCopiedFromUserText(title, userMessage)
+}
+
+function safeTitleFromGeneratedPayload(payload: string, userMessage: string): string {
+  const title = titleFromGeneratedPayload(payload)
+
+  return title && !shouldRetryGeneratedTitle(title, userMessage) ? title : ""
 }
 
 function trimContentToWordLimit(content: string, maxWords: number): string {
@@ -105,6 +128,10 @@ function userTurnCount(messages: ChatMessage[]) {
 
 function firstUserMessageContent(messages: ChatMessage[]) {
   return messages.find((message) => message.role === "user")?.content.trim() ?? ""
+}
+
+function shouldDeferInitialTitleGeneration(content: string) {
+  return content.trim().length < TITLE_DEFERRED_FIRST_MESSAGE_MAX_CHARACTERS
 }
 
 type ChatState = {
@@ -384,6 +411,7 @@ export const useChatStore = create<ChatState>((set) => ({
     const conversationId = useChatStore.getState().activeConversationId
     let shouldGenerateTitle = false
     let generatedTitlePayload = ""
+    const shouldDeferTitleGeneration = shouldDeferInitialTitleGeneration(trimmedContent)
 
     set((state) => {
       const activeConversation = state.conversations.find(
@@ -458,7 +486,7 @@ export const useChatStore = create<ChatState>((set) => ({
 
     const appendTitleChunk = (chunk: string) => {
       generatedTitlePayload = `${generatedTitlePayload}${chunk}`
-      const title = titleFromGeneratedPayload(generatedTitlePayload)
+      const title = safeTitleFromGeneratedPayload(generatedTitlePayload, trimmedContent)
 
       if (!title || generatedTitlePayload.trim().startsWith("{")) {
         return
@@ -476,11 +504,16 @@ export const useChatStore = create<ChatState>((set) => ({
       }))
     }
 
-    const finalizeTitle = async (status: "complete" | "failed") => {
+    const finalizeTitle = async (
+      status: "complete" | "failed",
+      titleReferenceText = trimmedContent,
+    ) => {
       set((state) => ({
         conversations: sortConversationsByUpdatedAt(
           updateConversationById(state.conversations, conversationId, (conversation) => {
-            const title = titleFromGeneratedPayload(generatedTitlePayload) || titleFromMessage(trimmedContent)
+            const title =
+              safeTitleFromGeneratedPayload(generatedTitlePayload, titleReferenceText) ||
+              titleFromMessage(trimmedContent)
 
             return {
               ...conversation,
@@ -533,7 +566,9 @@ export const useChatStore = create<ChatState>((set) => ({
         onChunk: appendAssistantChunk,
       })
       const titleStream = shouldGenerateTitle
-        ? streamConversationTitle({
+        ? shouldDeferTitleGeneration
+          ? Promise.resolve()
+          : streamConversationTitle({
             userMessage: trimmedContent,
             onChunk: appendTitleChunk,
           })
@@ -551,8 +586,26 @@ export const useChatStore = create<ChatState>((set) => ({
 
       if (conversationAfterResponse) {
         const titleReferenceText = firstUserMessageContent(conversationAfterResponse.messages) || trimmedContent
+        const firstTurnContext = titleContextFromTurns(conversationAfterResponse.messages, 1)
+
+        if (shouldGenerateTitle && shouldDeferTitleGeneration) {
+          generatedTitlePayload = ""
+
+          try {
+            await streamConversationTitle({
+              userMessage: trimContentToWordLimit(firstTurnContext || trimmedContent, TITLE_CONTENT_MAX_WORDS),
+              onChunk: (chunk) => {
+                generatedTitlePayload = `${generatedTitlePayload}${chunk}`
+              },
+            })
+            await finalizeTitle("complete", titleReferenceText)
+          } catch {
+            await finalizeTitle("failed", titleReferenceText)
+          }
+        }
+
         const currentTitle = shouldGenerateTitle
-          ? titleFromGeneratedPayload(generatedTitlePayload) || conversationAfterResponse.title
+          ? safeTitleFromGeneratedPayload(generatedTitlePayload, titleReferenceText) || conversationAfterResponse.title
           : conversationAfterResponse.title
 
         if (shouldRetryGeneratedTitle(currentTitle, titleReferenceText)) {
@@ -573,9 +626,9 @@ export const useChatStore = create<ChatState>((set) => ({
                   },
                 })
 
-                const retryTitle = titleFromGeneratedPayload(retryPayload)
+                const retryTitle = safeTitleFromGeneratedPayload(retryPayload, titleReferenceText)
 
-                if (retryTitle && !shouldRetryGeneratedTitle(retryTitle, titleReferenceText) && retryTitle !== lastTitle) {
+                if (retryTitle && retryTitle !== lastTitle) {
                   set((state) => ({
                     conversations: sortConversationsByUpdatedAt(
                       updateConversationById(state.conversations, conversationId, (conversation) => ({
@@ -606,7 +659,6 @@ export const useChatStore = create<ChatState>((set) => ({
             return lastTitle
           }
 
-          const firstTurnContext = titleContextFromTurns(conversationAfterResponse.messages, 1)
           const firstRetryTitle = shouldGenerateTitle
             ? await tryTitleRetries(firstTurnContext || trimmedContent)
             : currentTitle
