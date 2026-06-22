@@ -11,6 +11,7 @@ icons, and thumbnails happens in a private dashboard outside this repository.
 - Admin dashboard: `https://suprachat-model-catalog.artigalamithula.workers.dev/admin`
 - Database: Workers KV namespace `suprachat_model_catalog`
 - KV key: `catalog`
+- Worker source: `cloudflare/model-catalog-worker`
 
 The Worker serves:
 
@@ -85,6 +86,8 @@ Cache-Control: public, max-age=120, stale-while-revalidate=86400
 The dashboard supports:
 
 - Add and remove models.
+- Duplicate models.
+- Search models in the admin sidebar.
 - Edit model name, description, category, family, status, pipeline tag, tags, downloads, likes, last modified date, and model URL.
 - Mark models visible or hidden.
 - Add or remove a model from featured models.
@@ -92,11 +95,13 @@ The dashboard supports:
 - Add, remove, hide, and reorder categories.
 - Add image URLs for icons and thumbnails.
 - Upload small icon and thumbnail files directly in the dashboard.
+- Export and import catalog JSON for bulk editing.
 
 Current upload implementation:
 
-- Icons are capped at 120 KB.
-- Thumbnails are capped at 450 KB.
+- Icons are capped at 1 MB in the dashboard.
+- Thumbnails are capped at 5 MB in the dashboard.
+- The full saved catalog payload is capped below Workers KV's per-value limit.
 - Uploaded images are stored as data URLs in the KV catalog because R2 is not enabled on this Cloudflare account.
 
 Production upgrade path:
@@ -117,10 +122,21 @@ Production upgrade path:
 - The Worker validates and caps catalog payload fields before saving.
 - Image fields must be `https://` URLs or `data:image/...` URLs under the configured size caps.
 
+## Deploy
+
+The source folder is intentionally separate from the public app:
+
+```bash
+cd cloudflare/model-catalog-worker
+npx wrangler deploy
+```
+
+Wrangler must be authenticated and the `ADMIN_TOKEN` Worker secret must exist before deploying.
+The live Worker currently keeps that secret outside this repository.
+
 ## Account Notes
 
 D1 and Cloudflare Images returned authentication errors with the current account credentials.
 R2 returned `Please enable R2 through the Cloudflare Dashboard`.
 
 Because Workers KV was available, the deployed dashboard uses KV as the catalog database. This is suitable for a model catalog document and can be upgraded later to D1/R2 when those account capabilities are enabled.
-

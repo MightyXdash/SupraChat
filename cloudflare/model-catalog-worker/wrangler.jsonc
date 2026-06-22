@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "suprachat-model-catalog",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-01",
+  "kv_namespaces": [
+    {
+      "binding": "CATALOG",
+      "id": "882af6a17fd44f9b870c77e9b1e4895b"
+    }
+  ]
+}
