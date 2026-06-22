@@ -9,6 +9,7 @@ import { truncateConversationTitle } from "@/features/chat/lib/chat-records"
 import { Conversation } from "@/features/chat/types"
 
 type AppSidebarProps = {
+  activePanel: "chat" | "playground"
   activeConversationId: string
   collapsed: boolean
   conversations: Conversation[]
@@ -21,6 +22,7 @@ type AppSidebarProps = {
   onRenameConversation: (conversationId: string, title: string) => Promise<boolean>
   onSelectConversation: (conversationId: string) => void
   onOpenSearch: () => void
+  onOpenPlayground: () => void
   onToggleTheme: () => void
   onToggleCollapsed: () => void
 }
@@ -33,6 +35,7 @@ type ConversationMenuState = {
 }
 
 export function AppSidebar({
+  activePanel,
   activeConversationId,
   collapsed,
   conversations,
@@ -45,6 +48,7 @@ export function AppSidebar({
   onRenameConversation,
   onSelectConversation,
   onOpenSearch,
+  onOpenPlayground,
   onToggleTheme,
   onToggleCollapsed,
 }: AppSidebarProps) {
@@ -196,7 +200,11 @@ export function AppSidebar({
         {appNavigationItems.map((item) => (
           <button
             key={item.label}
-            className={cn("nav-item", item.isActive && "nav-item-active")}
+            className={cn(
+              "nav-item",
+              item.isActive && "nav-item-active",
+              item.action === "open-playground" && activePanel === "playground" && "nav-item-active",
+            )}
             type="button"
             aria-label={item.label}
             onClick={
@@ -204,7 +212,9 @@ export function AppSidebar({
                 ? () => void onCreateConversation()
                 : item.action === "search-conversations"
                   ? onOpenSearch
-                  : undefined
+                  : item.action === "open-playground"
+                    ? onOpenPlayground
+                    : undefined
             }
             title={collapsed ? item.label : undefined}
           >

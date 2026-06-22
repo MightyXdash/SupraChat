@@ -13,9 +13,13 @@ import { useChatStore } from "@/features/chat/store/use-chat-store"
 import { ConversationSearchDialog } from "@/features/chat/components/ConversationSearchDialog"
 import { ChatWorkspace } from "@/features/chat/components/ChatWorkspace"
 import { useAutoScroll } from "@/features/chat/hooks/useAutoScroll"
+import { PlaygroundWorkspace } from "@/features/playground/components/PlaygroundWorkspace"
+
+type AppPanel = "chat" | "playground"
 
 export function AppShell() {
   const [draft, setDraft] = useState("")
+  const [activePanel, setActivePanel] = useState<AppPanel>("chat")
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [theme, setTheme] = useState<AppTheme>(() => getStoredTheme() ?? getSystemTheme())
@@ -65,6 +69,16 @@ export function AppShell() {
     }
   }
 
+  async function handleCreateConversation() {
+    setActivePanel("chat")
+    return createConversation()
+  }
+
+  function handleSelectConversation(conversationId: string) {
+    setActivePanel("chat")
+    setActiveConversation(conversationId)
+  }
+
   return (
     <main
       className="app-shell min-h-screen overflow-hidden bg-[var(--background)] text-[var(--text-primary)]"
@@ -76,37 +90,43 @@ export function AppShell() {
         data-sidebar-state={isSidebarCollapsed ? "collapsed" : "expanded"}
       >
         <AppSidebar
+          activePanel={activePanel}
           activeConversationId={activeConversationId}
           collapsed={isSidebarCollapsed}
           conversations={conversations}
           isBusy={isGenerating}
           isLoading={isLoading}
           theme={theme}
-          onCreateConversation={createConversation}
+          onCreateConversation={handleCreateConversation}
           onDeleteConversation={deleteConversation}
           onRegenerateConversationTitle={regenerateConversationTitle}
           onRenameConversation={renameConversation}
-          onSelectConversation={setActiveConversation}
+          onSelectConversation={handleSelectConversation}
           onOpenSearch={() => setIsSearchOpen(true)}
+          onOpenPlayground={() => setActivePanel("playground")}
           onToggleTheme={toggleTheme}
           onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
         />
-        <ChatWorkspace
-          conversation={activeConversation}
-          draft={draft}
-          error={error}
-          isGenerating={isGenerating}
-          scrollRef={scrollRef}
-          onDraftChange={setDraft}
-          onSubmit={handleSubmit}
-        />
+        {activePanel === "playground" ? (
+          <PlaygroundWorkspace />
+        ) : (
+          <ChatWorkspace
+            conversation={activeConversation}
+            draft={draft}
+            error={error}
+            isGenerating={isGenerating}
+            scrollRef={scrollRef}
+            onDraftChange={setDraft}
+            onSubmit={handleSubmit}
+          />
+        )}
       </div>
       <ConversationSearchDialog
         conversations={conversations}
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
-        onCreateConversation={createConversation}
-        onSelectConversation={setActiveConversation}
+        onCreateConversation={handleCreateConversation}
+        onSelectConversation={handleSelectConversation}
       />
     </main>
   )
