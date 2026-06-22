@@ -240,6 +240,7 @@ function sortConversationsByUpdatedAt(conversations: Conversation[]) {
 const initialConversation = createConversationRecord()
 let initializationPromise: Promise<void> | null = null
 const recoveringTitleConversationIds = new Set<string>()
+const regeneratingTitleConversationIds = new Set<string>()
 
 async function generateTitleExpansion(conversation: Conversation) {
   const firstUserMessage = firstUserMessageContent(conversation.messages)
@@ -500,6 +501,10 @@ export const useChatStore = create<ChatState>((set) => ({
     return true
   },
   regenerateConversationTitle: async (conversationId) => {
+    if (regeneratingTitleConversationIds.has(conversationId)) {
+      return false
+    }
+
     const existingConversation = useChatStore
       .getState()
       .conversations.find((conversation) => conversation.id === conversationId)
@@ -508,12 +513,26 @@ export const useChatStore = create<ChatState>((set) => ({
       return false
     }
 
-    const titleContext = titleContextFromRecentMessages(
-      existingConversation.messages,
-      TITLE_CONTENT_MAX_WORDS,
-    )
+    regeneratingTitleConversationIds.add(conversationId)
+
+    const firstUserMessage = firstUserMessageContent(existingConversation.messages)
+    const firstAssistantMessage = firstAssistantMessageContent(existingConversation.messages)
+    const titleContext = shouldRepairOneTurnTitle(existingConversation)
+      ? trimContentToWordLimit(
+        [
+          firstUserMessage,
+          firstAssistantMessage,
+          await generateTitleExpansion(existingConversation),
+        ].filter(Boolean).join("\n\n"),
+        TITLE_CONTENT_MAX_WORDS,
+      )
+      : titleContextFromRecentMessages(
+        existingConversation.messages,
+        TITLE_CONTENT_MAX_WORDS,
+      )
 
     if (!titleContext) {
+      regeneratingTitleConversationIds.delete(conversationId)
       return false
     }
 
@@ -538,7 +557,10 @@ export const useChatStore = create<ChatState>((set) => ({
         },
       })
 
-      const generatedTitle = safeTitleFromGeneratedPayload(generatedTitlePayload, titleContext)
+      const generatedTitle = safeTitleFromGeneratedPayload(
+        generatedTitlePayload,
+        firstUserMessage || titleContext,
+      )
 
       if (!generatedTitle) {
         throw new Error("Unable to create a usable title.")
@@ -580,6 +602,8 @@ export const useChatStore = create<ChatState>((set) => ({
       }))
 
       return false
+    } finally {
+      regeneratingTitleConversationIds.delete(conversationId)
     }
   },
   deleteConversation: async (conversationId) => {
