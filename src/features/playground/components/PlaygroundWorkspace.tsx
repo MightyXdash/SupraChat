@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ArrowUpRight, RefreshCcw } from "lucide-react"
+import { ArrowUpRight, RefreshCcw, Search } from "lucide-react"
 import {
   fetchPlaygroundCatalog,
   type FeaturedPlaygroundModel,
@@ -138,6 +138,10 @@ function getGroupedModels(models: PlaygroundModel[], categories: PlaygroundCateg
   return groups
 }
 
+function getCategoryLabel(categories: PlaygroundCategory[], categoryId: string | null) {
+  return categories.find((category) => category.id === categoryId)?.label ?? categoryId ?? "Model"
+}
+
 function ModelIcon({ model, className = "" }: { model: PlaygroundModel; className?: string }) {
   return (
     <span className={`model-icon ${className}`} data-tone={getModelTone(model)} aria-hidden="true">
@@ -151,6 +155,8 @@ export function PlaygroundWorkspace() {
   const [models, setModels] = useState<PlaygroundModel[]>([])
   const [loadState, setLoadState] = useState<ModelLoadState>("idle")
   const [error, setError] = useState<string | null>(null)
+  const [modelQuery, setModelQuery] = useState("")
+  const [activeCategory, setActiveCategory] = useState("all")
 
   async function loadModels(signal?: AbortSignal) {
     setLoadState("loading")
@@ -181,7 +187,23 @@ export function PlaygroundWorkspace() {
 
   const featuredModels = catalog?.featuredModels ?? []
   const categories = catalog?.categories ?? []
-  const groupedModels = getGroupedModels(models, categories)
+  const visibleCategories = categories.filter((category) =>
+    models.some((model) => model.category === category.id),
+  )
+  const normalizedQuery = modelQuery.trim().toLowerCase()
+  const filteredModels = models.filter((model) => {
+    const matchesCategory = activeCategory === "all" || model.category === activeCategory
+    const matchesQuery =
+      normalizedQuery.length === 0 ||
+      [model.name, model.id, model.description, model.family, model.pipelineTag, ...model.tags]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery)
+
+    return matchesCategory && matchesQuery
+  })
+  const groupedModels = getGroupedModels(filteredModels, categories)
 
   return (
     <section className="playground-workspace bg-[var(--surface)]">
@@ -242,7 +264,7 @@ export function PlaygroundWorkspace() {
                         </div>
                         <div>
                           <dt>Category</dt>
-                          <dd>{displayModel.category ?? "Model"}</dd>
+                          <dd>{getCategoryLabel(categories, displayModel.category)}</dd>
                         </div>
                         <div>
                           <dt>Downloads</dt>
@@ -281,7 +303,7 @@ export function PlaygroundWorkspace() {
                 </p>
               </div>
               <span>
-                {loadState === "ready" ? `${models.length} models · SupraLabs catalog` : "Live catalog"}
+                {loadState === "ready" ? `${models.length} models / SupraLabs catalog` : "Live catalog"}
               </span>
             </div>
 
@@ -313,11 +335,53 @@ export function PlaygroundWorkspace() {
               </div>
             ) : null}
 
+            {loadState === "ready" && models.length > 0 ? (
+              <div className="model-catalog-toolbar" aria-label="Model catalog filters">
+                <label className="model-search-field">
+                  <Search className="h-4 w-4" aria-hidden="true" />
+                  <input
+                    value={modelQuery}
+                    onChange={(event) => setModelQuery(event.target.value)}
+                    placeholder="Search models"
+                    type="search"
+                  />
+                </label>
+                <div className="model-category-tabs" aria-label="Model categories">
+                  <button
+                    className={activeCategory === "all" ? "active" : ""}
+                    type="button"
+                    onClick={() => setActiveCategory("all")}
+                  >
+                    All
+                  </button>
+                  {visibleCategories.map((category) => (
+                    <button
+                      className={activeCategory === category.id ? "active" : ""}
+                      key={category.id}
+                      type="button"
+                      onClick={() => setActiveCategory(category.id)}
+                    >
+                      {category.label}
+                    </button>
+                  ))}
+                </div>
+                <span>{filteredModels.length} shown</span>
+              </div>
+            ) : null}
+
+            {loadState === "ready" && models.length > 0 && filteredModels.length === 0 ? (
+              <div className="playground-state-panel">
+                <strong>No matching models</strong>
+                <p>Adjust the search or category filter.</p>
+              </div>
+            ) : null}
+
             {groupedModels.map((group) => (
               <section className="model-group" key={group.id}>
                 <div className="model-group-heading">
                   <h3>{group.label}</h3>
                   {group.description ? <p>{group.description}</p> : null}
+                  <span>{group.models.length} models</span>
                 </div>
                 <div className="model-group-grid">
                   {group.models.map((model) => (
