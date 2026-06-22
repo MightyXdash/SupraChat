@@ -211,9 +211,7 @@ export function PlaygroundWorkspace() {
         <div className="playground-shell">
           <header className="playground-header">
             <div>
-              <p className="playground-backlink">Models</p>
-              <h2>All models</h2>
-              <p>Browse SupraLabs models and compare their capabilities.</p>
+              <p className="playground-backlink">SupraLabs' Models</p>
             </div>
             <button
               className="playground-refresh-button"
@@ -222,19 +220,11 @@ export function PlaygroundWorkspace() {
               disabled={loadState === "loading"}
             >
               <RefreshCcw className="h-4 w-4" aria-hidden="true" />
-              <span>{loadState === "loading" ? "Refreshing" : "Refresh catalog"}</span>
+              <span>{loadState === "loading" ? "Refreshing" : "Refresh"}</span>
             </button>
           </header>
 
-          <section className="playground-section" aria-labelledby="featured-models-title">
-            <div className="playground-section-heading playground-featured-heading">
-              <div>
-                <h3 id="featured-models-title">Featured models</h3>
-                <p>Start with the current SupraLabs models selected for local experimentation.</p>
-              </div>
-              <span>{featuredModels.length} featured</span>
-            </div>
-
+          <section className="playground-section playground-featured-section" aria-label="Featured models">
             <div className="featured-model-grid">
               {featuredModels.map((model) => {
                 const metadata = getFeaturedMetadata(models, model.id)
