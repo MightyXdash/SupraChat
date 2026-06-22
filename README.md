@@ -1,10 +1,9 @@
-<div align="center">
 
-# SupraChat
+<h1 align="center">SupraChat</h1>
 
-<img width="256" height="256" alt="FINAL_OHNE_TEXT" src="https://github.com/user-attachments/assets/1403120a-1c00-4ec5-aad0-a97040e3e55a" />
 
-</div>
+
+<img width="3440" height="1080" alt="SupraLabs_theme_Artwork_redesign" src="https://github.com/user-attachments/assets/b04de0a0-714b-4c8f-956a-9559a66a1e75" /><div align="center">
 
 
 
@@ -50,4 +49,4 @@ so packaged builds do not require a separate system Node installation.
 
 
 _placeholder image_
-<img width="2559" height="1439" alt="image" src="https://github.com/user-attachments/assets/0f334602-425d-470a-8c8c-201aec755d23" />
+
