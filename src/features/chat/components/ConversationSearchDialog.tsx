@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { MessageCircle, Search, SquarePen, X } from "lucide-react"
 import { searchConversations, getSearchWords } from "@/features/chat/lib/conversation-search"
 import { truncateConversationTitle } from "@/features/chat/lib/chat-records"
+import { SEARCH_TITLE_MAX_VISIBLE_CHARACTERS } from "@/features/chat/config/ui"
 import { Conversation } from "@/features/chat/types"
 
 type ConversationSearchDialogProps = {
@@ -162,7 +163,7 @@ export function ConversationSearchDialog({
                 const group = relativeGroupLabel(result.conversation.updatedAt)
                 const shouldRenderGroup = group !== previousGroup
                 previousGroup = group
-                const title = truncateConversationTitle(result.conversation.title)
+                const title = truncateConversationTitle(result.conversation.title, SEARCH_TITLE_MAX_VISIBLE_CHARACTERS)
                 const parts = highlightedParts(title, words)
                 const snippetParts = highlightedParts(result.matchedText, words)
 

@@ -17,7 +17,7 @@ import { useAutoScroll } from "@/features/chat/hooks/useAutoScroll"
 export function AppShell() {
   const [draft, setDraft] = useState("")
   const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [theme, setTheme] = useState<AppTheme>(() => getStoredTheme() ?? getSystemTheme())
   const { clearSubmitScrollSpace, scrollLatestUserTurnIntoView, scrollRef } = useAutoScroll()
   const conversations = useChatStore((state) => state.conversations)

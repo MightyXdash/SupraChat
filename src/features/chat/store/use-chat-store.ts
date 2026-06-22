@@ -25,7 +25,6 @@ const TITLE_REGENERATION_TEMPERATURE = 0.75
 const TITLE_DEFERRED_FIRST_MESSAGE_MAX_CHARACTERS = 40
 const TITLE_COPY_UNIGRAM_THRESHOLD = 0.9
 const TITLE_MIN_ENGLISH_LETTER_RATIO = 0.6
-const TITLE_RECOVERY_RECENT_CONVERSATION_LIMIT = 3
 const TITLE_RECOVERY_EXPANSION_WORDS = 200
 
 function letterUnigrams(content: string) {
@@ -239,7 +238,6 @@ function sortConversationsByUpdatedAt(conversations: Conversation[]) {
 
 const initialConversation = createConversationRecord()
 let initializationPromise: Promise<void> | null = null
-const recoveringTitleConversationIds = new Set<string>()
 const regeneratingTitleConversationIds = new Set<string>()
 
 async function generateTitleExpansion(conversation: Conversation) {
@@ -269,104 +267,6 @@ async function generateTitleExpansion(conversation: Conversation) {
   })
 
   return trimContentToWordLimit(expansion, TITLE_RECOVERY_EXPANSION_WORDS)
-}
-
-async function repairOneTurnConversationTitle(conversationId: string) {
-  if (recoveringTitleConversationIds.has(conversationId)) {
-    return
-  }
-
-  const conversation = useChatStore
-    .getState()
-    .conversations.find((item) => item.id === conversationId)
-
-  if (!conversation || !shouldRepairOneTurnTitle(conversation)) {
-    return
-  }
-
-  recoveringTitleConversationIds.add(conversationId)
-
-  setTimeout(() => {
-    const state = useChatStore.getState()
-    const currentConversation = state.conversations.find((item) => item.id === conversationId)
-
-    if (!currentConversation || !shouldRepairOneTurnTitle(currentConversation)) {
-      recoveringTitleConversationIds.delete(conversationId)
-      return
-    }
-
-    void (async () => {
-      try {
-        let generatedTitlePayload = ""
-        const firstUserMessage = firstUserMessageContent(currentConversation.messages)
-        const firstAssistantMessage = firstAssistantMessageContent(currentConversation.messages)
-        const expansion = await generateTitleExpansion(currentConversation)
-        const titleContext = trimContentToWordLimit(
-          [firstUserMessage, firstAssistantMessage, expansion].filter(Boolean).join("\n\n"),
-          TITLE_CONTENT_MAX_WORDS,
-        )
-
-        if (!titleContext) {
-          return
-        }
-
-        await streamConversationTitle({
-          userMessage: titleContext,
-          temperature: TITLE_REGENERATION_TEMPERATURE,
-          onChunk: (chunk) => {
-            generatedTitlePayload = `${generatedTitlePayload}${chunk}`
-          },
-        })
-
-        const title = safeTitleFromGeneratedPayload(generatedTitlePayload, firstUserMessage)
-
-        if (!title) {
-          return
-        }
-
-        const latestConversation = useChatStore
-          .getState()
-          .conversations.find((item) => item.id === conversationId)
-
-        if (!latestConversation || !shouldRepairOneTurnTitle(latestConversation)) {
-          return
-        }
-
-        const updatedConversation = {
-          ...latestConversation,
-          title,
-          titleStatus: "complete" as const,
-        }
-
-        await persistConversation(updatedConversation)
-
-        useChatStore.setState((stateAfterPersist) => ({
-          conversations: sortConversationsByUpdatedAt(
-            updateConversationById(
-              stateAfterPersist.conversations,
-              conversationId,
-              () => updatedConversation,
-            ),
-          ),
-        }))
-      } catch {
-        // One-turn title repair is best-effort and should not interrupt the user's next chat.
-      } finally {
-        recoveringTitleConversationIds.delete(conversationId)
-      }
-    })()
-  }, 0)
-}
-
-function repairRecentOneTurnConversationTitles() {
-  const recentConversations = useChatStore
-    .getState()
-    .conversations.filter((conversation) => conversation.messages.length > 0)
-    .slice(0, TITLE_RECOVERY_RECENT_CONVERSATION_LIMIT)
-
-  recentConversations
-    .filter(shouldRepairOneTurnTitle)
-    .forEach((conversation) => void repairOneTurnConversationTitle(conversation.id))
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -419,8 +319,6 @@ export const useChatStore = create<ChatState>((set) => ({
           error: null,
         })
 
-        repairRecentOneTurnConversationTitles()
-
         const needsRecovery = savedConversations.some(
           (c) => c.title.trim().length === 0 && c.messages.length > 0,
         )
@@ -457,8 +355,6 @@ export const useChatStore = create<ChatState>((set) => ({
         conversations: [conversation, ...sortConversationsByUpdatedAt(conversations)],
       }
     })
-
-    repairRecentOneTurnConversationTitles()
 
     return conversation.id
   },

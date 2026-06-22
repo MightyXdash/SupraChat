@@ -1362,7 +1362,7 @@ button:disabled {
 }
 
 .conversation-search-empty p {
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-size: 0.94rem;
   font-weight: 680;
   margin: 0 0 0.34rem;

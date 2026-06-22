@@ -87,12 +87,12 @@ export function titleFromGeneratedPayload(content: string) {
   }
 }
 
-export function truncateConversationTitle(title: string) {
-  if (title.length <= TITLE_MAX_VISIBLE_CHARACTERS) {
+export function truncateConversationTitle(title: string, maxCharacters = TITLE_MAX_VISIBLE_CHARACTERS) {
+  if (title.length <= maxCharacters) {
     return title
   }
 
-  return `${title.slice(0, Math.max(0, TITLE_MAX_VISIBLE_CHARACTERS - 3)).trimEnd()}...`
+  return `${title.slice(0, Math.max(0, maxCharacters - 3)).trimEnd()}...`
 }
 
 export function cleanIncompleteMarkdown(content: string) {

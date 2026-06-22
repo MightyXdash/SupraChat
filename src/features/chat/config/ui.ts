@@ -1,6 +1,7 @@
 export const DEFAULT_CONVERSATION_TITLE = "New Conversation"
 export const TITLE_PENDING_LABEL = "Naming conversation"
 export const TITLE_MAX_VISIBLE_CHARACTERS = 34
+export const SEARCH_TITLE_MAX_VISIBLE_CHARACTERS = 70
 
 export const QUICK_PROMPTS = [
   "Summarize a technical note",
