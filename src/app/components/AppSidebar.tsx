@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react"
-import { Moon, Pencil, Sun, Trash2 } from "lucide-react"
+import { Moon, Pencil, RefreshCcw, Sun, Trash2 } from "lucide-react"
 import { appNavigationItems, sidebarControlIcon as SidebarControlIcon } from "@/app/config/navigation"
 import { type AppTheme } from "@/app/config/theme"
 import { cn } from "@/lib/utils"
@@ -17,6 +17,7 @@ type AppSidebarProps = {
   theme: AppTheme
   onCreateConversation: () => Promise<string>
   onDeleteConversation: (conversationId: string) => Promise<boolean>
+  onRegenerateConversationTitle: (conversationId: string) => Promise<boolean>
   onRenameConversation: (conversationId: string, title: string) => Promise<boolean>
   onSelectConversation: (conversationId: string) => void
   onOpenSearch: () => void
@@ -26,6 +27,7 @@ type AppSidebarProps = {
 
 type ConversationMenuState = {
   conversationId: string
+  isClosing?: boolean
   x: number
   y: number
 }
@@ -39,6 +41,7 @@ export function AppSidebar({
   theme,
   onCreateConversation,
   onDeleteConversation,
+  onRegenerateConversationTitle,
   onRenameConversation,
   onSelectConversation,
   onOpenSearch,
@@ -48,6 +51,7 @@ export function AppSidebar({
   const [conversationMenu, setConversationMenu] = useState<ConversationMenuState | null>(null)
   const [renamingConversationId, setRenamingConversationId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState("")
+  const closeMenuTimerRef = useRef<number | null>(null)
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const recentsScrollRef = useRef<HTMLDivElement | null>(null)
   const isRecentsScrolling = useScrollVisibility(recentsScrollRef)
@@ -69,20 +73,52 @@ export function AppSidebar({
       return
     }
 
-    function closeMenu() {
-      setConversationMenu(null)
-    }
-
-    window.addEventListener("click", closeMenu)
-    window.addEventListener("resize", closeMenu)
-    window.addEventListener("blur", closeMenu)
+    window.addEventListener("click", closeConversationMenu)
+    window.addEventListener("resize", closeConversationMenu)
+    window.addEventListener("blur", closeConversationMenu)
 
     return () => {
-      window.removeEventListener("click", closeMenu)
-      window.removeEventListener("resize", closeMenu)
-      window.removeEventListener("blur", closeMenu)
+      window.removeEventListener("click", closeConversationMenu)
+      window.removeEventListener("resize", closeConversationMenu)
+      window.removeEventListener("blur", closeConversationMenu)
     }
   }, [conversationMenu])
+
+  useEffect(() => {
+    return () => {
+      if (closeMenuTimerRef.current !== null) {
+        window.clearTimeout(closeMenuTimerRef.current)
+      }
+    }
+  }, [])
+
+  function openConversationMenu(menu: ConversationMenuState) {
+    if (closeMenuTimerRef.current !== null) {
+      window.clearTimeout(closeMenuTimerRef.current)
+      closeMenuTimerRef.current = null
+    }
+
+    setConversationMenu(menu)
+  }
+
+  function closeConversationMenu() {
+    setConversationMenu((currentMenu) => {
+      if (!currentMenu || currentMenu.isClosing) {
+        return currentMenu
+      }
+
+      return { ...currentMenu, isClosing: true }
+    })
+
+    if (closeMenuTimerRef.current !== null) {
+      window.clearTimeout(closeMenuTimerRef.current)
+    }
+
+    closeMenuTimerRef.current = window.setTimeout(() => {
+      setConversationMenu(null)
+      closeMenuTimerRef.current = null
+    }, 150)
+  }
 
   async function handleRenameSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -109,14 +145,19 @@ export function AppSidebar({
     const deleted = await onDeleteConversation(conversationId)
 
     if (deleted) {
-      setConversationMenu(null)
+      closeConversationMenu()
     }
   }
 
   function startRenaming(conversation: Conversation) {
-    setConversationMenu(null)
+    closeConversationMenu()
     setRenamingConversationId(conversation.id)
     setRenameDraft(conversation.title)
+  }
+
+  async function handleRegenerateConversationTitle(conversationId: string) {
+    closeConversationMenu()
+    await onRegenerateConversationTitle(conversationId)
   }
 
   return (
@@ -221,7 +262,7 @@ export function AppSidebar({
                     onClick={() => onSelectConversation(conversation.id)}
                     onContextMenu={(event) => {
                       event.preventDefault()
-                      setConversationMenu({
+                      openConversationMenu({
                         conversationId: conversation.id,
                         x: event.clientX,
                         y: event.clientY,
@@ -251,6 +292,7 @@ export function AppSidebar({
       {conversationMenu ? (
         <div
           className="conversation-context-menu"
+          data-state={conversationMenu.isClosing ? "closed" : "open"}
           style={{ left: conversationMenu.x, top: conversationMenu.y }}
         >
           <button
@@ -267,6 +309,15 @@ export function AppSidebar({
             }}
           >
             <Pencil className="h-3 w-3" />
+            <span>Rename</span>
+          </button>
+          <button
+            className="conversation-context-action"
+            type="button"
+            disabled={conversationMenu.isClosing}
+            onClick={() => void handleRegenerateConversationTitle(conversationMenu.conversationId)}
+          >
+            <RefreshCcw className="h-3 w-3" />
             <span>Rename</span>
           </button>
           <button

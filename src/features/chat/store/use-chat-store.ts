@@ -21,9 +21,12 @@ import { ChatMessage, Conversation } from "@/features/chat/types"
 const TITLE_RETRY_MAX_ATTEMPTS = 12
 const TITLE_RETRY_TEMPERATURE = 0.35
 const TITLE_CONTENT_MAX_WORDS = 2000
+const TITLE_REGENERATION_TEMPERATURE = 0.75
 const TITLE_DEFERRED_FIRST_MESSAGE_MAX_CHARACTERS = 40
 const TITLE_COPY_UNIGRAM_THRESHOLD = 0.9
 const TITLE_MIN_ENGLISH_LETTER_RATIO = 0.6
+const TITLE_RECOVERY_RECENT_CONVERSATION_LIMIT = 3
+const TITLE_RECOVERY_EXPANSION_WORDS = 200
 
 function letterUnigrams(content: string) {
   return Array.from(content.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, ""))
@@ -122,6 +125,30 @@ function titleContextFromTurns(messages: ChatMessage[], maxTurns: number) {
     .join("\n\n")
 }
 
+function titleContextFromRecentMessages(messages: ChatMessage[], maxWords: number) {
+  const selectedMessages: string[] = []
+  let remainingWords = maxWords
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    const words = message.content.trim().split(/\s+/).filter(Boolean)
+
+    if (words.length === 0) {
+      continue
+    }
+
+    const selectedWords = words.slice(Math.max(0, words.length - remainingWords))
+    selectedMessages.unshift(`${message.role}: ${selectedWords.join(" ")}`)
+    remainingWords -= selectedWords.length
+
+    if (remainingWords <= 0) {
+      break
+    }
+  }
+
+  return selectedMessages.join("\n\n")
+}
+
 function userTurnCount(messages: ChatMessage[]) {
   return messages.filter((message) => message.role === "user").length
 }
@@ -130,8 +157,26 @@ function firstUserMessageContent(messages: ChatMessage[]) {
   return messages.find((message) => message.role === "user")?.content.trim() ?? ""
 }
 
+function firstAssistantMessageContent(messages: ChatMessage[]) {
+  return messages.find((message) => message.role === "assistant")?.content.trim() ?? ""
+}
+
 function shouldDeferInitialTitleGeneration(content: string) {
   return content.trim().length < TITLE_DEFERRED_FIRST_MESSAGE_MAX_CHARACTERS
+}
+
+function isOneTurnConversation(conversation: Conversation) {
+  return userTurnCount(conversation.messages) === 1
+}
+
+function shouldRepairOneTurnTitle(conversation: Conversation) {
+  const firstUserMessage = firstUserMessageContent(conversation.messages)
+
+  if (!firstUserMessage || !isOneTurnConversation(conversation)) {
+    return false
+  }
+
+  return shouldDeferInitialTitleGeneration(firstUserMessage) || shouldRetryGeneratedTitle(conversation.title, firstUserMessage)
 }
 
 type ChatState = {
@@ -143,6 +188,7 @@ type ChatState = {
   initialize: () => Promise<void>
   createConversation: () => Promise<string>
   renameConversation: (conversationId: string, title: string) => Promise<boolean>
+  regenerateConversationTitle: (conversationId: string) => Promise<boolean>
   deleteConversation: (conversationId: string) => Promise<boolean>
   sendMessage: (content: string, options?: { beforeGeneration?: () => Promise<void> | void }) => Promise<void>
   setActiveConversation: (conversationId: string) => void
@@ -193,6 +239,134 @@ function sortConversationsByUpdatedAt(conversations: Conversation[]) {
 
 const initialConversation = createConversationRecord()
 let initializationPromise: Promise<void> | null = null
+const recoveringTitleConversationIds = new Set<string>()
+
+async function generateTitleExpansion(conversation: Conversation) {
+  const firstUserMessage = firstUserMessageContent(conversation.messages)
+  const firstAssistantMessage = firstAssistantMessageContent(conversation.messages)
+  let expansion = ""
+
+  await streamChatCompletion({
+    messages: [
+      {
+        role: "user",
+        content: [
+          `Write about ${TITLE_RECOVERY_EXPANSION_WORDS} words of neutral context that explains what this short chat is likely about.`,
+          "Use concrete phrasing that would help a title model infer the topic.",
+          "Do not mention that you are writing context. Do not create a title.",
+          "",
+          `User message: ${firstUserMessage}`,
+          firstAssistantMessage ? `Assistant response: ${firstAssistantMessage}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      },
+    ],
+    onChunk: (chunk) => {
+      expansion = `${expansion}${chunk}`
+    },
+  })
+
+  return trimContentToWordLimit(expansion, TITLE_RECOVERY_EXPANSION_WORDS)
+}
+
+async function repairOneTurnConversationTitle(conversationId: string) {
+  if (recoveringTitleConversationIds.has(conversationId)) {
+    return
+  }
+
+  const conversation = useChatStore
+    .getState()
+    .conversations.find((item) => item.id === conversationId)
+
+  if (!conversation || !shouldRepairOneTurnTitle(conversation)) {
+    return
+  }
+
+  recoveringTitleConversationIds.add(conversationId)
+
+  setTimeout(() => {
+    const state = useChatStore.getState()
+    const currentConversation = state.conversations.find((item) => item.id === conversationId)
+
+    if (!currentConversation || !shouldRepairOneTurnTitle(currentConversation)) {
+      recoveringTitleConversationIds.delete(conversationId)
+      return
+    }
+
+    void (async () => {
+      try {
+        let generatedTitlePayload = ""
+        const firstUserMessage = firstUserMessageContent(currentConversation.messages)
+        const firstAssistantMessage = firstAssistantMessageContent(currentConversation.messages)
+        const expansion = await generateTitleExpansion(currentConversation)
+        const titleContext = trimContentToWordLimit(
+          [firstUserMessage, firstAssistantMessage, expansion].filter(Boolean).join("\n\n"),
+          TITLE_CONTENT_MAX_WORDS,
+        )
+
+        if (!titleContext) {
+          return
+        }
+
+        await streamConversationTitle({
+          userMessage: titleContext,
+          temperature: TITLE_REGENERATION_TEMPERATURE,
+          onChunk: (chunk) => {
+            generatedTitlePayload = `${generatedTitlePayload}${chunk}`
+          },
+        })
+
+        const title = safeTitleFromGeneratedPayload(generatedTitlePayload, firstUserMessage)
+
+        if (!title) {
+          return
+        }
+
+        const latestConversation = useChatStore
+          .getState()
+          .conversations.find((item) => item.id === conversationId)
+
+        if (!latestConversation || !shouldRepairOneTurnTitle(latestConversation)) {
+          return
+        }
+
+        const updatedConversation = {
+          ...latestConversation,
+          title,
+          titleStatus: "complete" as const,
+        }
+
+        await persistConversation(updatedConversation)
+
+        useChatStore.setState((stateAfterPersist) => ({
+          conversations: sortConversationsByUpdatedAt(
+            updateConversationById(
+              stateAfterPersist.conversations,
+              conversationId,
+              () => updatedConversation,
+            ),
+          ),
+        }))
+      } catch {
+        // One-turn title repair is best-effort and should not interrupt the user's next chat.
+      } finally {
+        recoveringTitleConversationIds.delete(conversationId)
+      }
+    })()
+  }, 0)
+}
+
+function repairRecentOneTurnConversationTitles() {
+  const recentConversations = useChatStore
+    .getState()
+    .conversations.filter((conversation) => conversation.messages.length > 0)
+    .slice(0, TITLE_RECOVERY_RECENT_CONVERSATION_LIMIT)
+
+  recentConversations
+    .filter(shouldRepairOneTurnTitle)
+    .forEach((conversation) => void repairOneTurnConversationTitle(conversation.id))
+}
 
 export const useChatStore = create<ChatState>((set) => ({
   conversations: [initialConversation],
@@ -244,6 +418,8 @@ export const useChatStore = create<ChatState>((set) => ({
           error: null,
         })
 
+        repairRecentOneTurnConversationTitles()
+
         const needsRecovery = savedConversations.some(
           (c) => c.title.trim().length === 0 && c.messages.length > 0,
         )
@@ -280,6 +456,8 @@ export const useChatStore = create<ChatState>((set) => ({
         conversations: [conversation, ...sortConversationsByUpdatedAt(conversations)],
       }
     })
+
+    repairRecentOneTurnConversationTitles()
 
     return conversation.id
   },
@@ -320,6 +498,89 @@ export const useChatStore = create<ChatState>((set) => ({
     }))
 
     return true
+  },
+  regenerateConversationTitle: async (conversationId) => {
+    const existingConversation = useChatStore
+      .getState()
+      .conversations.find((conversation) => conversation.id === conversationId)
+
+    if (!existingConversation || existingConversation.messages.length === 0) {
+      return false
+    }
+
+    const titleContext = titleContextFromRecentMessages(
+      existingConversation.messages,
+      TITLE_CONTENT_MAX_WORDS,
+    )
+
+    if (!titleContext) {
+      return false
+    }
+
+    set((state) => ({
+      error: null,
+      conversations: sortConversationsByUpdatedAt(
+        updateConversationById(state.conversations, conversationId, (conversation) => ({
+          ...conversation,
+          titleStatus: "generating",
+        })),
+      ),
+    }))
+
+    let generatedTitlePayload = ""
+
+    try {
+      await streamConversationTitle({
+        userMessage: titleContext,
+        temperature: TITLE_REGENERATION_TEMPERATURE,
+        onChunk: (chunk) => {
+          generatedTitlePayload = `${generatedTitlePayload}${chunk}`
+        },
+      })
+
+      const generatedTitle = safeTitleFromGeneratedPayload(generatedTitlePayload, titleContext)
+
+      if (!generatedTitle) {
+        throw new Error("Unable to create a usable title.")
+      }
+
+      const currentConversation = useChatStore
+        .getState()
+        .conversations.find((conversation) => conversation.id === conversationId)
+
+      if (!currentConversation) {
+        return false
+      }
+
+      const updatedConversation = {
+        ...currentConversation,
+        title: generatedTitle,
+        titleStatus: "complete" as const,
+        updatedAt: new Date().toISOString(),
+      }
+
+      await updateStoredConversation(updatedConversation)
+
+      set((state) => ({
+        conversations: sortConversationsByUpdatedAt(
+          updateConversationById(state.conversations, conversationId, () => updatedConversation),
+        ),
+      }))
+
+      return true
+    } catch {
+      set((state) => ({
+        error: "Unable to regenerate the conversation title. Check the local title model and try again.",
+        conversations: sortConversationsByUpdatedAt(
+          updateConversationById(state.conversations, conversationId, (conversation) => ({
+            ...conversation,
+            titleStatus: "failed",
+          })),
+        ),
+      }))
+
+      return false
+    }
   },
   deleteConversation: async (conversationId) => {
     const state = useChatStore.getState()

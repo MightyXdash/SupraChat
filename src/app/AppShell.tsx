@@ -25,6 +25,7 @@ export function AppShell() {
   const initialize = useChatStore((state) => state.initialize)
   const createConversation = useChatStore((state) => state.createConversation)
   const renameConversation = useChatStore((state) => state.renameConversation)
+  const regenerateConversationTitle = useChatStore((state) => state.regenerateConversationTitle)
   const deleteConversation = useChatStore((state) => state.deleteConversation)
   const setActiveConversation = useChatStore((state) => state.setActiveConversation)
   const sendMessage = useChatStore((state) => state.sendMessage)
@@ -83,6 +84,7 @@ export function AppShell() {
           theme={theme}
           onCreateConversation={createConversation}
           onDeleteConversation={deleteConversation}
+          onRegenerateConversationTitle={regenerateConversationTitle}
           onRenameConversation={renameConversation}
           onSelectConversation={setActiveConversation}
           onOpenSearch={() => setIsSearchOpen(true)}
