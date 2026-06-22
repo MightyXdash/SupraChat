@@ -88,6 +88,7 @@ The dashboard supports:
 - Add and remove models.
 - Duplicate models.
 - Search models in the admin sidebar.
+- Filter models by category, featured status, and visibility.
 - Edit model name, description, category, family, status, pipeline tag, tags, downloads, likes, last modified date, and model URL.
 - Mark models visible or hidden.
 - Add or remove a model from featured models.

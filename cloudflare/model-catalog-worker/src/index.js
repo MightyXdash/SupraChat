@@ -75,8 +75,24 @@ const ADMIN_HTML = String.raw`<!doctype html>
   --radius:14px;
 }
 *{box-sizing:border-box}
+html{background:var(--bg);color:var(--text)}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 button,input,textarea,select{font:inherit}
+input,textarea,select{
+  background:#fff!important;
+  border:1px solid var(--line)!important;
+  color:var(--text)!important;
+  -webkit-text-fill-color:var(--text)!important;
+  caret-color:var(--text);
+  color-scheme:light;
+}
+input::placeholder,textarea::placeholder{color:var(--faint)!important;-webkit-text-fill-color:var(--faint)!important}
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill{
+  box-shadow:0 0 0 1000px #fff inset!important;
+  -webkit-text-fill-color:var(--text)!important;
+}
 button{cursor:pointer}
 .login{display:grid;min-height:100vh;place-items:center;padding:24px}
 .login-card{background:var(--panel);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);max-width:430px;padding:30px;width:100%}
@@ -90,6 +106,7 @@ button{cursor:pointer}
 .status{align-items:center;background:var(--panel-soft);border:1px solid var(--line);border-radius:999px;color:var(--muted);display:inline-flex;font-size:12px;font-weight:700;gap:7px;height:32px;padding:0 11px;white-space:nowrap}
 .dot{background:var(--good);border-radius:50%;height:7px;width:7px}
 .toolbar{display:grid;gap:10px}
+.filter-grid{display:grid;gap:8px;grid-template-columns:1fr 1fr}
 .search{position:relative}
 .search input{background:var(--panel-soft);border:1px solid var(--line);border-radius:12px;color:var(--text);height:42px;outline:none;padding:0 12px;width:100%}
 .search input:focus,.field input:focus,.field textarea:focus,.field select:focus{border-color:color-mix(in srgb,var(--accent) 72%,var(--line));box-shadow:0 0 0 4px color-mix(in srgb,var(--accent-soft) 70%,transparent)}
@@ -125,6 +142,7 @@ button{cursor:pointer}
 .field.full{grid-column:1/-1}
 .field label{color:var(--muted);font-size:12px;font-weight:760;text-transform:uppercase}
 .field input,.field textarea,.field select{background:var(--panel-soft);border:1px solid var(--line);border-radius:10px;color:var(--text);outline:none;padding:10px 11px;width:100%}
+.toolbar select{border-radius:12px;height:40px;padding:0 12px;width:100%}
 .field textarea{min-height:90px;resize:vertical}
 .check-grid{display:grid;gap:10px;grid-template-columns:repeat(3,minmax(0,1fr))}
 .check{align-items:center;background:var(--panel-soft);border:1px solid var(--line);border-radius:10px;display:flex;font-weight:700;gap:8px;min-height:42px;padding:0 12px}
@@ -165,7 +183,19 @@ button{cursor:pointer}
     <div class="brand"><div><h1>SupraLabs Catalog</h1><p>Admin dashboard</p></div><span class="status"><i class="dot"></i><span id="dirtyState">Saved</span></span></div>
     <div class="toolbar">
       <div class="search"><input id="searchInput" placeholder="Search models" /></div>
-      <select id="categoryFilter" class="btn" style="width:100%;appearance:auto"></select>
+      <select id="categoryFilter" aria-label="Filter by category"></select>
+      <div class="filter-grid">
+        <select id="featuredFilter" aria-label="Filter by featured status">
+          <option value="">All models</option>
+          <option value="featured">Featured</option>
+          <option value="not-featured">Not featured</option>
+        </select>
+        <select id="visibilityFilter" aria-label="Filter by visibility">
+          <option value="">Any visibility</option>
+          <option value="visible">Visible</option>
+          <option value="hidden">Hidden</option>
+        </select>
+      </div>
       <div class="button-row">
         <button class="btn soft" id="addModel" type="button">Add model</button>
         <button class="btn" id="duplicateModel" type="button">Duplicate</button>
@@ -258,14 +288,14 @@ function normalizeCatalog(next){return {version:1,updatedAt:next.updatedAt||new 
 function render(){if(!catalog.models.length){selectedId=null}else if(!selectedId||!catalog.models.some(m=>m.id===selectedId)){selectedId=catalog.models[0]?.id||null}renderStats();renderFilters();renderModelList();renderEditor();renderFeatured();renderCategories()}
 function renderStats(){$("modelCount").textContent=catalog.models.length;$("featuredCount").textContent=catalog.featured.length;$("categoryCount").textContent=catalog.categories.length;$("visibleCount").textContent=catalog.models.filter(m=>m.isVisible!==false).length}
 function renderFilters(){const options=['<option value="">All categories</option>',...catalog.categories.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.label)+'</option>')].join("");$("categoryFilter").innerHTML=options;$("category").innerHTML=catalog.categories.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.label)+'</option>').join("")}
-function renderModelList(){const q=$("searchInput").value.toLowerCase();const cat=$("categoryFilter").value;const rows=catalog.models.filter(m=>(!cat||m.category===cat)&&((m.name+" "+m.id+" "+m.description).toLowerCase().includes(q))).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)||a.name.localeCompare(b.name));$("modelList").innerHTML=rows.map(m=>'<button class="model-item '+(m.id===selectedId?'active':'')+'" data-id="'+esc(m.id)+'"><strong>'+esc(m.name)+'</strong><span>'+esc(m.id)+' · '+esc(m.category||"model")+'</span></button>').join("")||'<p class="hint">No models match this view.</p>';document.querySelectorAll(".model-item").forEach(btn=>btn.onclick=()=>{selectedId=btn.dataset.id;render()})}
+function renderModelList(){const q=$("searchInput").value.toLowerCase();const cat=$("categoryFilter").value;const featured=$("featuredFilter").value;const visibility=$("visibilityFilter").value;const featuredIds=new Set((catalog.featured||[]).map(f=>f.id));const rows=catalog.models.filter(m=>(!cat||m.category===cat)&&(!featured||(featured==="featured"?featuredIds.has(m.id):!featuredIds.has(m.id)))&&(!visibility||(visibility==="visible"?m.isVisible!==false:m.isVisible===false))&&((m.name+" "+m.id+" "+m.description).toLowerCase().includes(q))).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)||a.name.localeCompare(b.name));$("modelList").innerHTML=rows.map(m=>'<button class="model-item '+(m.id===selectedId?'active':'')+'" data-id="'+esc(m.id)+'"><strong>'+esc(m.name)+'</strong><span>'+esc(m.id)+' · '+esc(m.category||"model")+(featuredIds.has(m.id)?" · Featured":"")+(m.isVisible===false?" · Hidden":"")+'</span></button>').join("")||'<p class="hint">No models match this view.</p>';document.querySelectorAll(".model-item").forEach(btn=>btn.onclick=()=>{selectedId=btn.dataset.id;render()})}
 function renderEditor(){const m=model();$("editorTitle").textContent=m?m.name:"Model details";document.querySelectorAll("#editorTitle,#deleteModel,#duplicateModel").forEach(el=>el.toggleAttribute("disabled",!m));if(!m)return;for(const key of fields){const el=$(key);if(!el)continue;if(key==="tags")el.value=(m.tags||[]).join(", ");else if(el.type==="checkbox")el.checked=m[key]!==false;else el.value=m[key]??""}$("isFeatured").checked=catalog.featured.some(f=>f.id===m.id);preview("iconPreview",m.iconUrl,"Icon");preview("thumbPreview",m.thumbnailUrl,"Thumbnail")}
 function renderFeatured(){$("featuredEditor").innerHTML=catalog.featured.sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)).map((f,i)=>'<div class="featured-row"><input value="'+esc(f.id)+'" data-feature-id="'+esc(f.id)+'" /><input type="number" value="'+Number(f.sortOrder??(i+1)*10)+'" data-feature-order="'+esc(f.id)+'" /><button class="mini" data-remove-feature="'+esc(f.id)+'">Remove</button></div>').join("")||'<p class="hint">No featured models yet.</p>';document.querySelectorAll("[data-remove-feature]").forEach(b=>b.onclick=()=>{catalog.featured=catalog.featured.filter(f=>f.id!==b.dataset.removeFeature);setDirty();render()});document.querySelectorAll("[data-feature-order]").forEach(i=>i.onchange=()=>{const f=catalog.featured.find(f=>f.id===i.dataset.featureOrder);if(f)f.sortOrder=Number(i.value||0);setDirty();render()});document.querySelectorAll("[data-feature-id]").forEach(i=>i.onchange=()=>{const f=catalog.featured.find(f=>f.id===i.dataset.featureId);if(f){f.id=i.value;setDirty();render()}})}
 function renderCategories(){$("categoryEditor").innerHTML=catalog.categories.sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)).map(c=>'<div class="category-row"><input value="'+esc(c.label)+'" data-cat-label="'+esc(c.id)+'" /><input type="number" value="'+Number(c.sortOrder||0)+'" data-cat-order="'+esc(c.id)+'" /><button class="mini" data-remove-cat="'+esc(c.id)+'">Remove</button></div>').join("");document.querySelectorAll("[data-cat-label]").forEach(i=>i.onchange=()=>{const c=catalog.categories.find(c=>c.id===i.dataset.catLabel);if(c)c.label=i.value;setDirty();render()});document.querySelectorAll("[data-cat-order]").forEach(i=>i.onchange=()=>{const c=catalog.categories.find(c=>c.id===i.dataset.catOrder);if(c)c.sortOrder=Number(i.value||0);setDirty();render()});document.querySelectorAll("[data-remove-cat]").forEach(b=>b.onclick=()=>{catalog.categories=catalog.categories.filter(c=>c.id!==b.dataset.removeCat);setDirty();render()})}
 function preview(id,url,label){const el=$(id);el.innerHTML=url?'<img src="'+esc(url)+'" alt="" />':label}
 function updateSelected(){const m=model();if(!m)return;const oldId=m.id;for(const key of fields){const el=$(key);if(!el)continue;if(key==="tags")m.tags=el.value.split(",").map(s=>s.trim()).filter(Boolean);else if(key==="downloads"||key==="likes")m[key]=Number(el.value||0);else if(el.type==="checkbox")m[key]=el.checked;else m[key]=el.value}if(oldId!==m.id){catalog.featured.forEach(f=>{if(f.id===oldId)f.id=m.id});selectedId=m.id}if($("isFeatured").checked){const existing=catalog.featured.find(f=>f.id===m.id);if($("syncFeatured").checked){const copy={...m,sortOrder:existing?.sortOrder??catalog.featured.length*10+10};if(existing)Object.assign(existing,copy);else catalog.featured.push(copy)}else if(!existing){catalog.featured.push({...m,sortOrder:catalog.featured.length*10+10})}}else{catalog.featured=catalog.featured.filter(f=>f.id!==m.id)}setDirty();render()}
 fields.forEach(key=>{addEventListener("input",e=>{if(e.target&&e.target.id===key)updateSelected()});addEventListener("change",e=>{if(e.target&&e.target.id===key)updateSelected()})});
-$("searchInput").oninput=renderModelList;$("categoryFilter").onchange=renderModelList;
+$("searchInput").oninput=renderModelList;$("categoryFilter").onchange=renderModelList;$("featuredFilter").onchange=renderModelList;$("visibilityFilter").onchange=renderModelList;
 $("loginForm").onsubmit=async(e)=>{e.preventDefault();$("loginError").textContent="";try{await api("/api/admin/login",{method:"POST",body:JSON.stringify({token:$("token").value})});await boot()}catch(err){$("loginError").textContent="Unable to sign in. Check the admin token."}};
 $("addModel").onclick=()=>{const m=normalizeModel({id:"SupraLabs/New-Model-"+(catalog.models.length+1),name:"New Model"});catalog.models.push(m);selectedId=m.id;setDirty();render()};
 $("duplicateModel").onclick=()=>{const m=model();if(!m)return;const copy=normalizeModel({...m,id:m.id+"-copy",name:m.name+" Copy",sortOrder:(m.sortOrder||0)+1});catalog.models.push(copy);selectedId=copy.id;setDirty();render()};
