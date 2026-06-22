@@ -13,6 +13,7 @@ import { useChatStore } from "@/features/chat/store/use-chat-store"
 import { ConversationSearchDialog } from "@/features/chat/components/ConversationSearchDialog"
 import { ChatWorkspace } from "@/features/chat/components/ChatWorkspace"
 import { useAutoScroll } from "@/features/chat/hooks/useAutoScroll"
+import { SuvaOverlay } from "@/features/suva/components/SuvaOverlay"
 
 export function AppShell() {
   const [draft, setDraft] = useState("")
@@ -108,6 +109,7 @@ export function AppShell() {
         onCreateConversation={createConversation}
         onSelectConversation={setActiveConversation}
       />
+      <SuvaOverlay />
     </main>
   )
 }

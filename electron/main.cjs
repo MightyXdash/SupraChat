@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron")
+const { app, BrowserWindow, Menu, ipcMain, dialog, session } = require("electron")
 const net = require("node:net")
 const path = require("node:path")
 const { startServer, stopServer } = require("../backend/node/server.cjs")
@@ -82,6 +82,22 @@ function createWindow() {
   })
 }
 
+function configureMediaPermissions() {
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission !== "media") {
+      callback(false)
+      return
+    }
+
+    const url = webContents.getURL()
+    const isTrustedRenderer =
+      url.startsWith("http://127.0.0.1:5173") ||
+      url.startsWith("file://")
+
+    callback(isTrustedRenderer)
+  })
+}
+
 function getFocusedWindow() {
   return BrowserWindow.getFocusedWindow()
 }
@@ -116,6 +132,7 @@ function stopBackend() {
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null)
+  configureMediaPermissions()
   try {
     await startBackend()
   } catch (error) {

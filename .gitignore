@@ -13,3 +13,13 @@ release/
 resources/models/**/*.gguf
 resources/llama.cpp/**/llama-server
 resources/llama.cpp/**/*.dylib
+resources/voice/**/*.onnx
+resources/voice/**/*.onnx.json
+resources/voice/**/*.tar.bz2
+resources/voice/**/*.wav
+resources/voice/**/tokens.txt
+resources/voice/**/bpe.model
+resources/voice/stt/*/
+!resources/voice/stt/sherpa-onnx/
+resources/voice/stt/sherpa-onnx/*
+!resources/voice/stt/sherpa-onnx/.gitkeep

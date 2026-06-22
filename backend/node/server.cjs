@@ -8,11 +8,12 @@ const {
 } = require("./llama-cpp-provider.cjs")
 const { checkCurrentRuntime } = require("./runtime-preflight.cjs")
 const { resolveRuntimeConfig } = require("./runtime-config.cjs")
+const { createVoiceRuntime } = require("./suva/voice-runtime.cjs")
 
-function getSystemPrompt() {
+function getSystemPrompt(filename = "sys_prompt.md", fallback = "You are Supra") {
   const possiblePaths = [
-    path.join(__dirname, "..", "..", "sys_prompt.md"),
-    path.join(process.cwd(), "sys_prompt.md"),
+    path.join(__dirname, "..", "..", filename),
+    path.join(process.cwd(), filename),
   ];
   for (const p of possiblePaths) {
     const resolved = path.resolve(p);
@@ -27,13 +28,14 @@ function getSystemPrompt() {
       }
     }
   }
-  return "You are Supra";
+  return fallback;
 }
 
 let serverInstance = null
 let databaseInstance = null
 let runtimeConfig = null
 let generationProvider = null
+let voiceRuntime = null
 
 function getAllowedOrigin(req, config) {
   const origin = req.headers.origin
@@ -73,13 +75,13 @@ function sendJson(req, res, statusCode, payload) {
   res.end(JSON.stringify(payload))
 }
 
-function readJsonBody(req) {
+function readJsonBody(req, maxBytes = 1_000_000) {
   return new Promise((resolve, reject) => {
     let body = ""
 
     req.on("data", (chunk) => {
       body += chunk
-      if (body.length > 1_000_000) {
+      if (body.length > maxBytes) {
         reject(new Error("payload_too_large"))
         req.destroy()
       }
@@ -150,6 +152,16 @@ function createServer(database, config, provider) {
       runtimePreflight: checkCurrentRuntime(),
       model: provider.chatModel.label,
       titleModel: provider.titleModel.label,
+    })
+    return
+  }
+
+  if (req.method === "GET" && url.pathname === "/suva/voice/health") {
+    sendJson(req, res, 200, {
+      ok: true,
+      service: "suva-voice",
+      runtime: "onnx",
+      voice: voiceRuntime.health(),
     })
     return
   }
@@ -300,6 +312,84 @@ function createServer(database, config, provider) {
     return
   }
 
+  if (req.method === "POST" && url.pathname === "/suva/chat") {
+    try {
+      const body = await readJsonBody(req)
+      const messages = Array.isArray(body.messages) ? body.messages : []
+
+      if (messages.length === 0) {
+        sendJson(req, res, 400, {
+          ok: false,
+          error: "missing_messages",
+          detail: "Send at least one SuVA message.",
+        })
+        return
+      }
+
+      const systemPrompt = getSystemPrompt(
+        "SuVA_sys_prompt.md",
+        "You are SuVA, the concise voice companion for SupraChat.",
+      )
+      const formattedMessages = [
+        { role: "system", content: systemPrompt },
+        ...messages.map((message) => ({
+          role: message.role,
+          content: String(message.content ?? ""),
+        })),
+      ]
+
+      const response = await provider.streamChat(formattedMessages)
+
+      writeStreamHeaders(req, res, config)
+      provider.pipeStream(response.data, res)
+    } catch (error) {
+      sendJson(req, res, 502, {
+        ok: false,
+        error: "suva_generation_failed",
+        detail: providerErrorDetail(error, config, "chat"),
+      })
+    }
+
+    return
+  }
+
+  if (req.method === "POST" && url.pathname === "/suva/stt") {
+    try {
+      const body = await readJsonBody(req, 12_000_000)
+      const samples = Array.isArray(body.samples) ? body.samples : []
+      const sampleRate = Number(body.sampleRate)
+
+      if (samples.length === 0 || !Number.isFinite(sampleRate)) {
+        sendJson(req, res, 400, {
+          ok: false,
+          error: "invalid_audio",
+          detail: "Send recorded audio samples to transcribe.",
+        })
+        return
+      }
+
+      const text = await voiceRuntime.transcribe({
+        sampleRate,
+        samples,
+      })
+
+      sendJson(req, res, 200, { ok: true, text })
+    } catch (error) {
+      const detail =
+        error?.code === "SUPRACHAT_SUVA_VOICE_RUNTIME_NOT_READY"
+          ? error.message
+          : "Unable to transcribe the recording. Check the local SuVA voice runtime and try again."
+
+      sendJson(req, res, 502, {
+        ok: false,
+        error: "suva_transcription_failed",
+        detail,
+      })
+    }
+
+    return
+  }
+
   if (req.method === "POST" && url.pathname === "/chat/title") {
     try {
       const body = await readJsonBody(req)
@@ -342,6 +432,7 @@ function startServer(options = {}) {
   runtimeConfig = resolveRuntimeConfig(options)
   databaseInstance = createChatDatabase(runtimeConfig.databasePath)
   generationProvider = createGenerationProvider()
+  voiceRuntime = createVoiceRuntime()
   serverInstance = createServer(databaseInstance, runtimeConfig, generationProvider)
   serverInstance.on("error", (error) => {
     if (error.code === "EADDRINUSE") {
@@ -354,6 +445,7 @@ function startServer(options = {}) {
         databaseInstance.close()
         databaseInstance = null
       }
+      voiceRuntime = null
       serverInstance = null
       runtimeConfig = null
       return
@@ -372,6 +464,7 @@ function startServer(options = {}) {
       databaseInstance = null
     }
 
+    voiceRuntime = null
     serverInstance = null
     runtimeConfig = null
   })
@@ -406,6 +499,8 @@ function stopServer() {
     databaseInstance.close()
     databaseInstance = null
   }
+
+  voiceRuntime = null
 }
 
 if (require.main === module) {
