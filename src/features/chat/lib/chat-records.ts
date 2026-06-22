@@ -4,6 +4,9 @@ import {
 } from "@/features/chat/config/ui"
 import { ChatMessage, ChatRole, Conversation } from "@/features/chat/types"
 
+const GENERATED_TITLE_DISALLOWED_CHARACTERS = /[^A-Za-z0-9\s.,!?;:'"()\-/+*=<>%&$#@]/g
+const GENERATED_TITLE_TRAILING_PUNCTUATION = /[.,!?;:]+$/u
+
 function makeId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
 }
@@ -43,9 +46,9 @@ export function titleFromMessage(content: string) {
 
 export function sanitizeGeneratedTitle(content: string) {
   return content
-    .replace(/["'`]/g, "")
+    .replace(GENERATED_TITLE_DISALLOWED_CHARACTERS, " ")
     .replace(/\s+/g, " ")
-    .replace(/[.。!?،؛:]+$/u, "")
+    .replace(GENERATED_TITLE_TRAILING_PUNCTUATION, "")
     .trim()
 }
 

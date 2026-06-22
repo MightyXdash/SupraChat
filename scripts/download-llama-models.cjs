@@ -10,14 +10,14 @@ const models = [
     destination: path.join("resources", "models", "chat", "LFM2.5-350M-Q6_K.gguf"),
   },
   {
-    label: "Supra Title 50M F16 title model",
-    repo: "SupraLabs/supra-title-50M-pre-gguf",
-    filename: "SupraTitle-50M-F16.gguf",
+    label: "Supra Title 350M Experimental Q4 K M title model",
+    repo: "SupraLabs/Supra-Title-350M-exp-GGUF",
+    filename: "LiquidAI_LFM2.5-350M-Base_1781204855.Q4_K_M.gguf",
     destination: path.join(
       "resources",
       "models",
       "title",
-      "SupraTitle-50M-F16.gguf",
+      "LiquidAI_LFM2.5-350M-Base_1781204855.Q4_K_M.gguf",
     ),
   },
 ]
