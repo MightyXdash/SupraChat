@@ -391,7 +391,7 @@ export function PlaygroundWorkspace() {
                         <strong>{model.name}</strong>
                         <span>{model.description ?? model.id}</span>
                         <small>
-                          {model.pipelineTag ?? "model"} · {formatNumber(model.downloads)} downloads
+                          {model.pipelineTag ?? "model"} / {formatNumber(model.downloads)} downloads
                         </small>
                       </span>
                       <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
