@@ -1160,6 +1160,8 @@ button:disabled {
 
 .conversation-search-backdrop {
   background: var(--overlay-dim);
+  backdrop-filter: blur(var(--search-backdrop-blur, 0px)) saturate(var(--search-backdrop-saturate, 1));
+  -webkit-backdrop-filter: blur(var(--search-backdrop-blur, 0px)) saturate(var(--search-backdrop-saturate, 1));
   border: 0;
   cursor: default;
   inset: 0;

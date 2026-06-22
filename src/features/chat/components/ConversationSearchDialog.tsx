@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { MessageCircle, Search, SquarePen, X } from "lucide-react"
 import { searchConversations, getSearchWords } from "@/features/chat/lib/conversation-search"
@@ -103,12 +103,8 @@ export function ConversationSearchDialog({
   return (
     <AnimatePresence>
       {isOpen ? (
-        <motion.div
+        <div
           className="conversation-search-layer"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
           role="presentation"
         >
           <motion.button
@@ -116,10 +112,22 @@ export function ConversationSearchDialog({
             type="button"
             aria-label="Close search"
             onClick={onClose}
-            initial={{ opacity: 0, backdropFilter: "blur(0px) saturate(1)" }}
-            animate={{ opacity: 1, backdropFilter: "blur(10px) saturate(0.94)" }}
-            exit={{ opacity: 0, backdropFilter: "blur(0px) saturate(1)" }}
-            transition={{ duration: 0.24, ease: "easeOut" }}
+            initial={{
+              opacity: 0,
+              "--search-backdrop-blur": "0px",
+              "--search-backdrop-saturate": "1",
+            } as CSSProperties}
+            animate={{
+              opacity: 1,
+              "--search-backdrop-blur": "10px",
+              "--search-backdrop-saturate": "0.94",
+            } as CSSProperties}
+            exit={{
+              opacity: 0,
+              "--search-backdrop-blur": "0px",
+              "--search-backdrop-saturate": "1",
+            } as CSSProperties}
+            transition={{ duration: 0.36, ease: "easeOut" }}
           />
           <motion.section
             className="conversation-search-dialog"
@@ -129,7 +137,7 @@ export function ConversationSearchDialog({
             initial={{ opacity: 0, scale: 1.08 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.08 }}
-            transition={{ duration: 0.24, ease: "easeOut" }}
+            transition={{ duration: 0.36, ease: "easeOut" }}
           >
             <div className="conversation-search-field">
               <Search className="h-4 w-4" aria-hidden="true" />
@@ -190,7 +198,7 @@ export function ConversationSearchDialog({
               ) : null}
             </div>
           </motion.section>
-        </motion.div>
+        </div>
       ) : null}
     </AnimatePresence>
   )
