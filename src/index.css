@@ -49,7 +49,8 @@
   --ctx-ring-center: rgba(247, 247, 247, 0.6);
   --ctx-popover-bg: rgba(247, 247, 247, 0.54);
   --overlay-dim: rgba(42, 37, 34, 0.18);
-  --search-surface: rgba(255, 255, 255, 0.9);
+  --search-overlay-dim: rgba(42, 37, 34, 0.1);
+  --search-surface: rgba(255, 255, 255, 0.36);
   --search-border: rgba(0, 0, 0, 0.1);
   --placeholder-color: color-mix(in srgb, var(--text-primary) 52%, transparent);
   --radius-panel: 10px;
@@ -96,9 +97,9 @@
   --glass-sheen: rgba(255, 255, 255, 0.06);
   --shadow-soft: rgba(0, 0, 0, 0.18);
   --shadow-strong: rgba(0, 0, 0, 0.34);
-  --composer-bg-start: rgba(48, 48, 48, 1);
-  --composer-bg-end: rgba(44, 44, 44, 1);
-  --composer-surface: rgba(48, 48, 48, 1);
+  --composer-bg-start: rgba(44, 44, 44, 1);
+  --composer-bg-end: rgba(40, 40, 40, 1);
+  --composer-surface: rgba(43, 43, 43, 1);
   --composer-border: rgba(255, 255, 255, 0.12);
   --composer-border-focus: rgba(255, 255, 255, 0.2);
   --composer-ring: rgba(255, 255, 255, 0.08);
@@ -110,7 +111,10 @@
   --ctx-ring-center: rgba(33, 33, 33, 0.92);
   --ctx-popover-bg: rgba(43, 43, 43, 0.96);
   --overlay-dim: rgba(23, 21, 17, 0.46);
-  --search-surface: rgba(38, 35, 30, 0.9);
+  --search-overlay-dim: rgba(23, 21, 17, 0.26);
+  --search-surface: rgba(46, 46, 46, 0.24);
+  --search-shadow-soft: rgba(0, 0, 0, 0.1);
+  --search-shadow-strong: rgba(0, 0, 0, 0.18);
   --search-border: rgba(255, 255, 255, 0.12);
   --placeholder-color: #666666;
 }
@@ -143,9 +147,9 @@
     --glass-sheen: rgba(255, 255, 255, 0.06);
     --shadow-soft: rgba(0, 0, 0, 0.18);
     --shadow-strong: rgba(0, 0, 0, 0.34);
-    --composer-bg-start: rgba(48, 48, 48, 1);
-    --composer-bg-end: rgba(44, 44, 44, 1);
-    --composer-surface: rgba(48, 48, 48, 1);
+    --composer-bg-start: rgba(44, 44, 44, 1);
+    --composer-bg-end: rgba(40, 40, 40, 1);
+    --composer-surface: rgba(43, 43, 43, 1);
     --composer-border: rgba(255, 255, 255, 0.12);
     --composer-border-focus: rgba(255, 255, 255, 0.2);
     --composer-ring: rgba(255, 255, 255, 0.08);
@@ -157,7 +161,10 @@
     --ctx-ring-center: rgba(33, 33, 33, 0.92);
     --ctx-popover-bg: rgba(43, 43, 43, 0.96);
     --overlay-dim: rgba(23, 21, 17, 0.46);
-    --search-surface: rgba(38, 35, 30, 0.9);
+    --search-overlay-dim: rgba(23, 21, 17, 0.26);
+    --search-surface: rgba(46, 46, 46, 0.24);
+    --search-shadow-soft: rgba(0, 0, 0, 0.1);
+    --search-shadow-strong: rgba(0, 0, 0, 0.18);
     --search-border: rgba(255, 255, 255, 0.12);
     --placeholder-color: #666666;
   }
@@ -438,8 +445,8 @@ body {
 
 .chat-composer {
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--sidebar) 94%, var(--composer-bg-start)), color-mix(in srgb, var(--sidebar) 86%, var(--composer-bg-end))),
-    var(--surface);
+    linear-gradient(180deg, var(--composer-bg-start), var(--composer-bg-end)),
+    var(--composer-surface);
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
   border-radius: 12px;
   box-shadow:
@@ -2015,7 +2022,7 @@ button:disabled {
 }
 
 .conversation-search-backdrop {
-  background: var(--overlay-dim);
+  background: var(--search-overlay-dim, var(--overlay-dim));
   backdrop-filter: blur(var(--search-backdrop-blur, 0px)) saturate(var(--search-backdrop-saturate, 1));
   -webkit-backdrop-filter: blur(var(--search-backdrop-blur, 0px)) saturate(var(--search-backdrop-saturate, 1));
   border: 0;
@@ -2025,16 +2032,14 @@ button:disabled {
 }
 
 .conversation-search-dialog {
-  background:
-    linear-gradient(180deg, var(--glass-sheen), transparent 30%),
-    var(--search-surface);
-  backdrop-filter: blur(22px) saturate(1.06);
-  -webkit-backdrop-filter: blur(22px) saturate(1.06);
+  background: var(--search-surface);
+  backdrop-filter: blur(30px) saturate(1.14);
+  -webkit-backdrop-filter: blur(30px) saturate(1.14);
   border: 1px solid var(--search-border);
   border-radius: 16px;
   box-shadow:
-    0 34px 76px var(--shadow-strong),
-    0 10px 28px var(--shadow-soft),
+    0 24px 52px var(--search-shadow-strong, var(--shadow-strong)),
+    0 8px 20px var(--search-shadow-soft, var(--shadow-soft)),
     inset 0 1px 0 var(--glass-inset);
   display: flex;
   flex-direction: column;
