@@ -1660,7 +1660,7 @@ button:disabled {
 }
 
 .model-list-card:hover {
-  background: color-mix(in srgb, var(--surface-elevated) 82%, var(--surface));
+  background: color-mix(in srgb, var(--surface-elevated) 92%, var(--surface));
   border-color: transparent;
   border-radius: 8px;
   box-shadow: 0 0.55rem 1.3rem color-mix(in srgb, var(--shadow-strong) 14%, transparent);
@@ -1668,12 +1668,12 @@ button:disabled {
 
 .model-list-card:hover strong,
 .model-list-card:hover > svg {
-  color: color-mix(in srgb, var(--text-primary) 88%, var(--accent-primary));
+  color: var(--text-primary);
 }
 
 .model-list-card:hover span,
 .model-list-card:hover small {
-  color: color-mix(in srgb, var(--text-secondary) 82%, var(--text-primary));
+  color: var(--text-secondary);
 }
 
 .model-list-icon {
@@ -1748,12 +1748,12 @@ button:disabled {
 
 :root[data-theme="light"] .playground-backlink,
 :root:not([data-theme]) .playground-backlink {
-  color: color-mix(in srgb, var(--text-muted) 86%, var(--surface));
+  color: color-mix(in srgb, var(--text-muted) 94%, var(--surface));
 }
 
 :root[data-theme="light"] .playground-header h2,
 :root:not([data-theme]) .playground-header h2 {
-  color: color-mix(in srgb, var(--text-secondary) 78%, var(--surface));
+  color: color-mix(in srgb, var(--text-secondary) 86%, var(--surface));
 }
 
 :root[data-theme="light"] .playground-header p:not(.playground-backlink),
@@ -1764,7 +1764,7 @@ button:disabled {
 :root:not([data-theme]) .model-group-heading h3,
 :root[data-theme="light"] .featured-model-title-row h4,
 :root:not([data-theme]) .featured-model-title-row h4 {
-  color: color-mix(in srgb, var(--text-secondary) 72%, var(--surface));
+  color: color-mix(in srgb, var(--text-secondary) 80%, var(--surface));
 }
 
 :root[data-theme="light"] .playground-section-heading p,
@@ -1777,7 +1777,7 @@ button:disabled {
 :root:not([data-theme]) .model-list-copy strong,
 :root[data-theme="light"] .playground-state-panel p,
 :root:not([data-theme]) .playground-state-panel p {
-  color: color-mix(in srgb, var(--text-secondary) 66%, var(--surface));
+  color: color-mix(in srgb, var(--text-secondary) 74%, var(--surface));
 }
 
 :root[data-theme="light"] .playground-featured-heading > span,
@@ -1788,7 +1788,7 @@ button:disabled {
 :root:not([data-theme]) .playground-section-heading-row > span,
 :root:not([data-theme]) .model-catalog-toolbar > span,
 :root:not([data-theme]) .model-group-heading span {
-  color: color-mix(in srgb, var(--text-muted) 58%, var(--surface));
+  color: color-mix(in srgb, var(--text-muted) 70%, var(--surface));
 }
 
 :root[data-theme="light"] .featured-model-specs dt,
@@ -1801,7 +1801,7 @@ button:disabled {
 :root:not([data-theme]) .model-list-copy span,
 :root:not([data-theme]) .model-search-field,
 :root:not([data-theme]) .model-search-field input::placeholder {
-  color: color-mix(in srgb, var(--text-muted) 62%, var(--surface));
+  color: color-mix(in srgb, var(--text-muted) 74%, var(--surface));
 }
 
 :root[data-theme="light"] .featured-model-specs dd,
@@ -1816,7 +1816,27 @@ button:disabled {
 :root:not([data-theme]) .model-search-field input,
 :root:not([data-theme]) .model-list-card > svg,
 :root:not([data-theme]) .model-list-copy small {
-  color: color-mix(in srgb, var(--text-secondary) 60%, var(--surface));
+  color: color-mix(in srgb, var(--text-secondary) 72%, var(--surface));
+}
+
+:root[data-theme="light"] .model-list-card:hover,
+:root:not([data-theme]) .model-list-card:hover {
+  background: color-mix(in srgb, var(--surface-elevated) 64%, var(--accent-light));
+  box-shadow: 0 0.65rem 1.45rem color-mix(in srgb, var(--shadow-strong) 16%, transparent);
+}
+
+:root[data-theme="light"] .model-list-card:hover .model-list-copy strong,
+:root[data-theme="light"] .model-list-card:hover > svg,
+:root:not([data-theme]) .model-list-card:hover .model-list-copy strong,
+:root:not([data-theme]) .model-list-card:hover > svg {
+  color: var(--text-primary);
+}
+
+:root[data-theme="light"] .model-list-card:hover .model-list-copy span,
+:root[data-theme="light"] .model-list-card:hover .model-list-copy small,
+:root:not([data-theme]) .model-list-card:hover .model-list-copy span,
+:root:not([data-theme]) .model-list-card:hover .model-list-copy small {
+  color: var(--text-secondary);
 }
 
 .model-list-card-loading span,
