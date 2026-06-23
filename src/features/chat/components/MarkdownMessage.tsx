@@ -389,97 +389,57 @@ function isUnorderedListItem(line: string) {
   return /^\s*[-*]\s+/.test(line)
 }
 
-export function MarkdownMessage({ content }: { content: string }) {
-  const [openTableMenu, setOpenTableMenu] = useState<string | null>(null)
-  const [closingTableMenu, setClosingTableMenu] = useState<string | null>(null)
-  const closeTimeoutRef = useRef<number | null>(null)
-  const rootRef = useRef<HTMLDivElement | null>(null)
-  const previousContentLengthRef = useRef(content.length)
-  const normalizedContent = normalizeMarkdownSource(content)
-  const animatedFrom =
-    content.length > previousContentLengthRef.current
-      ? previousContentLengthRef.current
-      : Number.POSITIVE_INFINITY
-  const lines = normalizedContent.split("\n")
+function splitOnThinking(content: string): { reasoning: string; answer: string } {
+  let reasoning = ""
+  let answer = ""
+  let isInsideReasoning = false
+  let hasReasoningMarker = false
+  let lastIndex = 0
+  const markerRegex = /<suprachat-think>|<\/suprachat-think>|<think>|<\/think>/g
+  let markerMatch: RegExpExecArray | null
+
+  while ((markerMatch = markerRegex.exec(content)) !== null) {
+    const textBeforeMarker = content.slice(lastIndex, markerMatch.index)
+    const marker = markerMatch[0]
+
+    if (isInsideReasoning) {
+      reasoning += textBeforeMarker
+    } else {
+      answer += textBeforeMarker
+    }
+
+    hasReasoningMarker = true
+    isInsideReasoning = marker === "<suprachat-think>" || marker === "<think>"
+    lastIndex = markerMatch.index + marker.length
+  }
+
+  if (!hasReasoningMarker) {
+    return { reasoning: "", answer: content }
+  }
+
+  const remainingText = content.slice(lastIndex)
+  if (isInsideReasoning) {
+    reasoning += remainingText
+  } else {
+    answer += remainingText
+  }
+
+  return { reasoning: reasoning.trim(), answer: answer.trim() }
+}
+
+function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[] {
+  const normalized = normalizeMarkdownSource(content)
+  const lines = normalized.split("\n")
   const blocks: ReactNode[] = []
   let lineIndex = 0
   let offset = 0
-
-  useEffect(() => {
-    setOpenTableMenu(null)
-    setClosingTableMenu(null)
-  }, [content])
-
-  useEffect(() => {
-    previousContentLengthRef.current = content.length
-  }, [content])
-
-  useEffect(() => {
-    return () => {
-      if (closeTimeoutRef.current) {
-        window.clearTimeout(closeTimeoutRef.current)
-      }
-    }
-  }, [])
-
-  function closeMenu(menuKey: string) {
-    setClosingTableMenu(menuKey)
-    closeTimeoutRef.current = window.setTimeout(() => {
-      setOpenTableMenu((current) => (current === menuKey ? null : current))
-      setClosingTableMenu((current) => (current === menuKey ? null : current))
-      closeTimeoutRef.current = null
-    }, 200)
-  }
-
-  useEffect(() => {
-    if (!openTableMenu) {
-      return
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        closeMenu(openTableMenu)
-      }
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown)
-
-    return () => window.removeEventListener("pointerdown", handlePointerDown)
-  }, [openTableMenu])
-
-  async function copyTableMarkdown(markdown: string) {
-    try {
-      await navigator.clipboard.writeText(markdown)
-      if (openTableMenu) {
-        closeMenu(openTableMenu)
-      }
-    } catch {
-      // Silently ignore clipboard failures for now.
-    }
-  }
-
-  function downloadTableMarkdown(markdown: string, key: string) {
-    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-
-    link.href = url
-    link.download = `table-${key}.md`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
-    if (openTableMenu) {
-      closeMenu(openTableMenu)
-    }
-  }
 
   while (lineIndex < lines.length) {
     const line = lines[lineIndex]
     const currentOffset = offset
 
     if (!line.trim()) {
-      blocks.push(<div aria-hidden="true" className="markdown-spacer" key={`space-${currentOffset}`} />)
+      blocks.push(<div aria-hidden="true" className="markdown-spacer" key={`s-${currentOffset}`} />)
       lineIndex += 1
       offset += line.length + 1
       continue
@@ -492,7 +452,7 @@ export function MarkdownMessage({ content }: { content: string }) {
     }
 
     if (/^\s*---+\s*$/.test(line)) {
-      blocks.push(<hr className="markdown-rule" key={`rule-${currentOffset}`} />)
+      blocks.push(<hr className="markdown-rule" key={`r-${currentOffset}`} />)
       lineIndex += 1
       offset += line.length + 1
       continue
@@ -519,7 +479,7 @@ export function MarkdownMessage({ content }: { content: string }) {
       }
 
       blocks.push(
-        <div className="markdown-code-block" key={`codeblock-${codeOffset}`}>
+        <div className="markdown-code-block" key={`cb-${codeOffset}`}>
           {language ? <div className="markdown-code-block-label">{language}</div> : null}
           <pre className="markdown-code-block-pre">
             <code>{codeLines.join("\n")}</code>
@@ -533,7 +493,7 @@ export function MarkdownMessage({ content }: { content: string }) {
     if (heading) {
       const HeadingTag = `h${Math.min(heading[1].length, 3)}` as "h1" | "h2" | "h3"
       blocks.push(
-        <HeadingTag className="markdown-heading" key={`heading-${currentOffset}`}>
+        <HeadingTag className="markdown-heading" key={`h-${currentOffset}`}>
           {renderInlineMarkdown(heading[2], currentOffset + heading[1].length + 1, animatedFrom)}
         </HeadingTag>,
       )
@@ -547,13 +507,11 @@ export function MarkdownMessage({ content }: { content: string }) {
       const columnCount = header.length
       const tableOffset = currentOffset
       const rows: { cells: string[]; offset: number }[] = []
-      const tableLines = [line]
 
       offset += line.length + 1
 
       const separatorLine = lines[lineIndex + 1]
       if (separatorLine && isTableSeparator(separatorLine)) {
-        tableLines.push(separatorLine)
         lineIndex += 2
         offset += separatorLine.length + 1
       } else {
@@ -561,17 +519,13 @@ export function MarkdownMessage({ content }: { content: string }) {
       }
 
       while (lineIndex < lines.length && isTableRow(lines[lineIndex])) {
-        tableLines.push(lines[lineIndex])
         rows.push({ cells: normalizeTableCells(splitTableRow(lines[lineIndex]), columnCount), offset })
         offset += lines[lineIndex].length + 1
         lineIndex += 1
       }
 
-      const tableMarkdown = tableLines.join("\n")
-      const tableMenuKey = `table-${tableOffset}`
-
       blocks.push(
-        <div className="markdown-table-block" key={`table-${tableOffset}`}>
+        <div className="markdown-table-block" key={`t-${tableOffset}`}>
           <div className="markdown-table-wrap">
             <table className="markdown-table">
               <thead>
@@ -596,58 +550,6 @@ export function MarkdownMessage({ content }: { content: string }) {
               </tbody>
             </table>
           </div>
-          <div className="markdown-table-actions">
-            <button
-              aria-expanded={openTableMenu === tableMenuKey}
-              aria-haspopup="menu"
-              className="markdown-table-menu-trigger"
-              type="button"
-              onClick={() => {
-                if (openTableMenu === tableMenuKey) {
-                  closeMenu(tableMenuKey)
-                  return
-                }
-
-                if (closeTimeoutRef.current) {
-                  window.clearTimeout(closeTimeoutRef.current)
-                  closeTimeoutRef.current = null
-                }
-
-                setClosingTableMenu(null)
-                setOpenTableMenu(tableMenuKey)
-              }}
-            >
-              <Ellipsis className="h-4 w-4" />
-            </button>
-            {openTableMenu === tableMenuKey || closingTableMenu === tableMenuKey ? (
-              <div
-                className={cn(
-                  "markdown-table-menu",
-                  closingTableMenu === tableMenuKey && "markdown-table-menu-closing",
-                )}
-                role="menu"
-              >
-                <button
-                  className="markdown-table-menu-item"
-                  role="menuitem"
-                  type="button"
-                  onClick={() => downloadTableMarkdown(tableMarkdown, `${tableOffset}`)}
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Download as markdown</span>
-                </button>
-                <button
-                  className="markdown-table-menu-item"
-                  role="menuitem"
-                  type="button"
-                  onClick={() => void copyTableMarkdown(tableMarkdown)}
-                >
-                  <Copy className="h-4 w-4" />
-                  <span>Copy to clipboard</span>
-                </button>
-              </div>
-            ) : null}
-          </div>
         </div>,
       )
       continue
@@ -656,7 +558,7 @@ export function MarkdownMessage({ content }: { content: string }) {
     const displayMath = /^\s*(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])\s*$/.exec(line)
     if (displayMath) {
       blocks.push(
-        <div className="latex-display-line" key={`math-${currentOffset}`}>
+        <div className="latex-display-line" key={`m-${currentOffset}`}>
           <MathExpression display source={displayMath[2]} />
         </div>,
       )
@@ -678,7 +580,7 @@ export function MarkdownMessage({ content }: { content: string }) {
       }
 
       blocks.push(
-        <blockquote className="markdown-quote" key={`quote-${quoteOffset}`}>
+        <blockquote className="markdown-quote" key={`q-${quoteOffset}`}>
           {renderInlineMarkdown(quoteLines.join("\n"), quoteOffset, animatedFrom)}
         </blockquote>,
       )
@@ -826,9 +728,115 @@ export function MarkdownMessage({ content }: { content: string }) {
     )
   }
 
+  return blocks
+}
+
+export function MarkdownMessage({ content, isGenerating }: { content: string; isGenerating?: boolean }) {
+  const [openTableMenu, setOpenTableMenu] = useState<string | null>(null)
+  const [closingTableMenu, setClosingTableMenu] = useState<string | null>(null)
+  const [isReasoningOpen, setIsReasoningOpen] = useState(false)
+  const closeTimeoutRef = useRef<number | null>(null)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const previousContentLengthRef = useRef(content.length)
+  const prevThinkingActiveRef = useRef(false)
+  const { reasoning, answer } = splitOnThinking(content)
+  const isStreaming = isGenerating || content.length > previousContentLengthRef.current
+  const isThinkingActive = isStreaming && !answer
+  const animatedFrom =
+    content.length > previousContentLengthRef.current
+      ? previousContentLengthRef.current
+      : Number.POSITIVE_INFINITY
+  const answerBlocks = buildMarkdownBlocks(answer, animatedFrom)
+
+  const allParagraphs = reasoning ? reasoning.split(/\n\n+/).filter(Boolean) : []
+  const completedParagraphs = /\n\s*\n\s*$/.test(reasoning)
+    ? allParagraphs
+    : allParagraphs.slice(0, -1)
+  const visibleParagraphs = isThinkingActive
+    ? completedParagraphs.slice(-1)
+    : allParagraphs
+
+  const showThinkingToggle = !!reasoning || (isGenerating && !answer)
+  const showParagraphs = isThinkingActive || isReasoningOpen
+
+  useEffect(() => {
+    setOpenTableMenu(null)
+    setClosingTableMenu(null)
+  }, [content])
+
+  useEffect(() => {
+    previousContentLengthRef.current = content.length
+  }, [content])
+
+  useEffect(() => {
+    if (prevThinkingActiveRef.current && !isThinkingActive) {
+      setIsReasoningOpen(false)
+    }
+    prevThinkingActiveRef.current = isThinkingActive
+  }, [isThinkingActive])
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        window.clearTimeout(closeTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  function closeMenu(menuKey: string) {
+    setClosingTableMenu(menuKey)
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setOpenTableMenu((current) => (current === menuKey ? null : current))
+      setClosingTableMenu((current) => (current === menuKey ? null : current))
+      closeTimeoutRef.current = null
+    }, 200)
+  }
+
+  useEffect(() => {
+    if (!openTableMenu) {
+      return
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        closeMenu(openTableMenu)
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown)
+
+    return () => window.removeEventListener("pointerdown", handlePointerDown)
+  }, [openTableMenu])
+
   return (
     <div className="markdown-content" ref={rootRef}>
-      {blocks}
+      {showThinkingToggle ? (
+        <>
+          <button
+            className="markdown-thinking-toggle"
+            type="button"
+            onClick={() => setIsReasoningOpen(!isReasoningOpen)}
+            aria-expanded={isReasoningOpen}
+          >
+            <span className={cn("markdown-thinking-label", isThinkingActive && "markdown-thinking-label-streaming")}>
+              {isThinkingActive ? "Thinking" : "Thoughts"}
+            </span>
+          </button>
+          {showParagraphs && visibleParagraphs.length > 0 ? (
+            <div className="markdown-reasoning-body">
+              {visibleParagraphs.map((para, index) => (
+                <div
+                  key={`t-${index}-${para.slice(0, 20)}`}
+                  className={cn("markdown-thought-paragraph", isThinkingActive && "thought-reveal")}
+                >
+                  {buildMarkdownBlocks(para, Number.POSITIVE_INFINITY)}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+      {answerBlocks}
     </div>
   )
 }

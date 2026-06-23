@@ -4,21 +4,10 @@ const { pipeline } = require("node:stream/promises")
 
 const models = [
   {
-    label: "LFM2.5 350M Q6 chat model",
-    repo: "LiquidAI/LFM2.5-350M-GGUF",
-    filename: "LFM2.5-350M-Q6_K.gguf",
-    destination: path.join("resources", "models", "chat", "LFM2.5-350M-Q6_K.gguf"),
-  },
-  {
-    label: "Supra Title 350M Experimental Q4 K M title model",
-    repo: "SupraLabs/Supra-Title-350M-exp-GGUF",
-    filename: "LiquidAI_LFM2.5-350M-Base_1781204855.Q4_K_M.gguf",
-    destination: path.join(
-      "resources",
-      "models",
-      "title",
-      "LiquidAI_LFM2.5-350M-Base_1781204855.Q4_K_M.gguf",
-    ),
+    label: "LFM 2.5 1.2B Thinking Q5 K M chat model",
+    repo: "unsloth/LFM2.5-1.2B-Thinking-GGUF",
+    filename: "LFM2.5-1.2B-Thinking-Q5_K_M.gguf",
+    destination: path.join("resources", "models", "chat", "LFM2.5-1.2B-Thinking-Q5_K_M.gguf"),
   },
 ]
 

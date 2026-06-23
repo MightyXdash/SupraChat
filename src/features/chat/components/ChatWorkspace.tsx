@@ -165,14 +165,15 @@ export function ChatWorkspace({
         {hasMessages && (
           <div className="mx-auto flex max-w-3xl flex-col gap-5">
             <AnimatePresence>
-              {conversation?.messages.map((message) => <ChatBubble key={message.id} message={message} />)}
+              {conversation?.messages.map((message, index) => (
+                <ChatBubble
+                  key={message.id}
+                  message={message}
+                  isGenerating={isGenerating && index === conversation.messages.length - 1}
+                />
+              ))}
             </AnimatePresence>
-            {isGenerating && (
-              <div className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent-primary)]" />
-                Generating response
-              </div>
-            )}
+            
           </div>
         )}
       </div>

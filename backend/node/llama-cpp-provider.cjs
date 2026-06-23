@@ -172,20 +172,26 @@ class LlamaCppWorker {
     return `http://127.0.0.1:${this.port}`
   }
 
-  async streamChat(messages, temperatureOverride) {
+  async streamChat(messages, temperatureOverride, thinking) {
     await this.ensureReady()
+
+    const body = {
+      model: this.model.filename,
+      messages,
+      stream: true,
+      temperature: typeof temperatureOverride === "number" ? temperatureOverride : this.model.temperature,
+      top_k: this.model.topK,
+      repeat_penalty: this.model.repeatPenalty,
+      max_tokens: this.model.maxTokens,
+    }
+
+    if (thinking !== undefined) {
+      body.thinking = thinking
+    }
 
     return axios.post(
       `${this.baseUrl}/v1/chat/completions`,
-      {
-        model: this.model.filename,
-        messages,
-        stream: true,
-        temperature: typeof temperatureOverride === "number" ? temperatureOverride : this.model.temperature,
-        top_k: this.model.topK,
-        repeat_penalty: this.model.repeatPenalty,
-        max_tokens: this.model.maxTokens,
-      },
+      body,
       { responseType: "stream", timeout: 600_000 },
     )
   }
@@ -201,9 +207,10 @@ class LlamaCppWorker {
   }
 }
 
-function pipeOpenAiSseStream(providerStream, res) {
+function pipeOpenAiSseStream(providerStream, res, thinking = true) {
   let buffer = ""
   let completed = false
+  let inReasoning = false
 
   function handleLine(line) {
     const trimmedLine = line.trim()
@@ -215,6 +222,10 @@ function pipeOpenAiSseStream(providerStream, res) {
     const payloadText = trimmedLine.replace(/^data:\s*/, "")
 
     if (payloadText === "[DONE]") {
+      if (inReasoning) {
+        res.write("</suprachat-think>")
+        inReasoning = false
+      }
       completed = true
       return
     }
@@ -225,8 +236,22 @@ function pipeOpenAiSseStream(providerStream, res) {
         payload?.choices?.[0]?.delta?.content ??
         payload?.choices?.[0]?.text ??
         ""
+      const reasoning =
+        payload?.choices?.[0]?.delta?.reasoning_content ?? ""
+
+      if (reasoning && thinking) {
+        if (!inReasoning) {
+          res.write("<suprachat-think>")
+          inReasoning = true
+        }
+        res.write(reasoning)
+      }
 
       if (content) {
+        if (inReasoning) {
+          res.write("</suprachat-think>")
+          inReasoning = false
+        }
         res.write(content)
       }
     } catch {
@@ -242,6 +267,11 @@ function pipeOpenAiSseStream(providerStream, res) {
   })
 
   providerStream.on("end", () => {
+    if (inReasoning) {
+      res.write("</suprachat-think>")
+      inReasoning = false
+    }
+
     if (buffer) {
       handleLine(buffer)
     }
@@ -266,9 +296,9 @@ function createLlamaCppProvider() {
   return {
     chatModel: CHAT_MODEL,
     titleModel: TITLE_MODEL,
-    async streamChat(messages) {
+    async streamChat(messages, thinking) {
       try {
-        return await chatWorker.streamChat(messages)
+        return await chatWorker.streamChat(messages, undefined, thinking)
       } catch (error) {
         throw normalizeLlamaError(error)
       }

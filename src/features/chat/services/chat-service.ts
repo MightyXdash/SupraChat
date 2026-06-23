@@ -121,7 +121,7 @@ export async function streamChatCompletion({
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, thinking: true }),
   })
 
   if (!response.ok || !response.body) {
@@ -130,16 +130,16 @@ export async function streamChatCompletion({
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
-  const pendingCharacters: string[] = []
+  const pendingOutput: string[] = []
   let streamFinished = false
   let displayTimer: number | undefined
 
   const displayComplete = new Promise<void>((resolve) => {
     displayTimer = window.setInterval(() => {
-      const nextCharacter = pendingCharacters.shift()
+      const nextToken = pendingOutput.shift()
 
-      if (nextCharacter !== undefined) {
-        onChunk(nextCharacter)
+      if (nextToken !== undefined) {
+        onChunk(nextToken)
         return
       }
 
@@ -152,12 +152,50 @@ export async function streamChatCompletion({
     }, chatRuntimeConfig.stream.characterFrameMs)
   })
 
+  const thinkingMarkers = ["<suprachat-think>", "</suprachat-think>", "<think>", "</think>"]
+  const maxMarkerLength = Math.max(...thinkingMarkers.map((marker) => marker.length))
+  let markerBuffer = ""
+
+  const findMarkerAtStart = (text: string) => thinkingMarkers.find((marker) => text.startsWith(marker))
+
+  const isMarkerPrefix = (text: string) => thinkingMarkers.some((marker) => marker.startsWith(text))
+
+  const queueText = (text: string) => {
+    pendingOutput.push(...Array.from(text))
+  }
+
   const queueChunk = (chunk: string) => {
-    if (!chunk) {
+    if (!chunk && !markerBuffer) {
       return
     }
 
-    pendingCharacters.push(...Array.from(chunk))
+    const text = markerBuffer + (chunk ?? "")
+    markerBuffer = ""
+
+    let cursor = 0
+
+    while (cursor < text.length) {
+      const remaining = text.slice(cursor)
+      const marker = findMarkerAtStart(remaining)
+
+      if (marker) {
+        pendingOutput.push(marker)
+        cursor += marker.length
+        continue
+      }
+
+      if (remaining.startsWith("<")) {
+        const possibleMarker = remaining.slice(0, Math.min(maxMarkerLength, remaining.length))
+
+        if (isMarkerPrefix(possibleMarker)) {
+          markerBuffer = remaining
+          break
+        }
+      }
+
+      queueText(text[cursor])
+      cursor += 1
+    }
   }
 
   try {
@@ -174,6 +212,11 @@ export async function streamChatCompletion({
 
     const remaining = decoder.decode()
     queueChunk(remaining)
+
+    if (markerBuffer) {
+      queueText(markerBuffer)
+      markerBuffer = ""
+    }
 
     streamFinished = true
     await displayComplete

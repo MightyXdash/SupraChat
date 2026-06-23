@@ -2,13 +2,13 @@ const os = require("node:os")
 const path = require("node:path")
 
 const CHAT_MODEL = {
-  id: "lfm2.5-350m-q6",
+  id: "lfm2.5-1.2b-thinking-q5-k-m",
   role: "chat",
   provider: "llama.cpp",
-  label: "LFM2.5 350M Q6",
-  repo: "LiquidAI/LFM2.5-350M-GGUF",
-  filename: "LFM2.5-350M-Q6_K.gguf",
-  contextWindowTokens: 8192,
+  label: "LFM 2.5 1.2B Thinking Q5 K M",
+  repo: "unsloth/LFM2.5-1.2B-Thinking-GGUF",
+  filename: "LFM2.5-1.2B-Thinking-Q5_K_M.gguf",
+  contextWindowTokens: 16384,
   maxTokens: 2048,
   temperature: 0.1,
   topK: 50,

@@ -35,9 +35,9 @@
   --glass-sheen: rgba(255, 255, 255, 0.36);
   --shadow-soft: rgba(0, 0, 0, 0.08);
   --shadow-strong: rgba(0, 0, 0, 0.16);
-  --composer-bg-start: rgba(255, 255, 255, 0.72);
-  --composer-bg-end: rgba(255, 255, 255, 0.58);
-  --composer-surface: rgba(255, 255, 255, 0.82);
+  --composer-bg-start: rgba(249, 249, 249, 1);
+  --composer-bg-end: rgba(244, 244, 244, 1);
+  --composer-surface: rgba(249, 249, 249, 1);
   --composer-border: rgba(0, 0, 0, 0.1);
   --composer-border-focus: rgba(0, 0, 0, 0.16);
   --composer-ring: rgba(0, 0, 0, 0.06);
@@ -51,11 +51,14 @@
   --overlay-dim: rgba(42, 37, 34, 0.18);
   --search-surface: rgba(255, 255, 255, 0.9);
   --search-border: rgba(0, 0, 0, 0.1);
-  --radius-panel: 14px;
+  --placeholder-color: color-mix(in srgb, var(--text-primary) 52%, transparent);
+  --radius-panel: 10px;
   --radius-control: 9px;
   --motion-fast: 160ms;
   --motion-base: 240ms;
   --motion-stream-character: 550ms;
+  --motion-thinking-shimmer: 5800ms;
+  --motion-thought-reveal: 520ms;
   --motion-sidebar-text-exit: 180ms;
   --motion-slow: 420ms;
   --ease-sidebar: cubic-bezier(0.22, 1, 0.36, 1);
@@ -93,9 +96,9 @@
   --glass-sheen: rgba(255, 255, 255, 0.06);
   --shadow-soft: rgba(0, 0, 0, 0.18);
   --shadow-strong: rgba(0, 0, 0, 0.34);
-  --composer-bg-start: rgba(33, 33, 33, 1);
-  --composer-bg-end: rgba(33, 33, 33, 1);
-  --composer-surface: rgba(33, 33, 33, 1);
+  --composer-bg-start: rgba(48, 48, 48, 1);
+  --composer-bg-end: rgba(44, 44, 44, 1);
+  --composer-surface: rgba(48, 48, 48, 1);
   --composer-border: rgba(255, 255, 255, 0.12);
   --composer-border-focus: rgba(255, 255, 255, 0.2);
   --composer-ring: rgba(255, 255, 255, 0.08);
@@ -109,6 +112,7 @@
   --overlay-dim: rgba(23, 21, 17, 0.46);
   --search-surface: rgba(38, 35, 30, 0.9);
   --search-border: rgba(255, 255, 255, 0.12);
+  --placeholder-color: #666666;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -139,9 +143,9 @@
     --glass-sheen: rgba(255, 255, 255, 0.06);
     --shadow-soft: rgba(0, 0, 0, 0.18);
     --shadow-strong: rgba(0, 0, 0, 0.34);
-    --composer-bg-start: rgba(33, 33, 33, 1);
-    --composer-bg-end: rgba(33, 33, 33, 1);
-    --composer-surface: rgba(33, 33, 33, 1);
+    --composer-bg-start: rgba(48, 48, 48, 1);
+    --composer-bg-end: rgba(44, 44, 44, 1);
+    --composer-surface: rgba(48, 48, 48, 1);
     --composer-border: rgba(255, 255, 255, 0.12);
     --composer-border-focus: rgba(255, 255, 255, 0.2);
     --composer-ring: rgba(255, 255, 255, 0.08);
@@ -155,6 +159,7 @@
     --overlay-dim: rgba(23, 21, 17, 0.46);
     --search-surface: rgba(38, 35, 30, 0.9);
     --search-border: rgba(255, 255, 255, 0.12);
+    --placeholder-color: #666666;
   }
 }
 
@@ -660,14 +665,14 @@ body {
 
 .chat-composer {
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, var(--composer-bg-start)), color-mix(in srgb, var(--surface) 88%, var(--composer-bg-end))),
+    linear-gradient(180deg, color-mix(in srgb, var(--sidebar) 94%, var(--composer-bg-start)), color-mix(in srgb, var(--sidebar) 86%, var(--composer-bg-end))),
     var(--surface);
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 20px;
+  border-radius: 12px;
   box-shadow:
     0 14px 34px color-mix(in srgb, var(--shadow-soft) 64%, transparent),
     inset 0 1px 0 var(--glass-inset);
-  padding: 0.72rem 0.78rem;
+  padding: 0.78rem 0.86rem;
   position: relative;
   transition:
     border-color var(--motion-fast) ease-out,
@@ -678,11 +683,9 @@ body {
 }
 
 .chat-composer[data-size="small"] {
-  align-items: center;
-  display: grid;
-  gap: 0.42rem;
-  grid-template-columns: minmax(0, 1fr) auto;
-  padding: 0.42rem 0.58rem 0.42rem 0.86rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.62rem 0.78rem 0.52rem;
 }
 
 .chat-composer::before {
@@ -694,11 +697,12 @@ body {
 }
 
 .chat-composer:focus-within {
-  border-color: color-mix(in srgb, var(--accent-primary) 42%, var(--border));
-  box-shadow:
-    0 16px 36px color-mix(in srgb, var(--shadow-soft) 76%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--accent-primary) 12%, transparent),
-    inset 0 1px 0 var(--glass-inset);
+  border-color: color-mix(in srgb, var(--border) 82%, transparent);
+}
+
+.chat-composer *:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .chat-composer-main {
@@ -709,9 +713,7 @@ body {
 }
 
 .chat-composer[data-size="small"] .chat-composer-main {
-  grid-column: 1;
-  grid-row: 1;
-  min-height: 1.9rem;
+  min-height: 2.4rem;
 }
 
 .chat-composer[data-size="small-medium"] .chat-composer-main {
@@ -719,19 +721,19 @@ body {
 }
 
 .chat-composer[data-size="medium-long"] .chat-composer-main {
-  min-height: 4.35rem;
+  min-height: 5rem;
 }
 
 .chat-composer[data-size="long"] .chat-composer-main {
-  min-height: 5.9rem;
+  min-height: 7rem;
 }
 
 .chat-composer-textarea {
   background: transparent;
   color: var(--text-primary);
   font-size: 0.95rem;
-  height: 48px;
-  max-height: 120px;
+  height: auto;
+  max-height: 320px;
   line-height: 1.45;
   min-height: 1.9rem;
   outline: none;
@@ -744,32 +746,38 @@ body {
 
 .chat-composer[data-size="small"] .chat-composer-textarea {
   overflow: hidden;
-  padding-bottom: 0.12rem;
-  padding-top: 0.34rem;
 }
 
 .chat-composer-textarea::placeholder {
-  color: color-mix(in srgb, var(--text-muted) 72%, var(--surface));
-  font-style: italic;
+  color: var(--placeholder-color);
+  font-style: normal;
+  font-weight: 400;
 }
 
 .chat-composer-footer {
   align-items: center;
   display: flex;
   justify-content: space-between;
-  margin-top: 0.28rem;
+  margin-top: 0.34rem;
   min-height: 2.2rem;
   position: relative;
   z-index: 1;
 }
 
-.chat-composer[data-size="small"] .chat-composer-footer {
-  display: contents;
+.chat-composer-footer-start {
+  align-items: center;
+  display: flex;
+  gap: 0.35rem;
 }
 
-.chat-composer[data-size="small"] .chat-composer-voice-button {
-  grid-column: 2;
-  grid-row: 1;
+.chat-composer-footer-end {
+  align-items: center;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.chat-composer[data-size="small"] .chat-composer-footer {
+  display: flex;
 }
 
 .chat-composer-footer-group {
@@ -785,6 +793,7 @@ body {
   border: 0;
   border-radius: 999px;
   color: var(--text-secondary);
+  cursor: pointer;
   height: 2.2rem;
   width: 2.2rem;
 }
@@ -799,9 +808,14 @@ body {
   background: color-mix(in srgb, var(--surface-elevated) 76%, var(--surface));
 }
 
+.chat-composer-round-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .chat-composer-voice-button {
-  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
-  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-primary) 14%, transparent);
+  border-radius: 8px;
   color: var(--text-secondary);
   height: 2.2rem;
   position: relative;
@@ -1239,7 +1253,7 @@ button:disabled {
 
 .featured-model-artwork {
   align-items: center;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 43 / 18;
   background:
     radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--accent-hover) 28%, transparent), transparent 34%),
     radial-gradient(circle at 84% 14%, color-mix(in srgb, var(--info) 18%, transparent), transparent 32%),
@@ -2632,4 +2646,93 @@ button:disabled {
 .latex-root-body {
   border-top: 1px solid currentColor;
   padding: 0.02rem 0.16rem 0;
+}
+
+@keyframes thinking-shimmer {
+  0% {
+    background-position: -220% center;
+  }
+  100% {
+    background-position: 220% center;
+  }
+}
+
+.markdown-thinking-toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: var(--font-sans);
+  margin: 0 0 0.5rem;
+  padding: 0.1rem 0.35rem;
+  user-select: none;
+}
+
+.markdown-thinking-label {
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: color var(--motion-fast) ease-out;
+}
+
+.markdown-thinking-label-streaming {
+  background: linear-gradient(
+    90deg,
+    var(--text-muted) 0%,
+    var(--text-muted) 32%,
+    color-mix(in srgb, var(--text-secondary) 72%, var(--surface) 28%) 44%,
+    var(--text-primary) 50%,
+    color-mix(in srgb, var(--text-secondary) 72%, var(--surface) 28%) 56%,
+    var(--text-muted) 68%,
+    var(--text-muted) 100%
+  );
+  background-clip: text;
+  background-size: 360% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: thinking-shimmer var(--motion-thinking-shimmer) ease-in-out infinite;
+  color: transparent;
+}
+
+.markdown-reasoning-body {
+  border-left: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.65;
+  margin: 0 0 0.75rem 0.25rem;
+  padding-left: 0.75rem;
+}
+
+.markdown-reasoning-body .markdown-paragraph {
+  color: var(--text-muted);
+}
+
+.markdown-reasoning-body .markdown-spacer {
+  height: 0.5rem;
+}
+
+@keyframes thought-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.985) translateY(0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.markdown-thought-paragraph {
+  overflow: hidden;
+  transform-origin: left top;
+}
+
+.markdown-thought-paragraph + .markdown-thought-paragraph {
+  margin-top: 1rem;
+}
+
+.markdown-thought-paragraph.thought-reveal {
+  animation: thought-reveal var(--motion-thought-reveal) var(--ease-sidebar-content) both;
 }

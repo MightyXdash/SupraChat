@@ -4,7 +4,7 @@ import { MarkdownMessage } from "@/features/chat/components/MarkdownMessage"
 import { ChatMessage } from "@/features/chat/types"
 import { cn } from "@/lib/utils"
 
-export const ChatBubble = memo(function ChatBubble({ message }: { message: ChatMessage }) {
+export const ChatBubble = memo(function ChatBubble({ message, isGenerating }: { message: ChatMessage; isGenerating?: boolean }) {
   const isUser = message.role === "user"
 
   return (
@@ -26,7 +26,7 @@ export const ChatBubble = memo(function ChatBubble({ message }: { message: ChatM
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
-          <MarkdownMessage content={message.content} />
+          <MarkdownMessage content={message.content} isGenerating={isGenerating} />
         )}
       </div>
     </motion.article>

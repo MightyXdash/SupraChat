@@ -574,7 +574,7 @@ export const useChatStore = create<ChatState>((set) => ({
   setActiveConversation: (conversationId) => {
     set({ activeConversationId: conversationId, error: null })
   },
-  sendMessage: async (content, options) => {
+  sendMessage: async (content, options = {}) => {
     const trimmedContent = content.trim()
 
     if (!trimmedContent) {

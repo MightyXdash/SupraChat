@@ -266,6 +266,7 @@ function createServer(database, config, provider) {
     try {
       const body = await readJsonBody(req)
       const messages = Array.isArray(body.messages) ? body.messages : []
+      const thinking = body.thinking !== false
 
       if (messages.length === 0) {
         sendJson(req, res, 400, {
@@ -277,18 +278,21 @@ function createServer(database, config, provider) {
       }
 
       const systemPrompt = getSystemPrompt()
+      const promptContent = thinking
+        ? systemPrompt
+        : `${systemPrompt}\n\nDo not reason step by step. Do not use thinking tags. Respond directly and concisely.`
       const formattedMessages = [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: promptContent },
         ...messages.map((message) => ({
           role: message.role,
           content: String(message.content ?? ""),
         })),
       ]
 
-      const response = await provider.streamChat(formattedMessages)
+      const response = await provider.streamChat(formattedMessages, thinking)
 
       writeStreamHeaders(req, res, config)
-      provider.pipeStream(response.data, res)
+      provider.pipeStream(response.data, res, thinking)
     } catch (error) {
       sendJson(req, res, 502, {
         ok: false,

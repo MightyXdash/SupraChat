@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react"
-import { ArrowUp } from "lucide-react"
+import { ArrowUp, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 type ChatComposerProps = {
@@ -62,7 +62,7 @@ export function ChatComposer({
     const firstStep = Math.round(lineHeight + verticalPadding)
     const secondStep = Math.round(lineHeight * 2 + verticalPadding)
     const thirdStep = Math.round(lineHeight * 3 + verticalPadding)
-    const fourthStep = Math.round(lineHeight * 4 + verticalPadding)
+    const maxStep = Math.round(lineHeight * 12 + verticalPadding)
     const scrollHeight = textarea.scrollHeight
     const isEmptyDraft = draft.length === 0
     const hasExpandedContent = !isEmptyDraft && (draft.includes("\n") || scrollHeight > firstStep)
@@ -81,7 +81,7 @@ export function ChatComposer({
           ? secondStep
           : nextSize === "medium-long"
             ? thirdStep
-            : Math.min(scrollHeight, fourthStep)
+            : Math.min(scrollHeight, maxStep)
 
     textarea.style.height = `${nextHeight}px`
     setComposerSize(nextSize)
@@ -112,7 +112,7 @@ export function ChatComposer({
             ref={textareaRef}
             aria-label="Message SupraChat"
             className="chat-composer-textarea"
-            placeholder="Message Supra..."
+            placeholder="Send a message..."
             rows={1}
             value={draft}
             onChange={(event) => onDraftChange(event.target.value)}
@@ -123,16 +123,30 @@ export function ChatComposer({
         </div>
 
         <div className="chat-composer-footer">
-          <Button
-            aria-label="Send message"
-            className="chat-composer-voice-button"
-            disabled={!draft.trim() || isGenerating}
-            size="icon"
-            type="submit"
-            variant="ghost"
-          >
-            <ArrowUp className="h-4 w-4" />
-          </Button>
+          <div className="chat-composer-footer-start">
+            <button
+              aria-label="Attach files"
+              className="chat-composer-round-button"
+              disabled
+              tabIndex={-1}
+              title="Attachments are not yet supported"
+              type="button"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="chat-composer-footer-end">
+            <Button
+              aria-label="Send message"
+              className="chat-composer-voice-button"
+              disabled={!draft.trim() || isGenerating}
+              size="icon"
+              type="submit"
+              variant="ghost"
+            >
+              <ArrowUp className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </form>
     </div>

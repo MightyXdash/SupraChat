@@ -2,7 +2,7 @@ const os = require("node:os")
 const path = require("node:path")
 
 const DEFAULT_APP_DATA_DIRECTORY = "SupraChat"
-const DEFAULT_CHAT_MODEL = "lfm2.5-350m-q6"
+const DEFAULT_CHAT_MODEL = "lfm2.5-1.2b-thinking-q5-k-m"
 const DEFAULT_TITLE_MODEL = "supra-title-350m-exp-q4-k-m"
 const DEFAULT_NODE_PORT = 3001
 
