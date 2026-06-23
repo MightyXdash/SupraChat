@@ -4,12 +4,14 @@ import { ChatCompletionMessage, Conversation } from "@/features/chat/types"
 type StreamChatCompletionOptions = {
   messages: ChatCompletionMessage[]
   onChunk: (chunk: string) => void
+  signal?: AbortSignal
 }
 
 type StreamConversationTitleOptions = {
   userMessage: string
   onChunk: (chunk: string) => void
   temperature?: number
+  signal?: AbortSignal
 }
 
 export class ChatServiceError extends Error {
@@ -47,6 +49,10 @@ async function fetchWithRetry(input: RequestInfo | URL, init?: RequestInit) {
     try {
       return await fetch(input, init)
     } catch (error) {
+      if (init?.signal?.aborted || error instanceof DOMException && error.name === "AbortError") {
+        throw error
+      }
+
       if (attempt === maxAttempts) {
         throw error
       }
@@ -112,9 +118,30 @@ export async function deleteStoredConversation(conversationId: string) {
   await readJson<{ ok: true }>(response)
 }
 
+export async function synthesizeSpeech(text: string) {
+  const response = await fetchWithRetry(`${chatRuntimeConfig.apiBaseUrl}/speech/tts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text }),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorDetail(response))
+  }
+
+  return {
+    blob: await response.blob(),
+    cacheHit: response.headers.get("X-SupraChat-Speech-Cache-Hit") === "1",
+    cacheKey: response.headers.get("X-SupraChat-Speech-Cache-Key") ?? "",
+  }
+}
+
 export async function streamChatCompletion({
   messages,
   onChunk,
+  signal,
 }: StreamChatCompletionOptions) {
   const response = await fetchWithRetry(chatRuntimeConfig.endpoint, {
     method: "POST",
@@ -122,6 +149,7 @@ export async function streamChatCompletion({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ messages, thinking: true }),
+    signal,
   })
 
   if (!response.ok || !response.body) {
@@ -133,9 +161,30 @@ export async function streamChatCompletion({
   const pendingOutput: string[] = []
   let streamFinished = false
   let displayTimer: number | undefined
+  let abortDisplay: (() => void) | undefined
 
-  const displayComplete = new Promise<void>((resolve) => {
+  const displayComplete = new Promise<void>((resolve, reject) => {
+    abortDisplay = () => {
+      pendingOutput.length = 0
+      if (displayTimer !== undefined) {
+        window.clearInterval(displayTimer)
+      }
+      reject(new DOMException("Generation stopped.", "AbortError"))
+    }
+
+    if (signal?.aborted) {
+      abortDisplay()
+      return
+    }
+
+    signal?.addEventListener("abort", abortDisplay, { once: true })
+
     displayTimer = window.setInterval(() => {
+      if (signal?.aborted) {
+        abortDisplay?.()
+        return
+      }
+
       const nextToken = pendingOutput.shift()
 
       if (nextToken !== undefined) {
@@ -200,6 +249,10 @@ export async function streamChatCompletion({
 
   try {
     while (true) {
+      if (signal?.aborted) {
+        throw new DOMException("Generation stopped.", "AbortError")
+      }
+
       const { done, value } = await reader.read()
 
       if (done) {
@@ -221,6 +274,9 @@ export async function streamChatCompletion({
     streamFinished = true
     await displayComplete
   } finally {
+    signal?.removeEventListener("abort", abortDisplay ?? (() => undefined))
+    reader.releaseLock()
+
     if (displayTimer !== undefined) {
       window.clearInterval(displayTimer)
     }
@@ -231,6 +287,7 @@ export async function streamConversationTitle({
   userMessage,
   onChunk,
   temperature,
+  signal,
 }: StreamConversationTitleOptions) {
   const response = await fetchWithRetry(chatRuntimeConfig.titleEndpoint, {
     method: "POST",
@@ -238,6 +295,7 @@ export async function streamConversationTitle({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ message: userMessage, temperature }),
+    signal,
   })
 
   if (!response.ok || !response.body) {
@@ -248,6 +306,10 @@ export async function streamConversationTitle({
   const decoder = new TextDecoder()
 
   while (true) {
+    if (signal?.aborted) {
+      throw new DOMException("Generation stopped.", "AbortError")
+    }
+
     const { done, value } = await reader.read()
 
     if (done) {

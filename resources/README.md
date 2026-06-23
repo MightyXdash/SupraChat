@@ -19,6 +19,13 @@ resources/
   models/
     chat/LFM2.5-350M-Q6_K.gguf
     title/LiquidAI_LFM2.5-350M-Base_1781204855.Q4_K_M.gguf
+  voice/
+    tts/vits-piper-en_US-amy-low-int8/en_US-amy-low.onnx
+    tts/vits-piper-en_US-amy-low-int8/tokens.txt
+    tts/vits-piper-en_US-amy-low-int8/espeak-ng-data/
+    stt/whisper-tiny-en-int8/tiny.en-encoder.int8.onnx
+    stt/whisper-tiny-en-int8/tiny.en-decoder.int8.onnx
+    stt/whisper-tiny-en-int8/tiny.en-tokens.txt
 ```
 
 Download the default GGUF model files:
@@ -41,6 +48,13 @@ Title model:
 
 - Repository: `SupraLabs/Supra-Title-350M-exp-GGUF`
 - Default file: `LiquidAI_LFM2.5-350M-Base_1781204855.Q4_K_M.gguf`
+
+Speech models:
+
+- TTS repository: `k2-fsa/sherpa-onnx`
+- Default TTS files: `voice/tts/vits-piper-en_US-amy-low-int8/en_US-amy-low.onnx`, `voice/tts/vits-piper-en_US-amy-low-int8/tokens.txt`, and `voice/tts/vits-piper-en_US-amy-low-int8/espeak-ng-data/`
+- STT repository: `csukuangfj/sherpa-onnx-whisper-tiny.en`
+- Default STT files: `voice/stt/whisper-tiny-en-int8/tiny.en-encoder.int8.onnx`, `voice/stt/whisper-tiny-en-int8/tiny.en-decoder.int8.onnx`, and `voice/stt/whisper-tiny-en-int8/tiny.en-tokens.txt`
 
 Development overrides:
 

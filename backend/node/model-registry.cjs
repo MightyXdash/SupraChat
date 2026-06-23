@@ -10,9 +10,10 @@ const CHAT_MODEL = {
   filename: "LFM2.5-1.2B-Thinking-Q5_K_M.gguf",
   contextWindowTokens: 16384,
   maxTokens: 2048,
-  temperature: 0.1,
+  temperature: 0.35,
   topK: 50,
-  repeatPenalty: 1.05,
+  topP: 0.9,
+  repeatPenalty: 1.08,
 }
 
 const TITLE_MODEL = {
@@ -27,6 +28,33 @@ const TITLE_MODEL = {
   temperature: 0.1,
   topK: 40,
   repeatPenalty: 1.08,
+}
+
+const SPEECH_TTS_MODEL = {
+  id: "piper-en-us-amy-low-int8",
+  role: "tts",
+  provider: "sherpa-onnx-node",
+  label: "Piper en_US Amy Low int8",
+  repo: "k2-fsa/sherpa-onnx",
+  modelPath: path.join("voice", "tts", "vits-piper-en_US-amy-low-int8", "en_US-amy-low.onnx"),
+  configPath: path.join("voice", "tts", "vits-piper-en_US-amy-low-int8", "en_US-amy-low.onnx.json"),
+  tokensPath: path.join("voice", "tts", "vits-piper-en_US-amy-low-int8", "tokens.txt"),
+  dataDir: path.join("voice", "tts", "vits-piper-en_US-amy-low-int8", "espeak-ng-data"),
+  language: "en-US",
+  approximateSizeMb: 36,
+}
+
+const SPEECH_STT_MODEL = {
+  id: "sherpa-whisper-tiny-en-int8",
+  role: "stt",
+  provider: "onnxruntime-node",
+  label: "Sherpa ONNX Whisper Tiny English int8",
+  repo: "csukuangfj/sherpa-onnx-whisper-tiny.en",
+  encoderPath: path.join("voice", "stt", "whisper-tiny-en-int8", "tiny.en-encoder.int8.onnx"),
+  decoderPath: path.join("voice", "stt", "whisper-tiny-en-int8", "tiny.en-decoder.int8.onnx"),
+  tokensPath: path.join("voice", "stt", "whisper-tiny-en-int8", "tiny.en-tokens.txt"),
+  language: "en-US",
+  approximateSizeMb: 110,
 }
 
 function getPlatformKey(platform = process.platform, arch = process.arch) {
@@ -80,6 +108,29 @@ function resolveModelPath(model, resourceRoot = resolveResourceRoot()) {
   return path.join(resourceRoot, "models", model.role, model.filename)
 }
 
+function resolveSpeechAssetPath(relativePath, resourceRoot = resolveResourceRoot()) {
+  return path.join(resourceRoot, relativePath)
+}
+
+function resolveSpeechTtsModel(resourceRoot = resolveResourceRoot()) {
+  return {
+    ...SPEECH_TTS_MODEL,
+    modelPath: resolveSpeechAssetPath(SPEECH_TTS_MODEL.modelPath, resourceRoot),
+    configPath: resolveSpeechAssetPath(SPEECH_TTS_MODEL.configPath, resourceRoot),
+    tokensPath: resolveSpeechAssetPath(SPEECH_TTS_MODEL.tokensPath, resourceRoot),
+    dataDir: resolveSpeechAssetPath(SPEECH_TTS_MODEL.dataDir, resourceRoot),
+  }
+}
+
+function resolveSpeechSttModel(resourceRoot = resolveResourceRoot()) {
+  return {
+    ...SPEECH_STT_MODEL,
+    encoderPath: resolveSpeechAssetPath(SPEECH_STT_MODEL.encoderPath, resourceRoot),
+    decoderPath: resolveSpeechAssetPath(SPEECH_STT_MODEL.decoderPath, resourceRoot),
+    tokensPath: resolveSpeechAssetPath(SPEECH_STT_MODEL.tokensPath, resourceRoot),
+  }
+}
+
 function getHardwareAccelerationArgs() {
   const configured = process.env.SUPRACHAT_LLAMA_GPU_LAYERS
 
@@ -108,6 +159,8 @@ function getThreadCount() {
 
 module.exports = {
   CHAT_MODEL,
+  SPEECH_STT_MODEL,
+  SPEECH_TTS_MODEL,
   TITLE_MODEL,
   getHardwareAccelerationArgs,
   getPlatformKey,
@@ -116,4 +169,6 @@ module.exports = {
   resolveLlamaServerPath,
   resolveModelPath,
   resolveResourceRoot,
+  resolveSpeechSttModel,
+  resolveSpeechTtsModel,
 }

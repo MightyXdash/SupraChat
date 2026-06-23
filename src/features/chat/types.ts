@@ -17,3 +17,12 @@ export type Conversation = {
 }
 
 export type ChatCompletionMessage = Pick<ChatMessage, "role" | "content">
+
+export type SpeechPlaybackState = {
+  currentTime: number
+  duration: number
+  isPreparing: boolean
+  messageId: string | null
+  pendingMessageId: string | null
+  status: "idle" | "loading" | "playing" | "paused"
+}

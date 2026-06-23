@@ -26,6 +26,7 @@ const TITLE_DEFERRED_FIRST_MESSAGE_MAX_CHARACTERS = 40
 const TITLE_COPY_UNIGRAM_THRESHOLD = 0.9
 const TITLE_MIN_ENGLISH_LETTER_RATIO = 0.6
 const TITLE_RECOVERY_EXPANSION_WORDS = 200
+let activeGenerationController: AbortController | null = null
 
 function letterUnigrams(content: string) {
   return Array.from(content.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, ""))
@@ -188,8 +189,11 @@ type ChatState = {
   createConversation: () => Promise<string>
   renameConversation: (conversationId: string, title: string) => Promise<boolean>
   regenerateConversationTitle: (conversationId: string) => Promise<boolean>
+  regenerateAssistantMessage: (messageId: string) => Promise<void>
+  editUserMessage: (messageId: string, content: string) => Promise<void>
   deleteConversation: (conversationId: string) => Promise<boolean>
   sendMessage: (content: string, options?: { beforeGeneration?: () => Promise<void> | void }) => Promise<void>
+  stopGeneration: () => void
   setActiveConversation: (conversationId: string) => void
 }
 
@@ -275,6 +279,240 @@ export const useChatStore = create<ChatState>((set) => ({
   isLoading: true,
   isGenerating: false,
   error: null,
+  stopGeneration: () => {
+    activeGenerationController?.abort()
+  },
+  regenerateAssistantMessage: async (messageId) => {
+    const stateBeforeRegenerate = useChatStore.getState()
+
+    if (stateBeforeRegenerate.isGenerating) {
+      return
+    }
+
+    const conversationId = stateBeforeRegenerate.activeConversationId
+    const activeConversation = stateBeforeRegenerate.conversations.find(
+      (conversation) => conversation.id === conversationId,
+    )
+    const messageIndex = activeConversation?.messages.findIndex((message) => message.id === messageId) ?? -1
+    const targetMessage = messageIndex >= 0 ? activeConversation?.messages[messageIndex] : undefined
+
+    if (!activeConversation || !targetMessage || targetMessage.role !== "assistant") {
+      return
+    }
+
+    const priorMessages = activeConversation.messages.slice(0, messageIndex)
+    const generationController = new AbortController()
+    activeGenerationController?.abort()
+    activeGenerationController = generationController
+
+    set((state) => ({
+      error: null,
+      isGenerating: true,
+      conversations: sortConversationsByUpdatedAt(
+        updateConversationById(state.conversations, conversationId, (conversation) => ({
+          ...conversation,
+          messages: conversation.messages.slice(0, messageIndex + 1).map((message) =>
+            message.id === messageId ? { ...message, content: "" } : message,
+          ),
+          updatedAt: new Date().toISOString(),
+        })),
+      ),
+    }))
+
+    const appendAssistantChunk = (chunk: string) => {
+      set((state) => ({
+        conversations: sortConversationsByUpdatedAt(
+          updateAssistantMessage(
+            state.conversations,
+            conversationId,
+            messageId,
+            (currentContent) => `${currentContent}${chunk}`,
+          ),
+        ),
+      }))
+    }
+
+    const finalizeAssistantMessage = (formatter: (content: string) => string) => {
+      set((state) => ({
+        conversations: sortConversationsByUpdatedAt(
+          updateAssistantMessage(
+            state.conversations,
+            conversationId,
+            messageId,
+            formatter,
+          ),
+        ),
+      }))
+    }
+
+    try {
+      await streamChatCompletion({
+        messages: priorMessages.map((message) => ({
+          role: message.role,
+          content: message.content,
+        })),
+        onChunk: appendAssistantChunk,
+        signal: generationController.signal,
+      })
+
+      finalizeAssistantMessage(cleanIncompleteMarkdown)
+
+      const completedConversation = useChatStore
+        .getState()
+        .conversations.find((conversation) => conversation.id === conversationId)
+
+      if (completedConversation) {
+        await persistConversation(completedConversation)
+      }
+
+      set({ isGenerating: false })
+    } catch (error) {
+      finalizeAssistantMessage(cleanIncompleteMarkdown)
+
+      const interruptedConversation = useChatStore
+        .getState()
+        .conversations.find((conversation) => conversation.id === conversationId)
+
+      if (interruptedConversation) {
+        try {
+          await persistConversation(interruptedConversation)
+        } catch {
+          // Preserve the generation error as the primary user-facing failure.
+        }
+      }
+
+      set({
+        isGenerating: false,
+        error:
+          generationController.signal.aborted || error instanceof DOMException && error.name === "AbortError"
+            ? null
+            : error instanceof Error
+              ? error.message
+              : GENERATION_ERROR_MESSAGE,
+      })
+    } finally {
+      if (activeGenerationController === generationController) {
+        activeGenerationController = null
+      }
+    }
+  },
+  editUserMessage: async (messageId, content) => {
+    const trimmedContent = content.trim()
+    const stateBeforeEdit = useChatStore.getState()
+
+    if (!trimmedContent || stateBeforeEdit.isGenerating) {
+      return
+    }
+
+    const conversationId = stateBeforeEdit.activeConversationId
+    const activeConversation = stateBeforeEdit.conversations.find(
+      (conversation) => conversation.id === conversationId,
+    )
+    const messageIndex = activeConversation?.messages.findIndex((message) => message.id === messageId) ?? -1
+    const targetMessage = messageIndex >= 0 ? activeConversation?.messages[messageIndex] : undefined
+
+    if (!activeConversation || !targetMessage || targetMessage.role !== "user") {
+      return
+    }
+
+    const assistantMessage = createMessage("assistant", "")
+    const generationController = new AbortController()
+    activeGenerationController?.abort()
+    activeGenerationController = generationController
+    const updatedAt = new Date().toISOString()
+    const promptMessages = activeConversation.messages.slice(0, messageIndex + 1).map((message) =>
+      message.id === messageId ? { ...message, content: trimmedContent } : message,
+    )
+
+    set((state) => ({
+      error: null,
+      isGenerating: true,
+      conversations: sortConversationsByUpdatedAt(
+        updateConversationById(state.conversations, conversationId, (conversation) => ({
+          ...conversation,
+          messages: [...promptMessages, assistantMessage],
+          updatedAt,
+        })),
+      ),
+    }))
+
+    const appendAssistantChunk = (chunk: string) => {
+      set((state) => ({
+        conversations: sortConversationsByUpdatedAt(
+          updateAssistantMessage(
+            state.conversations,
+            conversationId,
+            assistantMessage.id,
+            (currentContent) => `${currentContent}${chunk}`,
+          ),
+        ),
+      }))
+    }
+
+    const finalizeAssistantMessage = (formatter: (content: string) => string) => {
+      set((state) => ({
+        conversations: sortConversationsByUpdatedAt(
+          updateAssistantMessage(
+            state.conversations,
+            conversationId,
+            assistantMessage.id,
+            formatter,
+          ),
+        ),
+      }))
+    }
+
+    try {
+      await streamChatCompletion({
+        messages: promptMessages.map((message) => ({
+          role: message.role,
+          content: message.content,
+        })),
+        onChunk: appendAssistantChunk,
+        signal: generationController.signal,
+      })
+
+      finalizeAssistantMessage(cleanIncompleteMarkdown)
+
+      const completedConversation = useChatStore
+        .getState()
+        .conversations.find((conversation) => conversation.id === conversationId)
+
+      if (completedConversation) {
+        await persistConversation(completedConversation)
+      }
+
+      set({ isGenerating: false })
+    } catch (error) {
+      finalizeAssistantMessage(cleanIncompleteMarkdown)
+
+      const interruptedConversation = useChatStore
+        .getState()
+        .conversations.find((conversation) => conversation.id === conversationId)
+
+      if (interruptedConversation) {
+        try {
+          await persistConversation(interruptedConversation)
+        } catch {
+          // Preserve the generation error as the primary user-facing failure.
+        }
+      }
+
+      set({
+        isGenerating: false,
+        error:
+          generationController.signal.aborted || error instanceof DOMException && error.name === "AbortError"
+            ? null
+            : error instanceof Error
+              ? error.message
+              : GENERATION_ERROR_MESSAGE,
+      })
+    } finally {
+      if (activeGenerationController === generationController) {
+        activeGenerationController = null
+      }
+    }
+  },
   initialize: async () => {
     if (initializationPromise) {
       await initializationPromise
@@ -590,6 +828,9 @@ export const useChatStore = create<ChatState>((set) => ({
     const userMessage = createMessage("user", trimmedContent)
     const assistantMessage = createMessage("assistant", "")
     const conversationId = useChatStore.getState().activeConversationId
+    const generationController = new AbortController()
+    activeGenerationController?.abort()
+    activeGenerationController = generationController
     let shouldGenerateTitle = false
     let generatedTitlePayload = ""
     const shouldDeferTitleGeneration = shouldDeferInitialTitleGeneration(trimmedContent)
@@ -745,6 +986,7 @@ export const useChatStore = create<ChatState>((set) => ({
               content: message.content,
             })) ?? [],
         onChunk: appendAssistantChunk,
+        signal: generationController.signal,
       })
       const titleStream = shouldGenerateTitle
         ? shouldDeferTitleGeneration
@@ -752,12 +994,23 @@ export const useChatStore = create<ChatState>((set) => ({
           : streamConversationTitle({
             userMessage: trimmedContent,
             onChunk: appendTitleChunk,
+            signal: generationController.signal,
           })
             .then(() => finalizeTitle("complete"))
-            .catch(() => finalizeTitle("failed"))
+            .catch((error) => {
+              if (generationController.signal.aborted || error instanceof DOMException && error.name === "AbortError") {
+                return
+              }
+
+              return finalizeTitle("failed")
+            })
         : Promise.resolve()
 
       await Promise.all([responseStream, titleStream])
+
+      if (generationController.signal.aborted) {
+        throw new DOMException("Generation stopped.", "AbortError")
+      }
 
       finalizeAssistantMessage(cleanIncompleteMarkdown)
 
@@ -778,9 +1031,14 @@ export const useChatStore = create<ChatState>((set) => ({
               onChunk: (chunk) => {
                 generatedTitlePayload = `${generatedTitlePayload}${chunk}`
               },
+              signal: generationController.signal,
             })
             await finalizeTitle("complete", titleReferenceText)
           } catch {
+            if (generationController.signal.aborted) {
+              throw new DOMException("Generation stopped.", "AbortError")
+            }
+
             await finalizeTitle("failed", titleReferenceText)
           }
         }
@@ -805,6 +1063,7 @@ export const useChatStore = create<ChatState>((set) => ({
                   onChunk: (chunk) => {
                     retryPayload = `${retryPayload}${chunk}`
                   },
+                  signal: generationController.signal,
                 })
 
                 const retryTitle = safeTitleFromGeneratedPayload(retryPayload, titleReferenceText)
@@ -833,6 +1092,10 @@ export const useChatStore = create<ChatState>((set) => ({
 
                 lastTitle = retryTitle || lastTitle
               } catch {
+                if (generationController.signal.aborted) {
+                  throw new DOMException("Generation stopped.", "AbortError")
+                }
+
                 // Retry title generation is best-effort; continue to next attempt.
               }
             }
@@ -879,8 +1142,17 @@ export const useChatStore = create<ChatState>((set) => ({
 
       set({
         isGenerating: false,
-        error: error instanceof Error ? error.message : GENERATION_ERROR_MESSAGE,
+        error:
+          generationController.signal.aborted || error instanceof DOMException && error.name === "AbortError"
+            ? null
+            : error instanceof Error
+              ? error.message
+              : GENERATION_ERROR_MESSAGE,
       })
+    } finally {
+      if (activeGenerationController === generationController) {
+        activeGenerationController = null
+      }
     }
   },
 }))

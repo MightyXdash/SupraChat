@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { AppSidebar } from "@/app/components/AppSidebar"
 import { WindowTitleBar } from "@/app/components/WindowTitleBar"
 import {
@@ -13,6 +13,9 @@ import { useChatStore } from "@/features/chat/store/use-chat-store"
 import { ConversationSearchDialog } from "@/features/chat/components/ConversationSearchDialog"
 import { ChatWorkspace } from "@/features/chat/components/ChatWorkspace"
 import { useAutoScroll } from "@/features/chat/hooks/useAutoScroll"
+import { speechTextFromAssistantMessage } from "@/features/chat/lib/message-content"
+import { synthesizeSpeech } from "@/features/chat/services/chat-service"
+import { ChatMessage, SpeechPlaybackState } from "@/features/chat/types"
 import {
   PlaygroundWorkspace,
   type PlaygroundView,
@@ -20,13 +23,66 @@ import {
 
 type AppPanel = "chat" | "playground"
 
+type CachedSpeechClip = {
+  url: string
+}
+
+let silentSpeechPrimerUrl: string | null = null
+
+function getSilentSpeechPrimerUrl() {
+  if (silentSpeechPrimerUrl) {
+    return silentSpeechPrimerUrl
+  }
+
+  const sampleRate = 16_000
+  const sampleCount = 160
+  const headerSize = 44
+  const dataSize = sampleCount * 2
+  const buffer = new ArrayBuffer(headerSize + dataSize)
+  const view = new DataView(buffer)
+  const writeAscii = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) {
+      view.setUint8(offset + index, value.charCodeAt(index))
+    }
+  }
+
+  writeAscii(0, "RIFF")
+  view.setUint32(4, 36 + dataSize, true)
+  writeAscii(8, "WAVE")
+  writeAscii(12, "fmt ")
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, 1, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true)
+  view.setUint16(32, 2, true)
+  view.setUint16(34, 16, true)
+  writeAscii(36, "data")
+  view.setUint32(40, dataSize, true)
+
+  silentSpeechPrimerUrl = URL.createObjectURL(new Blob([buffer], { type: "audio/wav" }))
+  return silentSpeechPrimerUrl
+}
+
 export function AppShell() {
   const [draft, setDraft] = useState("")
   const [activePanel, setActivePanel] = useState<AppPanel>("chat")
   const [playgroundView, setPlaygroundView] = useState<PlaygroundView>("featured")
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [speechPlayback, setSpeechPlayback] = useState<SpeechPlaybackState>({
+    currentTime: 0,
+    duration: 0,
+    isPreparing: false,
+    messageId: null,
+    pendingMessageId: null,
+    status: "idle",
+  })
   const [theme, setTheme] = useState<AppTheme>(() => getStoredTheme() ?? getSystemTheme())
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const speechCacheRef = useRef<Map<string, CachedSpeechClip>>(new Map())
+  const speechRequestRef = useRef(0)
   const { clearSubmitScrollSpace, scrollLatestUserTurnIntoView, scrollRef } = useAutoScroll()
   const conversations = useChatStore((state) => state.conversations)
   const activeConversationId = useChatStore((state) => state.activeConversationId)
@@ -34,9 +90,12 @@ export function AppShell() {
   const createConversation = useChatStore((state) => state.createConversation)
   const renameConversation = useChatStore((state) => state.renameConversation)
   const regenerateConversationTitle = useChatStore((state) => state.regenerateConversationTitle)
+  const regenerateAssistantMessage = useChatStore((state) => state.regenerateAssistantMessage)
+  const editUserMessage = useChatStore((state) => state.editUserMessage)
   const deleteConversation = useChatStore((state) => state.deleteConversation)
   const setActiveConversation = useChatStore((state) => state.setActiveConversation)
   const sendMessage = useChatStore((state) => state.sendMessage)
+  const stopGeneration = useChatStore((state) => state.stopGeneration)
   const isLoading = useChatStore((state) => state.isLoading)
   const isGenerating = useChatStore((state) => state.isGenerating)
   const error = useChatStore((state) => state.error)
@@ -49,6 +108,51 @@ export function AppShell() {
     applyAppTheme(theme)
     window.localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
+
+  useEffect(() => {
+    const audio = new Audio()
+    audio.autoplay = true
+    audio.preload = "auto"
+    audioRef.current = audio
+
+    function handleTimeUpdate() {
+      setSpeechPlayback((current) => ({
+        ...current,
+        currentTime: audio.currentTime || 0,
+      }))
+    }
+
+    function handleLoadedMetadata() {
+      setSpeechPlayback((current) => ({
+        ...current,
+        duration: Number.isFinite(audio.duration) ? audio.duration : 0,
+      }))
+    }
+
+    function handleEnded() {
+      setSpeechPlayback((current) => ({
+        ...current,
+        currentTime: 0,
+        duration: 0,
+        isPreparing: false,
+        messageId: null,
+        pendingMessageId: null,
+        status: "idle",
+      }))
+    }
+
+    audio.addEventListener("timeupdate", handleTimeUpdate)
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata)
+    audio.addEventListener("ended", handleEnded)
+
+    return () => {
+      audio.pause()
+      audio.removeEventListener("timeupdate", handleTimeUpdate)
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata)
+      audio.removeEventListener("ended", handleEnded)
+      audioRef.current = null
+    }
+  }, [])
 
   function toggleTheme() {
     setTheme((currentTheme) => (currentTheme === "light" ? "dark" : "light"))
@@ -67,19 +171,187 @@ export function AppShell() {
 
     setDraft("")
     try {
-      await sendMessage(message, { beforeGeneration: scrollLatestUserTurnIntoView })
+      if (editingMessageId) {
+        const messageId = editingMessageId
+        setEditingMessageId(null)
+        await editUserMessage(messageId, message)
+      } else {
+        await sendMessage(message, { beforeGeneration: scrollLatestUserTurnIntoView })
+      }
     } finally {
       clearSubmitScrollSpace()
     }
   }
 
+  function handleEditUserMessage(message: ChatMessage) {
+    if (isGenerating) {
+      return
+    }
+
+    setActivePanel("chat")
+    setEditingMessageId(message.id)
+    setDraft(message.content)
+  }
+
+  function handleCancelEdit() {
+    setEditingMessageId(null)
+    setDraft("")
+  }
+
+  async function playSpeechClip(message: ChatMessage) {
+    const text = speechTextFromAssistantMessage(message.content)
+
+    if (!text) {
+      return
+    }
+
+    const audio = audioRef.current
+
+    if (!audio) {
+      return
+    }
+
+    if (audio.paused || !audio.src) {
+      const primerUrl = getSilentSpeechPrimerUrl()
+      audio.muted = true
+      audio.src = primerUrl
+      audio.currentTime = 0
+      audio.load()
+      void audio.play().catch(() => undefined).finally(() => {
+        if (audio.src === primerUrl) {
+          audio.pause()
+          audio.currentTime = 0
+          audio.muted = false
+        }
+      })
+    } else {
+      audio.muted = false
+    }
+
+    const requestId = speechRequestRef.current + 1
+    speechRequestRef.current = requestId
+    const cacheKey = `${message.id}:${text}`
+    const cachedClip = speechCacheRef.current.get(cacheKey)
+
+    setSpeechPlayback((current) => ({
+      ...current,
+      isPreparing: true,
+      messageId: current.status === "idle" ? message.id : current.messageId,
+      pendingMessageId: message.id,
+      status: current.status === "idle" ? "loading" : current.status,
+    }))
+
+    try {
+      const resolvedClip = cachedClip ?? await synthesizeSpeech(text).then((result) => {
+        const cached = { url: URL.createObjectURL(result.blob) }
+        speechCacheRef.current.set(cacheKey, cached)
+        return cached
+      })
+
+      if (speechRequestRef.current !== requestId) {
+        return
+      }
+
+      audio.pause()
+      audio.muted = false
+      audio.autoplay = true
+      audio.preload = "auto"
+      audio.src = resolvedClip.url
+      audio.currentTime = 0
+      audio.load()
+
+      let nextStatus: SpeechPlaybackState["status"] = "playing"
+
+      try {
+        await audio.play()
+      } catch (error) {
+        console.error("Unable to start speech playback automatically.", error)
+        nextStatus = "paused"
+      }
+
+      setSpeechPlayback((current) => ({
+        ...current,
+        currentTime: 0,
+        duration: Number.isFinite(audio.duration) ? audio.duration : current.duration,
+        isPreparing: false,
+        messageId: message.id,
+        pendingMessageId: null,
+        status: nextStatus,
+      }))
+    } catch (error) {
+      if (speechRequestRef.current !== requestId) {
+        return
+      }
+
+      console.error("Unable to prepare speech playback.", error)
+      setSpeechPlayback((current) => ({
+        ...current,
+        isPreparing: false,
+        pendingMessageId: null,
+        status: current.messageId ? current.status : "idle",
+      }))
+    }
+  }
+
+  function toggleSpeechPlayback() {
+    const audio = audioRef.current
+
+    if (!audio || speechPlayback.status === "idle" || speechPlayback.isPreparing) {
+      return
+    }
+
+    if (audio.paused) {
+      void audio.play()
+      setSpeechPlayback((current) => ({ ...current, status: "playing" }))
+      return
+    }
+
+    audio.pause()
+    setSpeechPlayback((current) => ({ ...current, status: "paused" }))
+  }
+
+  function stopSpeechPlayback() {
+    const audio = audioRef.current
+    speechRequestRef.current += 1
+
+    if (audio) {
+      audio.pause()
+      audio.removeAttribute("src")
+      audio.load()
+    }
+
+    setSpeechPlayback({
+      currentTime: 0,
+      duration: 0,
+      isPreparing: false,
+      messageId: null,
+      pendingMessageId: null,
+      status: "idle",
+    })
+  }
+
+  function seekSpeechPlayback(value: number) {
+    const audio = audioRef.current
+
+    if (!audio || !Number.isFinite(value)) {
+      return
+    }
+
+    audio.currentTime = value
+    setSpeechPlayback((current) => ({ ...current, currentTime: value }))
+  }
+
   async function handleCreateConversation() {
     setActivePanel("chat")
+    setEditingMessageId(null)
+    setDraft("")
     return createConversation()
   }
 
   function handleSelectConversation(conversationId: string) {
     setActivePanel("chat")
+    setEditingMessageId(null)
+    setDraft("")
     setActiveConversation(conversationId)
   }
 
@@ -117,11 +389,21 @@ export function AppShell() {
           <ChatWorkspace
             conversation={activeConversation}
             draft={draft}
+            editingMessageId={editingMessageId}
             error={error}
             isGenerating={isGenerating}
             scrollRef={scrollRef}
+            speechPlayback={speechPlayback}
+            onCancelEdit={handleCancelEdit}
             onDraftChange={setDraft}
+            onEditUserMessage={handleEditUserMessage}
+            onRegenerateAssistantMessage={regenerateAssistantMessage}
+            onSeekSpeech={seekSpeechPlayback}
+            onSpeakAssistantMessage={playSpeechClip}
+            onStopSpeech={stopSpeechPlayback}
+            onStopGeneration={stopGeneration}
             onSubmit={handleSubmit}
+            onToggleSpeech={toggleSpeechPlayback}
           />
         )}
       </div>

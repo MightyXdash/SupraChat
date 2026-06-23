@@ -1,33 +1,50 @@
-import { CSSProperties, RefObject, useEffect, useRef, useState } from "react"
-import { AnimatePresence, motion } from "framer-motion"
+import { RefObject } from "react"
+import { AnimatePresence } from "framer-motion"
 import { ChatBubble } from "@/features/chat/components/ChatBubble"
 import { ChatComposer } from "@/features/chat/components/ChatComposer"
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import { useScrollVisibility } from "@/features/chat/hooks/useScrollVisibility"
-import { Conversation } from "@/features/chat/types"
+import { ChatMessage, Conversation, SpeechPlaybackState } from "@/features/chat/types"
 
 type ChatWorkspaceProps = {
   conversation?: Conversation
   draft: string
+  editingMessageId: string | null
   error: string | null
   isGenerating: boolean
   scrollRef: RefObject<HTMLDivElement | null>
+  speechPlayback: SpeechPlaybackState
+  onCancelEdit: () => void
   onDraftChange: (value: string) => void
+  onEditUserMessage: (message: ChatMessage) => void
+  onRegenerateAssistantMessage: (messageId: string) => Promise<void> | void
+  onSeekSpeech: (value: number) => void
+  onSpeakAssistantMessage: (message: ChatMessage) => Promise<void> | void
+  onStopSpeech: () => void
+  onStopGeneration: () => void
   onSubmit: () => Promise<void> | void
+  onToggleSpeech: () => void
 }
 
 export function ChatWorkspace({
   conversation,
   draft,
+  editingMessageId,
   error,
   isGenerating,
   scrollRef,
+  speechPlayback,
+  onCancelEdit,
   onDraftChange,
+  onEditUserMessage,
+  onRegenerateAssistantMessage,
+  onSeekSpeech,
+  onSpeakAssistantMessage,
+  onStopSpeech,
+  onStopGeneration,
   onSubmit,
+  onToggleSpeech,
 }: ChatWorkspaceProps) {
-  const [isUsageOpen, setIsUsageOpen] = useState(false)
-  const usageButtonRef = useRef<HTMLDivElement | null>(null)
-  const usagePopoverRef = useRef<HTMLDivElement | null>(null)
   const isChatScrolling = useScrollVisibility(scrollRef)
   const hasMessages = Boolean(conversation && conversation.messages.length > 0)
   const messageCount = conversation?.messages.length ?? 0
@@ -48,114 +65,13 @@ export function ChatWorkspace({
     Math.round((estimatedTokens / chatRuntimeConfig.contextWindowTokens) * 100),
   )
   const tokenState = contextUsage >= 85 ? "danger" : contextUsage >= 60 ? "warning" : "healthy"
-  const chartTotal = Math.max(estimatedTokens, 1)
-  const systemAngle = ((messageCount > 0 ? systemTokens : 0) / chartTotal) * 360
-  const userAngle = (userTokens / chartTotal) * 360
-  const assistantAngle = Math.max(0, 360 - systemAngle - userAngle)
-  const tokenBreakdown = [
-    { label: "System", value: messageCount > 0 ? systemTokens : 0, className: "system" },
-    { label: "User prompts", value: userTokens, className: "user" },
-    { label: "Assistant output", value: assistantTokens, className: "assistant" },
-  ]
-
-  useEffect(() => {
-    if (!isUsageOpen) {
-      return
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target as Node
-
-      if (!usageButtonRef.current?.contains(target) && !usagePopoverRef.current?.contains(target)) {
-        setIsUsageOpen(false)
-      }
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown)
-
-    return () => window.removeEventListener("pointerdown", handlePointerDown)
-  }, [isUsageOpen])
+  const latestUserMessageId = conversation?.messages.reduce<string | null>(
+    (latestMessageId, message) => message.role === "user" ? message.id : latestMessageId,
+    null,
+  )
 
   return (
     <section className="relative flex min-h-0 flex-col bg-[var(--surface)]">
-      <header className="chat-workspace-header px-5">
-        <div className="chat-workspace-report" aria-label="Context usage">
-          <div className="chat-token-usage-wrap" ref={usageButtonRef}>
-            <button
-              aria-expanded={isUsageOpen}
-              className="chat-token-usage-button"
-              data-state={tokenState}
-              type="button"
-              onClick={() => setIsUsageOpen((value) => !value)}
-            >
-              <span
-                className="chat-token-usage-ring"
-                style={{ "--usage": `${contextUsage}%` } as CSSProperties}
-                aria-hidden="true"
-              />
-              <span>{estimatedTokens.toLocaleString()}</span>
-              <small>{contextUsage}% ctx</small>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <AnimatePresence>
-        {isUsageOpen ? (
-          <div className="chat-token-popover-layer" ref={usagePopoverRef}>
-            <motion.div
-              animate={{ opacity: 1, scale: 1 }}
-              className="chat-token-popover"
-              exit={{ opacity: 0, scale: 0.96 }}
-              initial={{ opacity: 0, scale: 0.88 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className="chat-token-popover-header">
-                <div>
-                  <p>Context usage</p>
-                  <span>
-                    {estimatedTokens.toLocaleString()} of{" "}
-                    {chatRuntimeConfig.contextWindowTokens.toLocaleString()} tokens
-                  </span>
-                </div>
-                <strong>{contextUsage}%</strong>
-              </div>
-              <div className="chat-token-visual">
-                <div
-                  className="chat-token-ring"
-                  style={
-                    {
-                      "--system-angle": `${systemAngle}deg`,
-                      "--user-angle": `${systemAngle + userAngle}deg`,
-                      "--assistant-angle": `${systemAngle + userAngle + assistantAngle}deg`,
-                    } as CSSProperties
-                  }
-                >
-                  <strong>{contextUsage}%</strong>
-                  <span>used</span>
-                </div>
-                <div className="chat-token-breakdown">
-                  {tokenBreakdown.map((item) => (
-                    <div className="chat-token-row" data-kind={item.className} key={item.label}>
-                      <span>
-                        <i aria-hidden="true" />
-                        {item.label}
-                      </span>
-                      <strong>{item.value.toLocaleString()}</strong>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="chat-token-row chat-token-row-total">
-                <span>Total estimate</span>
-                <strong>{estimatedTokens.toLocaleString()}</strong>
-              </div>
-              <p className="chat-token-note">Estimated from conversation text. Runtime token accounting can replace this later.</p>
-            </motion.div>
-          </div>
-        ) : null}
-      </AnimatePresence>
-
       <div
         ref={scrollRef}
         className="chat-workspace-scroll scrollbar-reveal min-h-0 flex-1 overflow-y-auto px-6 pb-40 max-[780px]:px-4 max-[780px]:pb-36"
@@ -168,8 +84,13 @@ export function ChatWorkspace({
               {conversation?.messages.map((message, index) => (
                 <ChatBubble
                   key={message.id}
+                  canEdit={message.id === latestUserMessageId}
                   message={message}
                   isGenerating={isGenerating && index === conversation.messages.length - 1}
+                  onEdit={onEditUserMessage}
+                  onRegenerate={onRegenerateAssistantMessage}
+                  onSpeak={onSpeakAssistantMessage}
+                  speechLoading={speechPlayback.pendingMessageId === message.id}
                 />
               ))}
             </AnimatePresence>
@@ -190,8 +111,21 @@ export function ChatWorkspace({
           draft={draft}
           error={error}
           isGenerating={isGenerating}
+          contextUsage={{
+            estimatedTokens,
+            maxTokens: chatRuntimeConfig.contextWindowTokens,
+            percentage: contextUsage,
+            state: tokenState,
+          }}
+          isEditing={Boolean(editingMessageId)}
+          speechPlayback={speechPlayback}
+          onCancelEdit={onCancelEdit}
           onDraftChange={onDraftChange}
+          onSeekSpeech={onSeekSpeech}
+          onStopSpeech={onStopSpeech}
+          onStopGeneration={onStopGeneration}
           onSubmit={onSubmit}
+          onToggleSpeech={onToggleSpeech}
         />
       </div>
     </section>

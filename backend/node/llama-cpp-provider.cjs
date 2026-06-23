@@ -181,6 +181,7 @@ class LlamaCppWorker {
       stream: true,
       temperature: typeof temperatureOverride === "number" ? temperatureOverride : this.model.temperature,
       top_k: this.model.topK,
+      top_p: this.model.topP,
       repeat_penalty: this.model.repeatPenalty,
       max_tokens: this.model.maxTokens,
     }

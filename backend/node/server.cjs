@@ -8,6 +8,8 @@ const {
 } = require("./llama-cpp-provider.cjs")
 const { checkCurrentRuntime } = require("./runtime-preflight.cjs")
 const { resolveRuntimeConfig } = require("./runtime-config.cjs")
+const { getSpeechOnnxRuntimeInfo } = require("./speech-onnx-runtime.cjs")
+const { synthesizeSpeechClip } = require("./speech-service.cjs")
 
 function getSystemPrompt() {
   const possiblePaths = [
@@ -107,6 +109,19 @@ function writeStreamHeaders(req, res, config) {
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     "Content-Type": "text/plain; charset=utf-8",
   })
+}
+
+function sendFile(req, res, statusCode, filePath, mimeType, extraHeaders = {}) {
+  res.writeHead(statusCode, {
+    "Access-Control-Allow-Origin": getAllowedOrigin(req, runtimeConfig),
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+    "Cache-Control": "private, max-age=31536000, immutable",
+    "Content-Type": mimeType,
+    ...extraHeaders,
+  })
+
+  fs.createReadStream(filePath).pipe(res)
 }
 
 function createGenerationProvider() {
@@ -334,6 +349,32 @@ function createServer(database, config, provider) {
     return
   }
 
+  if (req.method === "POST" && url.pathname === "/speech/tts") {
+    try {
+      const body = await readJsonBody(req)
+      const text = String(body.text ?? "")
+      const clip = await synthesizeSpeechClip(text, config)
+
+      sendFile(req, res, 200, clip.path, clip.mimeType, {
+        "X-SupraChat-Speech-Cache-Hit": clip.cacheHit ? "1" : "0",
+        "X-SupraChat-Speech-Cache-Key": clip.cacheKey,
+      })
+    } catch (error) {
+      const isUserError =
+        error?.code === "SUPRACHAT_SPEECH_TEXT_REQUIRED" ||
+        error?.code === "SUPRACHAT_SPEECH_TEXT_TOO_LONG" ||
+        error?.code === "SUPRACHAT_SPEECH_PLATFORM_UNSUPPORTED"
+
+      sendJson(req, res, isUserError ? 400 : 502, {
+        ok: false,
+        error: "speech_synthesis_failed",
+        detail: error?.message ?? "Unable to synthesize speech playback.",
+      })
+    }
+
+    return
+  }
+
   sendJson(req, res, 404, { ok: false, error: "not_found" })
   })
 }
@@ -388,6 +429,7 @@ function startServer(options = {}) {
     console.log(`Node backend listening on http://127.0.0.1:${boundPort}`)
     console.log(`SupraChat database: ${runtimeConfig.databasePath}`)
     console.log("SupraChat runtime: llama.cpp")
+    console.log(`SupraChat speech runtime: ${getSpeechOnnxRuntimeInfo().backend}`)
     console.log(`SupraChat chat model: ${generationProvider.chatModel.label}`)
     console.log(`SupraChat title model: ${generationProvider.titleModel.label}`)
   })
