@@ -1068,7 +1068,7 @@ button:disabled {
 
 .playground-workspace {
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 98%, var(--background)), var(--surface) 42%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, var(--background)), color-mix(in srgb, var(--surface) 78%, var(--background))),
     var(--surface);
   min-height: 0;
   overflow: hidden;
@@ -1076,7 +1076,7 @@ button:disabled {
 
 :root[data-theme="dark"] .playground-workspace {
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--background) 82%, black), var(--background) 48%),
+    linear-gradient(180deg, color-mix(in srgb, var(--background) 82%, var(--surface-elevated)), color-mix(in srgb, var(--background) 68%, var(--surface))),
     var(--background);
 }
 
@@ -1105,7 +1105,7 @@ button:disabled {
 }
 
 .playground-backlink {
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 74%, var(--surface));
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -1114,7 +1114,7 @@ button:disabled {
 }
 
 .playground-header h2 {
-  color: color-mix(in srgb, var(--text-primary) 90%, var(--text-secondary));
+  color: color-mix(in srgb, var(--text-primary) 72%, var(--text-secondary));
   font-size: clamp(2rem, 3.6vw, 2.82rem);
   font-weight: 780;
   letter-spacing: 0;
@@ -1123,7 +1123,7 @@ button:disabled {
 }
 
 .playground-header p:not(.playground-backlink) {
-  color: color-mix(in srgb, var(--text-secondary) 82%, var(--surface));
+  color: color-mix(in srgb, var(--text-secondary) 68%, var(--surface));
   font-size: 0.92rem;
   line-height: 1.45;
   margin: 0.62rem 0 0;
@@ -1132,10 +1132,10 @@ button:disabled {
 
 .playground-refresh-button {
   align-items: center;
-  background: color-mix(in srgb, var(--surface-elevated) 34%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 22%, transparent);
   border: 0;
   border-radius: 999px;
-  color: color-mix(in srgb, var(--text-secondary) 90%, var(--surface));
+  color: color-mix(in srgb, var(--text-secondary) 66%, var(--surface));
   display: inline-flex;
   flex: 0 0 auto;
   gap: 0.36rem;
@@ -1150,8 +1150,8 @@ button:disabled {
 }
 
 .playground-refresh-button:hover {
-  background: color-mix(in srgb, var(--surface-elevated) 58%, transparent);
-  color: color-mix(in srgb, var(--text-primary) 84%, var(--accent-primary));
+  background: color-mix(in srgb, var(--surface-elevated) 34%, transparent);
+  color: color-mix(in srgb, var(--text-secondary) 72%, var(--accent-primary));
   transform: translateY(-1px);
 }
 
@@ -1182,7 +1182,7 @@ button:disabled {
 
 .playground-section-heading h3,
 .model-group-heading h3 {
-  color: color-mix(in srgb, var(--text-primary) 82%, var(--text-secondary));
+  color: color-mix(in srgb, var(--text-secondary) 60%, var(--surface));
   font-size: 1rem;
   font-weight: 760;
   line-height: 1.2;
@@ -1191,7 +1191,7 @@ button:disabled {
 
 .playground-section-heading p,
 .model-group-heading p {
-  color: color-mix(in srgb, var(--text-secondary) 82%, var(--surface));
+  color: color-mix(in srgb, var(--text-secondary) 52%, var(--surface));
   font-size: 0.83rem;
   line-height: 1.45;
   margin: 0.28rem 0 0;
@@ -1207,7 +1207,7 @@ button:disabled {
 
 .playground-featured-heading > span,
 .playground-section-heading-row > span {
-  color: color-mix(in srgb, var(--text-muted) 76%, var(--surface));
+  color: color-mix(in srgb, var(--text-muted) 60%, var(--surface));
   font-size: 0.68rem;
   font-weight: 760;
   letter-spacing: 0.05em;
@@ -1222,30 +1222,30 @@ button:disabled {
 }
 
 .featured-model-card {
+  --featured-model-low-contrast: color-mix(in srgb, var(--text-muted) 72%, var(--surface));
+  --featured-model-low-contrast-strong: color-mix(in srgb, var(--text-secondary) 62%, var(--surface));
+  --featured-model-low-contrast-soft: color-mix(in srgb, var(--text-muted) 58%, var(--surface));
   background: transparent;
   border: 0;
   border-radius: 0;
-  color: color-mix(in srgb, var(--text-primary) 82%, var(--text-secondary));
+  color: var(--featured-model-low-contrast);
+  display: flex;
+  flex-direction: column;
+  min-height: clamp(29rem, 34vw, 34rem);
   min-width: 0;
   padding: 0;
   text-decoration: none;
-  transition:
-    transform var(--motion-fast) ease-out;
-}
-
-.featured-model-card:hover {
-  transform: translateY(-1px);
 }
 
 .featured-model-artwork {
   align-items: center;
-  aspect-ratio: 16 / 8;
+  aspect-ratio: 16 / 10;
   background:
-    radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--accent-hover) 42%, transparent), transparent 34%),
-    radial-gradient(circle at 84% 14%, color-mix(in srgb, var(--info) 30%, transparent), transparent 32%),
-    linear-gradient(135deg, color-mix(in srgb, var(--accent-light) 72%, var(--surface)), color-mix(in srgb, var(--accent-primary) 58%, var(--surface)));
+    radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--accent-hover) 28%, transparent), transparent 34%),
+    radial-gradient(circle at 84% 14%, color-mix(in srgb, var(--info) 18%, transparent), transparent 32%),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-light) 58%, var(--surface)), color-mix(in srgb, var(--accent-primary) 32%, var(--surface)));
   border: 0;
-  border-radius: 18px;
+  border-radius: 12px;
   display: flex;
   justify-content: center;
   overflow: hidden;
@@ -1254,37 +1254,69 @@ button:disabled {
 }
 
 :root[data-theme="dark"] .featured-model-artwork {
+  background:
+    radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--accent-hover) 22%, transparent), transparent 34%),
+    radial-gradient(circle at 84% 14%, color-mix(in srgb, var(--info) 16%, transparent), transparent 32%),
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 86%, var(--accent-light)), color-mix(in srgb, var(--accent-light) 54%, var(--surface)));
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--glass-border) 68%, transparent),
-    0 0.9rem 2.2rem color-mix(in srgb, var(--shadow-strong) 34%, transparent);
+    inset 0 0 0 1px color-mix(in srgb, var(--glass-border) 52%, transparent),
+    0 0.9rem 2.2rem color-mix(in srgb, var(--shadow-strong) 18%, transparent);
+}
+
+:root[data-theme="dark"] .featured-model-artwork[data-tone="reasoning"] {
+  background:
+    radial-gradient(circle at 22% 22%, color-mix(in srgb, var(--info) 24%, transparent), transparent 34%),
+    radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--accent-hover) 18%, transparent), transparent 30%),
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 88%, var(--accent-light)), color-mix(in srgb, var(--info) 18%, var(--accent-light)));
+}
+
+:root[data-theme="dark"] .featured-model-artwork[data-tone="utility"] {
+  background:
+    radial-gradient(circle at 18% 16%, color-mix(in srgb, var(--success) 22%, transparent), transparent 32%),
+    radial-gradient(circle at 82% 20%, color-mix(in srgb, var(--accent-primary) 22%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 88%, var(--accent-light)), color-mix(in srgb, var(--success) 14%, var(--accent-light)));
+}
+
+:root[data-theme="dark"] .featured-model-artwork[data-tone="story"] {
+  background:
+    radial-gradient(circle at 18% 20%, color-mix(in srgb, var(--warning) 24%, transparent), transparent 32%),
+    radial-gradient(circle at 84% 24%, color-mix(in srgb, var(--error) 16%, transparent), transparent 36%),
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 84%, var(--accent-light)), color-mix(in srgb, var(--warning) 16%, var(--accent-light)));
+}
+
+:root[data-theme="dark"] .featured-model-artwork[data-tone="research"] {
+  background:
+    radial-gradient(circle at 18% 16%, color-mix(in srgb, var(--text-muted) 16%, transparent), transparent 34%),
+    radial-gradient(circle at 82% 20%, color-mix(in srgb, var(--accent-primary) 14%, transparent), transparent 36%),
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 90%, var(--surface)), color-mix(in srgb, var(--accent-light) 26%, var(--surface-elevated)));
 }
 
 .featured-model-artwork[data-tone="reasoning"] {
   background:
-    radial-gradient(circle at 22% 22%, color-mix(in srgb, var(--info) 40%, transparent), transparent 34%),
-    radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--accent-hover) 32%, transparent), transparent 30%),
-    linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 56%, var(--accent-light)), color-mix(in srgb, var(--info) 34%, var(--surface)));
+    radial-gradient(circle at 22% 22%, color-mix(in srgb, var(--info) 28%, transparent), transparent 34%),
+    radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--accent-hover) 22%, transparent), transparent 30%),
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 58%, var(--accent-light)), color-mix(in srgb, var(--info) 22%, var(--surface)));
 }
 
 .featured-model-artwork[data-tone="utility"] {
   background:
-    radial-gradient(circle at 18% 16%, color-mix(in srgb, var(--success) 34%, transparent), transparent 32%),
-    radial-gradient(circle at 82% 20%, color-mix(in srgb, var(--accent-primary) 42%, transparent), transparent 34%),
-    linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 60%, var(--accent-light)), color-mix(in srgb, var(--success) 25%, var(--surface)));
+    radial-gradient(circle at 18% 16%, color-mix(in srgb, var(--success) 24%, transparent), transparent 32%),
+    radial-gradient(circle at 82% 20%, color-mix(in srgb, var(--accent-primary) 28%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 60%, var(--accent-light)), color-mix(in srgb, var(--success) 18%, var(--surface)));
 }
 
 .featured-model-artwork[data-tone="story"] {
   background:
-    radial-gradient(circle at 18% 20%, color-mix(in srgb, var(--warning) 40%, transparent), transparent 32%),
-    radial-gradient(circle at 84% 24%, color-mix(in srgb, var(--error) 28%, transparent), transparent 36%),
-    linear-gradient(135deg, color-mix(in srgb, var(--accent-light) 70%, var(--surface)), color-mix(in srgb, var(--warning) 36%, var(--surface)));
+    radial-gradient(circle at 18% 20%, color-mix(in srgb, var(--warning) 28%, transparent), transparent 32%),
+    radial-gradient(circle at 84% 24%, color-mix(in srgb, var(--error) 18%, transparent), transparent 36%),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-light) 60%, var(--surface)), color-mix(in srgb, var(--warning) 22%, var(--surface)));
 }
 
 .featured-model-artwork[data-tone="research"] {
   background:
-    radial-gradient(circle at 18% 16%, color-mix(in srgb, var(--text-muted) 26%, transparent), transparent 34%),
-    radial-gradient(circle at 82% 20%, color-mix(in srgb, var(--accent-primary) 26%, transparent), transparent 36%),
-    linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 68%, var(--surface)), color-mix(in srgb, var(--accent-light) 52%, var(--surface)));
+    radial-gradient(circle at 18% 16%, color-mix(in srgb, var(--text-muted) 18%, transparent), transparent 34%),
+    radial-gradient(circle at 82% 20%, color-mix(in srgb, var(--accent-primary) 18%, transparent), transparent 36%),
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 58%, var(--surface)), color-mix(in srgb, var(--accent-light) 34%, var(--surface)));
 }
 
 .featured-model-artwork img {
@@ -1299,7 +1331,7 @@ button:disabled {
 }
 
 .featured-model-artwork span {
-  color: var(--text-primary);
+  color: var(--featured-model-low-contrast-strong);
   font-size: clamp(1.12rem, 2.3vw, 1.86rem);
   font-weight: 720;
   line-height: 1.05;
@@ -1311,11 +1343,14 @@ button:disabled {
 }
 
 :root[data-theme="dark"] .featured-model-artwork span {
-  color: var(--text-primary);
+  color: var(--featured-model-low-contrast-strong);
   text-shadow: 0 1px 14px color-mix(in srgb, var(--shadow-strong) 24%, transparent);
 }
 
 .featured-model-summary {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   padding: 1.2rem 0 0;
 }
 
@@ -1327,7 +1362,7 @@ button:disabled {
 }
 
 .featured-model-title-row h4 {
-  color: color-mix(in srgb, var(--text-primary) 86%, var(--text-secondary));
+  color: color-mix(in srgb, var(--text-secondary) 68%, var(--surface));
   font-size: 0.96rem;
   font-weight: 760;
   line-height: 1.25;
@@ -1335,7 +1370,7 @@ button:disabled {
 }
 
 .featured-model-title-row p {
-  color: color-mix(in srgb, var(--text-secondary) 86%, var(--surface));
+  color: color-mix(in srgb, var(--text-secondary) 58%, var(--surface));
   font-size: 0.8rem;
   line-height: 1.5;
   margin: 0.35rem 0 0;
@@ -1347,7 +1382,7 @@ button:disabled {
     linear-gradient(145deg, color-mix(in srgb, var(--accent-light) 68%, var(--surface)), color-mix(in srgb, var(--accent-primary) 28%, var(--surface)));
   border: 0;
   border-radius: 9px;
-  color: color-mix(in srgb, var(--text-primary) 66%, var(--accent-hover));
+  color: var(--featured-model-low-contrast-strong);
   display: inline-flex;
   flex: 0 0 auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -1386,7 +1421,7 @@ button:disabled {
 }
 
 .featured-model-specs {
-  border-top: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--border) 46%, transparent);
   display: grid;
   gap: 0;
   margin: 1.3rem 0 0;
@@ -1394,7 +1429,7 @@ button:disabled {
 
 .featured-model-specs div {
   align-items: center;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
   display: flex;
   gap: 0.8rem;
   justify-content: space-between;
@@ -1402,13 +1437,13 @@ button:disabled {
 }
 
 .featured-model-specs dt {
-  color: color-mix(in srgb, var(--text-secondary) 88%, var(--surface));
+  color: var(--featured-model-low-contrast-soft);
   font-size: 0.76rem;
   font-weight: 560;
 }
 
 .featured-model-specs dd {
-  color: color-mix(in srgb, var(--text-primary) 88%, var(--text-secondary));
+  color: var(--featured-model-low-contrast-strong);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.72rem;
   font-weight: 720;
@@ -1421,7 +1456,7 @@ button:disabled {
 }
 
 .featured-model-specs div:first-child dd {
-  background: color-mix(in srgb, var(--surface-elevated) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 44%, transparent);
   border-radius: 7px;
   padding: 0.23rem 0.42rem;
 }
@@ -1439,7 +1474,8 @@ button:disabled {
   display: flex;
   gap: 0.75rem;
   justify-content: space-between;
-  margin-top: 1.1rem;
+  margin-top: auto;
+  padding-top: 1.1rem;
 }
 
 .model-chip-row {
@@ -1450,10 +1486,10 @@ button:disabled {
 }
 
 .model-chip-row span {
-  background: color-mix(in srgb, var(--surface-elevated) 56%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 34%, transparent);
   border: 0;
   border-radius: 999px;
-  color: color-mix(in srgb, var(--text-secondary) 84%, var(--surface));
+  color: var(--featured-model-low-contrast-soft);
   font-size: 0.62rem;
   font-weight: 700;
   line-height: 1;
@@ -1462,13 +1498,13 @@ button:disabled {
 
 .featured-model-footer a,
 .model-list-card {
-  color: var(--text-primary);
+  color: var(--featured-model-low-contrast);
   text-decoration: none;
 }
 
 .featured-model-footer a {
   align-items: center;
-  color: color-mix(in srgb, var(--text-primary) 76%, var(--accent-primary));
+  color: var(--featured-model-low-contrast-strong);
   display: inline-flex;
   flex: 0 0 auto;
   font-size: 0.76rem;
@@ -1478,12 +1514,12 @@ button:disabled {
 }
 
 .featured-model-footer a:hover {
-  color: var(--accent-hover);
+  color: color-mix(in srgb, var(--text-secondary) 72%, var(--accent-primary));
 }
 
 .model-catalog-toolbar {
   align-items: center;
-  background: color-mix(in srgb, var(--surface-elevated) 28%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 18%, transparent);
   border: 0;
   border-radius: 12px;
   display: grid;
@@ -1494,15 +1530,15 @@ button:disabled {
 }
 
 :root[data-theme="dark"] .model-catalog-toolbar {
-  background: color-mix(in srgb, var(--surface-elevated) 48%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 28%, transparent);
 }
 
 .model-search-field {
   align-items: center;
-  background: color-mix(in srgb, var(--surface) 82%, var(--surface-elevated));
+  background: color-mix(in srgb, var(--surface) 66%, var(--surface-elevated));
   border: 0;
   border-radius: 8px;
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 74%, var(--surface));
   display: flex;
   gap: 0.48rem;
   min-height: 2.26rem;
@@ -1516,7 +1552,7 @@ button:disabled {
 .model-search-field input {
   background: transparent;
   border: 0;
-  color: var(--text-primary);
+  color: color-mix(in srgb, var(--text-secondary) 70%, var(--surface));
   font: inherit;
   font-size: 0.78rem;
   min-width: 0;
@@ -1525,7 +1561,7 @@ button:disabled {
 }
 
 .model-search-field input::placeholder {
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 64%, var(--surface));
 }
 
 .model-category-tabs {
@@ -1544,7 +1580,7 @@ button:disabled {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 999px;
-  color: color-mix(in srgb, var(--text-secondary) 76%, var(--surface));
+  color: color-mix(in srgb, var(--text-secondary) 58%, var(--surface));
   flex: 0 0 auto;
   font-size: 0.72rem;
   font-weight: 720;
@@ -1557,18 +1593,18 @@ button:disabled {
 }
 
 .model-category-tabs button:hover {
-  background: color-mix(in srgb, var(--surface-elevated) 48%, transparent);
-  color: var(--text-primary);
+  background: color-mix(in srgb, var(--surface-elevated) 26%, transparent);
+  color: color-mix(in srgb, var(--text-secondary) 72%, var(--surface));
 }
 
 .model-category-tabs button.active {
-  background: color-mix(in srgb, var(--text-primary) 92%, var(--accent-primary));
+  background: color-mix(in srgb, var(--surface-elevated) 42%, var(--accent-light));
   border-color: transparent;
-  color: var(--surface);
+  color: color-mix(in srgb, var(--text-secondary) 78%, var(--accent-primary));
 }
 
 .model-catalog-toolbar > span {
-  color: color-mix(in srgb, var(--text-muted) 72%, var(--surface));
+  color: color-mix(in srgb, var(--text-muted) 58%, var(--surface));
   font-size: 0.68rem;
   font-weight: 760;
   letter-spacing: 0.04em;
@@ -1577,7 +1613,7 @@ button:disabled {
 }
 
 .model-group {
-  border-top: 1px solid color-mix(in srgb, var(--border) 64%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--border) 42%, transparent);
   display: grid;
   gap: 1.35rem;
   grid-template-columns: minmax(12rem, 0.34fr) minmax(0, 1fr);
@@ -1589,7 +1625,7 @@ button:disabled {
 }
 
 .model-group-heading span {
-  color: color-mix(in srgb, var(--text-muted) 70%, var(--surface));
+  color: color-mix(in srgb, var(--text-muted) 42%, var(--surface));
   display: block;
   font-size: 0.68rem;
   font-weight: 720;
@@ -1605,6 +1641,9 @@ button:disabled {
 }
 
 .model-list-card {
+  --all-models-low-contrast: color-mix(in srgb, var(--text-muted) 64%, var(--surface));
+  --all-models-low-contrast-strong: color-mix(in srgb, var(--text-secondary) 54%, var(--surface));
+  --all-models-low-contrast-soft: color-mix(in srgb, var(--text-muted) 48%, var(--surface));
   align-items: flex-start;
   border: 1px solid transparent;
   border-radius: 12px;
@@ -1615,17 +1654,26 @@ button:disabled {
   padding: 0.58rem 0.62rem;
   transition:
     background var(--motion-fast) ease-out,
-    border-color var(--motion-fast) ease-out;
+    border-color var(--motion-fast) ease-out,
+    border-radius var(--motion-fast) ease-out,
+    box-shadow var(--motion-fast) ease-out;
 }
 
 .model-list-card:hover {
-  background: color-mix(in srgb, var(--surface-elevated) 38%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 82%, var(--surface));
   border-color: transparent;
+  border-radius: 8px;
+  box-shadow: 0 0.55rem 1.3rem color-mix(in srgb, var(--shadow-strong) 14%, transparent);
 }
 
 .model-list-card:hover strong,
 .model-list-card:hover > svg {
-  color: var(--accent-hover);
+  color: color-mix(in srgb, var(--text-primary) 88%, var(--accent-primary));
+}
+
+.model-list-card:hover span,
+.model-list-card:hover small {
+  color: color-mix(in srgb, var(--text-secondary) 82%, var(--text-primary));
 }
 
 .model-list-icon {
@@ -1648,7 +1696,7 @@ button:disabled {
 }
 
 .model-list-copy strong {
-  color: color-mix(in srgb, var(--text-primary) 84%, var(--text-secondary));
+  color: color-mix(in srgb, var(--text-secondary) 46%, var(--surface));
   font-size: 0.88rem;
   font-weight: 740;
   line-height: 1.25;
@@ -1657,14 +1705,14 @@ button:disabled {
 }
 
 .model-list-copy span {
-  color: color-mix(in srgb, var(--text-secondary) 84%, var(--surface));
+  color: color-mix(in srgb, var(--text-muted) 52%, var(--surface));
   font-size: 0.76rem;
   line-height: 1.42;
   margin-top: 0.2rem;
 }
 
 .model-list-copy small {
-  color: color-mix(in srgb, var(--text-muted) 78%, var(--surface));
+  color: color-mix(in srgb, var(--text-muted) 38%, var(--surface));
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.66rem;
   font-weight: 650;
@@ -1675,13 +1723,13 @@ button:disabled {
 }
 
 .model-list-card > svg {
-  color: color-mix(in srgb, var(--text-muted) 62%, var(--surface));
+  color: var(--all-models-low-contrast-soft);
   margin-top: 0.34rem;
   transition: color var(--motion-fast) ease-out;
 }
 
 .playground-state-panel {
-  background: color-mix(in srgb, var(--surface-elevated) 36%, var(--surface));
+  background: color-mix(in srgb, var(--surface-elevated) 22%, var(--surface));
   border: 0;
   border-radius: 14px;
   padding: 1.1rem;
@@ -1693,9 +1741,82 @@ button:disabled {
 }
 
 .playground-state-panel p {
-  color: color-mix(in srgb, var(--text-secondary) 76%, var(--surface));
+  color: color-mix(in srgb, var(--text-secondary) 62%, var(--surface));
   font-size: 0.82rem;
   margin: 0.3rem 0 0;
+}
+
+:root[data-theme="light"] .playground-backlink,
+:root:not([data-theme]) .playground-backlink {
+  color: color-mix(in srgb, var(--text-muted) 82%, var(--surface));
+}
+
+:root[data-theme="light"] .playground-header h2,
+:root:not([data-theme]) .playground-header h2 {
+  color: color-mix(in srgb, var(--text-secondary) 66%, var(--text-primary));
+}
+
+:root[data-theme="light"] .playground-header p:not(.playground-backlink),
+:root:not([data-theme]) .playground-header p:not(.playground-backlink),
+:root[data-theme="light"] .playground-section-heading h3,
+:root[data-theme="light"] .model-group-heading h3,
+:root:not([data-theme]) .playground-section-heading h3,
+:root:not([data-theme]) .model-group-heading h3,
+:root[data-theme="light"] .featured-model-title-row h4,
+:root:not([data-theme]) .featured-model-title-row h4 {
+  color: color-mix(in srgb, var(--text-secondary) 64%, var(--text-primary));
+}
+
+:root[data-theme="light"] .playground-section-heading p,
+:root[data-theme="light"] .model-group-heading p,
+:root:not([data-theme]) .playground-section-heading p,
+:root:not([data-theme]) .model-group-heading p,
+:root[data-theme="light"] .featured-model-title-row p,
+:root:not([data-theme]) .featured-model-title-row p,
+:root[data-theme="light"] .model-list-copy strong,
+:root:not([data-theme]) .model-list-copy strong,
+:root[data-theme="light"] .playground-state-panel p,
+:root:not([data-theme]) .playground-state-panel p {
+  color: color-mix(in srgb, var(--text-secondary) 58%, var(--text-primary));
+}
+
+:root[data-theme="light"] .playground-featured-heading > span,
+:root[data-theme="light"] .playground-section-heading-row > span,
+:root[data-theme="light"] .model-catalog-toolbar > span,
+:root[data-theme="light"] .model-group-heading span,
+:root:not([data-theme]) .playground-featured-heading > span,
+:root:not([data-theme]) .playground-section-heading-row > span,
+:root:not([data-theme]) .model-catalog-toolbar > span,
+:root:not([data-theme]) .model-group-heading span {
+  color: color-mix(in srgb, var(--text-muted) 50%, var(--text-primary));
+}
+
+:root[data-theme="light"] .featured-model-specs dt,
+:root[data-theme="light"] .model-chip-row span,
+:root[data-theme="light"] .model-list-copy span,
+:root[data-theme="light"] .model-search-field,
+:root[data-theme="light"] .model-search-field input::placeholder,
+:root:not([data-theme]) .featured-model-specs dt,
+:root:not([data-theme]) .model-chip-row span,
+:root:not([data-theme]) .model-list-copy span,
+:root:not([data-theme]) .model-search-field,
+:root:not([data-theme]) .model-search-field input::placeholder {
+  color: color-mix(in srgb, var(--text-muted) 54%, var(--text-primary));
+}
+
+:root[data-theme="light"] .featured-model-specs dd,
+:root[data-theme="light"] .featured-model-footer a,
+:root[data-theme="light"] .model-category-tabs button,
+:root[data-theme="light"] .model-search-field input,
+:root[data-theme="light"] .model-list-card > svg,
+:root[data-theme="light"] .model-list-copy small,
+:root:not([data-theme]) .featured-model-specs dd,
+:root:not([data-theme]) .featured-model-footer a,
+:root:not([data-theme]) .model-category-tabs button,
+:root:not([data-theme]) .model-search-field input,
+:root:not([data-theme]) .model-list-card > svg,
+:root:not([data-theme]) .model-list-copy small {
+  color: color-mix(in srgb, var(--text-secondary) 50%, var(--text-primary));
 }
 
 .model-list-card-loading span,

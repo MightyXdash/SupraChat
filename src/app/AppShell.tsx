@@ -13,13 +13,17 @@ import { useChatStore } from "@/features/chat/store/use-chat-store"
 import { ConversationSearchDialog } from "@/features/chat/components/ConversationSearchDialog"
 import { ChatWorkspace } from "@/features/chat/components/ChatWorkspace"
 import { useAutoScroll } from "@/features/chat/hooks/useAutoScroll"
-import { PlaygroundWorkspace } from "@/features/playground/components/PlaygroundWorkspace"
+import {
+  PlaygroundWorkspace,
+  type PlaygroundView,
+} from "@/features/playground/components/PlaygroundWorkspace"
 
 type AppPanel = "chat" | "playground"
 
 export function AppShell() {
   const [draft, setDraft] = useState("")
   const [activePanel, setActivePanel] = useState<AppPanel>("chat")
+  const [playgroundView, setPlaygroundView] = useState<PlaygroundView>("featured")
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [theme, setTheme] = useState<AppTheme>(() => getStoredTheme() ?? getSystemTheme())
@@ -108,7 +112,7 @@ export function AppShell() {
           onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
         />
         {activePanel === "playground" ? (
-          <PlaygroundWorkspace />
+          <PlaygroundWorkspace view={playgroundView} onViewChange={setPlaygroundView} />
         ) : (
           <ChatWorkspace
             conversation={activeConversation}
