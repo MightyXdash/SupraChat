@@ -1748,12 +1748,12 @@ button:disabled {
 
 :root[data-theme="light"] .playground-backlink,
 :root:not([data-theme]) .playground-backlink {
-  color: color-mix(in srgb, var(--text-muted) 82%, var(--surface));
+  color: color-mix(in srgb, var(--text-muted) 86%, var(--surface));
 }
 
 :root[data-theme="light"] .playground-header h2,
 :root:not([data-theme]) .playground-header h2 {
-  color: color-mix(in srgb, var(--text-secondary) 66%, var(--text-primary));
+  color: color-mix(in srgb, var(--text-secondary) 78%, var(--surface));
 }
 
 :root[data-theme="light"] .playground-header p:not(.playground-backlink),
@@ -1764,7 +1764,7 @@ button:disabled {
 :root:not([data-theme]) .model-group-heading h3,
 :root[data-theme="light"] .featured-model-title-row h4,
 :root:not([data-theme]) .featured-model-title-row h4 {
-  color: color-mix(in srgb, var(--text-secondary) 64%, var(--text-primary));
+  color: color-mix(in srgb, var(--text-secondary) 72%, var(--surface));
 }
 
 :root[data-theme="light"] .playground-section-heading p,
@@ -1777,7 +1777,7 @@ button:disabled {
 :root:not([data-theme]) .model-list-copy strong,
 :root[data-theme="light"] .playground-state-panel p,
 :root:not([data-theme]) .playground-state-panel p {
-  color: color-mix(in srgb, var(--text-secondary) 58%, var(--text-primary));
+  color: color-mix(in srgb, var(--text-secondary) 66%, var(--surface));
 }
 
 :root[data-theme="light"] .playground-featured-heading > span,
@@ -1788,7 +1788,7 @@ button:disabled {
 :root:not([data-theme]) .playground-section-heading-row > span,
 :root:not([data-theme]) .model-catalog-toolbar > span,
 :root:not([data-theme]) .model-group-heading span {
-  color: color-mix(in srgb, var(--text-muted) 50%, var(--text-primary));
+  color: color-mix(in srgb, var(--text-muted) 58%, var(--surface));
 }
 
 :root[data-theme="light"] .featured-model-specs dt,
@@ -1801,7 +1801,7 @@ button:disabled {
 :root:not([data-theme]) .model-list-copy span,
 :root:not([data-theme]) .model-search-field,
 :root:not([data-theme]) .model-search-field input::placeholder {
-  color: color-mix(in srgb, var(--text-muted) 54%, var(--text-primary));
+  color: color-mix(in srgb, var(--text-muted) 62%, var(--surface));
 }
 
 :root[data-theme="light"] .featured-model-specs dd,
@@ -1816,7 +1816,7 @@ button:disabled {
 :root:not([data-theme]) .model-search-field input,
 :root:not([data-theme]) .model-list-card > svg,
 :root:not([data-theme]) .model-list-copy small {
-  color: color-mix(in srgb, var(--text-secondary) 50%, var(--text-primary));
+  color: color-mix(in srgb, var(--text-secondary) 60%, var(--surface));
 }
 
 .model-list-card-loading span,
