@@ -1,0 +1,378 @@
+import { type CSSProperties, useEffect, useMemo, useState } from "react"
+import { AnimatePresence, motion } from "framer-motion"
+import { RefreshCcw, X } from "lucide-react"
+import { settingsTabs, type SettingsTabId } from "@/features/settings/config/settings-tabs"
+import { SettingsBadge, SettingsPath, SettingsSegmentedControl, SettingsToggle } from "@/features/settings/components/SettingsControl"
+import { SettingsNav } from "@/features/settings/components/SettingsNav"
+import { SettingsRow } from "@/features/settings/components/SettingsRow"
+import { SettingsSection } from "@/features/settings/components/SettingsSection"
+import {
+  fetchSettingsModels,
+  fetchSettingsRuntime,
+  fetchSettingsStorage,
+  type SettingsModelsPayload,
+  type SettingsRuntimePayload,
+  type SettingsStoragePayload,
+} from "@/features/settings/services/settings-service"
+import { useSettingsStore } from "@/features/settings/store/use-settings-store"
+
+type SettingsDialogProps = {
+  isOpen: boolean
+  onClose: () => void
+}
+
+type SettingsDataState = {
+  error: string | null
+  isLoading: boolean
+  models: SettingsModelsPayload | null
+  runtime: SettingsRuntimePayload | null
+  storage: SettingsStoragePayload | null
+}
+
+function formatBytes(value: number | null | undefined) {
+  if (!value) {
+    return "Not available"
+  }
+
+  return new Intl.NumberFormat("en", {
+    maximumFractionDigits: value >= 1024 * 1024 * 1024 ? 1 : 0,
+    style: "unit",
+    unit: value >= 1024 * 1024 * 1024 ? "gigabyte" : "megabyte",
+    unitDisplay: "short",
+  }).format(value / (value >= 1024 * 1024 * 1024 ? 1024 * 1024 * 1024 : 1024 * 1024))
+}
+
+function formatModelSize(sizeBytes: number | null, approximateSizeMb?: number) {
+  if (sizeBytes) {
+    return formatBytes(sizeBytes)
+  }
+
+  if (approximateSizeMb) {
+    return `Approx. ${formatBytes(approximateSizeMb * 1024 * 1024)}`
+  }
+
+  return "Size not available"
+}
+
+function statusTone(ok?: boolean) {
+  return ok ? "success" : "warning"
+}
+
+export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
+  const [activeTab, setActiveTab] = useState<SettingsTabId>("general")
+  const [dataState, setDataState] = useState<SettingsDataState>({
+    error: null,
+    isLoading: false,
+    models: null,
+    runtime: null,
+    storage: null,
+  })
+  const activeTabDefinition = useMemo(
+    () => settingsTabs.find((tab) => tab.id === activeTab) ?? settingsTabs[0],
+    [activeTab],
+  )
+  const defaultWorkspace = useSettingsStore((state) => state.defaultWorkspace)
+  const density = useSettingsStore((state) => state.density)
+  const frostedSurfaces = useSettingsStore((state) => state.frostedSurfaces)
+  const messageFont = useSettingsStore((state) => state.messageFont)
+  const reduceMotion = useSettingsStore((state) => state.reduceMotion)
+  const showContextMeter = useSettingsStore((state) => state.showContextMeter)
+  const startWithLastConversation = useSettingsStore((state) => state.startWithLastConversation)
+  const themePreference = useSettingsStore((state) => state.themePreference)
+  const setDefaultWorkspace = useSettingsStore((state) => state.setDefaultWorkspace)
+  const setDensity = useSettingsStore((state) => state.setDensity)
+  const setFrostedSurfaces = useSettingsStore((state) => state.setFrostedSurfaces)
+  const setMessageFont = useSettingsStore((state) => state.setMessageFont)
+  const setReduceMotion = useSettingsStore((state) => state.setReduceMotion)
+  const setShowContextMeter = useSettingsStore((state) => state.setShowContextMeter)
+  const setStartWithLastConversation = useSettingsStore((state) => state.setStartWithLastConversation)
+  const setThemePreference = useSettingsStore((state) => state.setThemePreference)
+
+  async function loadSettingsData() {
+    setDataState((current) => ({ ...current, error: null, isLoading: true }))
+
+    try {
+      const [runtime, models, storage] = await Promise.all([
+        fetchSettingsRuntime(),
+        fetchSettingsModels(),
+        fetchSettingsStorage(),
+      ])
+
+      setDataState({
+        error: null,
+        isLoading: false,
+        models,
+        runtime,
+        storage,
+      })
+    } catch (error) {
+      setDataState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Unable to load settings information.",
+        isLoading: false,
+      }))
+    }
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    void loadSettingsData()
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isOpen, onClose])
+
+  return (
+    <AnimatePresence>
+      {isOpen ? (
+        <div className="settings-layer" role="presentation">
+          <motion.button
+            className="settings-backdrop"
+            type="button"
+            aria-label="Close settings"
+            onClick={onClose}
+            initial={{
+              opacity: 0,
+              "--settings-backdrop-blur": "0px",
+              "--settings-backdrop-saturate": "1",
+            } as CSSProperties}
+            animate={{
+              opacity: 1,
+              "--settings-backdrop-blur": "8px",
+              "--settings-backdrop-saturate": "0.96",
+            } as CSSProperties}
+            exit={{
+              opacity: 0,
+              "--settings-backdrop-blur": "0px",
+              "--settings-backdrop-saturate": "1",
+            } as CSSProperties}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          />
+          <motion.section
+            className="settings-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Settings"
+            initial={{ opacity: 0, scale: 0.985, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.985, y: 8 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <aside className="settings-sidebar">
+              <div className="settings-sidebar-header">
+                <span>Settings</span>
+                <button className="settings-icon-button" type="button" aria-label="Close settings" onClick={onClose}>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <SettingsNav activeTab={activeTab} onChange={setActiveTab} />
+              <div className="settings-sidebar-footer">
+                <span>SupraChat Desktop</span>
+                <span>v0.1.0</span>
+              </div>
+            </aside>
+
+            <div className="settings-content">
+              <header className="settings-content-header">
+                <div>
+                  <h2>{activeTabDefinition.label}</h2>
+                </div>
+                <button
+                  className="settings-icon-button settings-refresh-icon-button"
+                  type="button"
+                  aria-label="Refresh settings"
+                  onClick={() => void loadSettingsData()}
+                  disabled={dataState.isLoading}
+                >
+                  <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </header>
+
+              {dataState.error ? (
+                <div className="settings-status-panel" role="status">
+                  {dataState.error}
+                </div>
+              ) : null}
+
+              <div className="settings-content-scroll scrollbar-reveal">
+                {activeTab === "general" ? (
+                  <>
+                    <SettingsSection title="Workspace" description="Choose how SupraChat opens and behaves during normal use.">
+                      <SettingsRow label="Opening view" description="Choose the workspace shown first when the app starts.">
+                        <SettingsSegmentedControl
+                          aria-label="Opening view"
+                          value={defaultWorkspace}
+                          options={[
+                            { label: "Chat", value: "chat" },
+                            { label: "Playground", value: "playground" },
+                          ]}
+                          onChange={setDefaultWorkspace}
+                        />
+                      </SettingsRow>
+                      <SettingsRow label="Start with last conversation" description="Restore the last active conversation when possible.">
+                        <SettingsToggle checked={startWithLastConversation} onChange={setStartWithLastConversation} />
+                      </SettingsRow>
+                    </SettingsSection>
+
+                    <SettingsSection title="Conversation Controls">
+                      <SettingsRow label="Auto-title conversations" description="Conversation titles are generated locally with the bundled title model.">
+                        <SettingsBadge tone="success">Enabled</SettingsBadge>
+                      </SettingsRow>
+                      <SettingsRow label="Delete confirmation" description="Conversation deletion currently uses a native confirmation prompt.">
+                        <SettingsBadge>Active</SettingsBadge>
+                      </SettingsRow>
+                    </SettingsSection>
+                  </>
+                ) : null}
+
+                {activeTab === "appearance" ? (
+                  <>
+                    <SettingsSection title="Theme" description="Theme preference is stored locally and follows the system by default.">
+                      <SettingsRow label="Theme">
+                        <SettingsSegmentedControl
+                          aria-label="Theme"
+                          value={themePreference}
+                          options={[
+                            { label: "System", value: "system" },
+                            { label: "Light", value: "light" },
+                            { label: "Dark", value: "dark" },
+                          ]}
+                          onChange={setThemePreference}
+                        />
+                      </SettingsRow>
+                      <SettingsRow label="Frosted surfaces" description="Reduce translucent surfaces if you prefer a flatter interface.">
+                        <SettingsSegmentedControl
+                          aria-label="Frosted surfaces"
+                          value={frostedSurfaces}
+                          options={[
+                            { label: "Standard", value: "standard" },
+                            { label: "Reduced", value: "reduced" },
+                          ]}
+                          onChange={setFrostedSurfaces}
+                        />
+                      </SettingsRow>
+                    </SettingsSection>
+
+                    <SettingsSection title="Reading">
+                      <SettingsRow label="Interface density">
+                        <SettingsSegmentedControl
+                          aria-label="Interface density"
+                          value={density}
+                          options={[
+                            { label: "Comfortable", value: "comfortable" },
+                            { label: "Compact", value: "compact" },
+                          ]}
+                          onChange={setDensity}
+                        />
+                      </SettingsRow>
+                      <SettingsRow label="Message font">
+                        <SettingsSegmentedControl
+                          aria-label="Message font"
+                          value={messageFont}
+                          options={[
+                            { label: "Sans", value: "sans" },
+                            { label: "Serif", value: "serif" },
+                          ]}
+                          onChange={setMessageFont}
+                        />
+                      </SettingsRow>
+                      <SettingsRow label="Reduce motion">
+                        <SettingsToggle checked={reduceMotion} onChange={setReduceMotion} />
+                      </SettingsRow>
+                      <SettingsRow label="Show context meter">
+                        <SettingsToggle checked={showContextMeter} onChange={setShowContextMeter} />
+                      </SettingsRow>
+                    </SettingsSection>
+                  </>
+                ) : null}
+
+                {activeTab === "models" ? (
+                  <SettingsSection title="Bundled Models" description={`Resource root: ${dataState.models?.resourceRoot ?? "Loading"}`}>
+                    {(dataState.models?.models ?? []).map((model) => (
+                      <SettingsRow
+                        key={model.id}
+                        label={model.label}
+                        description={`${model.role.toUpperCase()} · ${model.provider} · ${formatModelSize(model.sizeBytes, model.approximateSizeMb)}`}
+                      >
+                        <SettingsBadge tone={model.installed ? "success" : "warning"}>
+                          {model.installed ? "Installed" : "Missing"}
+                        </SettingsBadge>
+                      </SettingsRow>
+                    ))}
+                    {!dataState.models?.models.length ? (
+                      <div className="settings-status-panel">Model information is loading.</div>
+                    ) : null}
+                  </SettingsSection>
+                ) : null}
+
+                {activeTab === "runtime" ? (
+                  <>
+                    <SettingsSection title="Status" description="Local execution uses the bundled llama.cpp runtime.">
+                      <SettingsRow label="Runtime">
+                        <SettingsBadge tone={statusTone(dataState.runtime?.runtimePreflight.ok)}>
+                          {dataState.runtime?.runtimePreflight.ok ? "Ready" : "Attention Required"}
+                        </SettingsBadge>
+                      </SettingsRow>
+                      <SettingsRow label="API endpoint">
+                        <SettingsPath value={dataState.runtime?.apiBaseUrl ?? "Loading"} />
+                      </SettingsRow>
+                      <SettingsRow label="Platform">
+                        <SettingsBadge>{dataState.runtime ? `${dataState.runtime.platform}-${dataState.runtime.arch}` : "Loading"}</SettingsBadge>
+                      </SettingsRow>
+                      <SettingsRow label="Threads">
+                        <SettingsBadge>{dataState.runtime ? String(dataState.runtime.threadCount) : "Loading"}</SettingsBadge>
+                      </SettingsRow>
+                    </SettingsSection>
+
+                    <SettingsSection title="Runtime Files">
+                      {(dataState.runtime?.runtimePreflight.checks ?? []).map((check) => (
+                        <SettingsRow key={check.path} label={check.label} description={check.path}>
+                          <SettingsBadge tone={statusTone(check.ok)}>{check.ok ? "Ready" : "Missing"}</SettingsBadge>
+                        </SettingsRow>
+                      ))}
+                    </SettingsSection>
+                  </>
+                ) : null}
+
+                {activeTab === "data" ? (
+                  <>
+                    <SettingsSection title="Local Storage" description="Conversation data is stored on this device.">
+                      <SettingsRow label="Data folder">
+                        <SettingsPath value={dataState.storage?.dataDir ?? "Loading"} />
+                      </SettingsRow>
+                      <SettingsRow label="Database">
+                        <SettingsPath value={dataState.storage?.databasePath ?? "Loading"} />
+                      </SettingsRow>
+                      <SettingsRow label="Database size">
+                        <SettingsBadge>{formatBytes(dataState.storage?.databaseSizeBytes)}</SettingsBadge>
+                      </SettingsRow>
+                    </SettingsSection>
+
+                    <SettingsSection title="Conversation Data">
+                      <SettingsRow label="Conversations">
+                        <SettingsBadge>{String(dataState.storage?.stats.conversationCount ?? 0)}</SettingsBadge>
+                      </SettingsRow>
+                      <SettingsRow label="Messages">
+                        <SettingsBadge>{String(dataState.storage?.stats.messageCount ?? 0)}</SettingsBadge>
+                      </SettingsRow>
+                    </SettingsSection>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </motion.section>
+        </div>
+      ) : null}
+    </AnimatePresence>
+  )
+}

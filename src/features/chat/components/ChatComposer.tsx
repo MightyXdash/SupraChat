@@ -17,6 +17,7 @@ type ChatComposerProps = {
   isGenerating: boolean
   contextUsage: ContextUsageSummary
   speechPlayback: SpeechPlaybackState
+  showContextMeter: boolean
   onCancelEdit: () => void
   onDraftChange: (value: string) => void
   onSeekSpeech: (value: number) => void
@@ -33,6 +34,7 @@ export function ChatComposer({
   isGenerating,
   contextUsage,
   speechPlayback,
+  showContextMeter,
   onCancelEdit,
   onDraftChange,
   onSeekSpeech,
@@ -211,20 +213,22 @@ export function ChatComposer({
 
         <div className="chat-composer-footer">
           <div className="chat-composer-footer-start">
-            <div
-              aria-label={`Context length: ${contextTooltip}`}
-              className="chat-context-meter"
-              data-state={contextUsage.state}
-              role="status"
-              title={contextTooltip}
-            >
-              <span
-                aria-hidden="true"
-                className="chat-context-meter-ring"
-                style={{ "--usage": `${contextUsage.percentage}%` } as CSSProperties}
-              />
-              <span>{contextUsage.percentage}%</span>
-            </div>
+            {showContextMeter ? (
+              <div
+                aria-label={`Context length: ${contextTooltip}`}
+                className="chat-context-meter"
+                data-state={contextUsage.state}
+                role="status"
+                title={contextTooltip}
+              >
+                <span
+                  aria-hidden="true"
+                  className="chat-context-meter-ring"
+                  style={{ "--usage": `${contextUsage.percentage}%` } as CSSProperties}
+                />
+                <span>{contextUsage.percentage}%</span>
+              </div>
+            ) : null}
           </div>
           <div className="chat-composer-footer-end">
             <Button

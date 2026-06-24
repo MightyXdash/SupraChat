@@ -3,9 +3,7 @@ import { AppSidebar } from "@/app/components/AppSidebar"
 import { WindowTitleBar } from "@/app/components/WindowTitleBar"
 import {
   applyAppTheme,
-  getStoredTheme,
   getSystemTheme,
-  THEME_STORAGE_KEY,
   type AppTheme,
 } from "@/app/config/theme"
 import { appWindowConfig } from "@/app/config/window"
@@ -20,6 +18,8 @@ import {
   PlaygroundWorkspace,
   type PlaygroundView,
 } from "@/features/playground/components/PlaygroundWorkspace"
+import { SettingsDialog } from "@/features/settings/components/SettingsDialog"
+import { useSettingsStore } from "@/features/settings/store/use-settings-store"
 
 type AppPanel = "chat" | "playground"
 
@@ -66,9 +66,10 @@ function getSilentSpeechPrimerUrl() {
 
 export function AppShell() {
   const [draft, setDraft] = useState("")
-  const [activePanel, setActivePanel] = useState<AppPanel>("chat")
+  const [activePanel, setActivePanel] = useState<AppPanel>(() => useSettingsStore.getState().defaultWorkspace)
   const [playgroundView, setPlaygroundView] = useState<PlaygroundView>("featured")
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [speechPlayback, setSpeechPlayback] = useState<SpeechPlaybackState>({
@@ -79,7 +80,7 @@ export function AppShell() {
     pendingMessageId: null,
     status: "idle",
   })
-  const [theme, setTheme] = useState<AppTheme>(() => getStoredTheme() ?? getSystemTheme())
+  const [theme, setTheme] = useState<AppTheme>(() => getSystemTheme())
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const speechCacheRef = useRef<Map<string, CachedSpeechClip>>(new Map())
   const speechRequestRef = useRef(0)
@@ -99,15 +100,37 @@ export function AppShell() {
   const isLoading = useChatStore((state) => state.isLoading)
   const isGenerating = useChatStore((state) => state.isGenerating)
   const error = useChatStore((state) => state.error)
+  const themePreference = useSettingsStore((state) => state.themePreference)
+  const setThemePreference = useSettingsStore((state) => state.setThemePreference)
+  const density = useSettingsStore((state) => state.density)
+  const frostedSurfaces = useSettingsStore((state) => state.frostedSurfaces)
+  const messageFont = useSettingsStore((state) => state.messageFont)
+  const reduceMotion = useSettingsStore((state) => state.reduceMotion)
+  const showContextMeter = useSettingsStore((state) => state.showContextMeter)
 
   useEffect(() => {
     void initialize()
   }, [initialize])
 
   useEffect(() => {
-    applyAppTheme(theme)
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
-  }, [theme])
+    const mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)")
+
+    function resolveTheme() {
+      const nextTheme = themePreference === "system" ? getSystemTheme() : themePreference
+      setTheme(nextTheme)
+      applyAppTheme(nextTheme)
+    }
+
+    resolveTheme()
+
+    if (themePreference !== "system" || !mediaQuery) {
+      return
+    }
+
+    mediaQuery.addEventListener("change", resolveTheme)
+
+    return () => mediaQuery.removeEventListener("change", resolveTheme)
+  }, [themePreference])
 
   useEffect(() => {
     const audio = new Audio()
@@ -155,7 +178,7 @@ export function AppShell() {
   }, [])
 
   function toggleTheme() {
-    setTheme((currentTheme) => (currentTheme === "light" ? "dark" : "light"))
+    setThemePreference(theme === "light" ? "dark" : "light")
   }
 
   const activeConversation = conversations.find(
@@ -359,6 +382,10 @@ export function AppShell() {
     <main
       className="app-shell min-h-screen overflow-hidden bg-[var(--background)] text-[var(--text-primary)]"
       data-platform={appWindowConfig.platform}
+      data-density={density}
+      data-frosted-surfaces={frostedSurfaces}
+      data-message-font={messageFont}
+      data-reduce-motion={reduceMotion}
     >
       <WindowTitleBar />
       <div
@@ -380,6 +407,7 @@ export function AppShell() {
           onSelectConversation={handleSelectConversation}
           onOpenSearch={() => setIsSearchOpen(true)}
           onOpenPlayground={() => setActivePanel("playground")}
+          onOpenSettings={() => setIsSettingsOpen(true)}
           onToggleTheme={toggleTheme}
           onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
         />
@@ -394,6 +422,7 @@ export function AppShell() {
             isGenerating={isGenerating}
             scrollRef={scrollRef}
             speechPlayback={speechPlayback}
+            showContextMeter={showContextMeter}
             onCancelEdit={handleCancelEdit}
             onDraftChange={setDraft}
             onEditUserMessage={handleEditUserMessage}
@@ -414,6 +443,7 @@ export function AppShell() {
         onCreateConversation={handleCreateConversation}
         onSelectConversation={handleSelectConversation}
       />
+      <SettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </main>
   )
 }

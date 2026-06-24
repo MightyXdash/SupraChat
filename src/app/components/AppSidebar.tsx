@@ -23,6 +23,7 @@ type AppSidebarProps = {
   onSelectConversation: (conversationId: string) => void
   onOpenSearch: () => void
   onOpenPlayground: () => void
+  onOpenSettings: () => void
   onToggleTheme: () => void
   onToggleCollapsed: () => void
 }
@@ -49,6 +50,7 @@ export function AppSidebar({
   onSelectConversation,
   onOpenSearch,
   onOpenPlayground,
+  onOpenSettings,
   onToggleTheme,
   onToggleCollapsed,
 }: AppSidebarProps) {
@@ -214,7 +216,9 @@ export function AppSidebar({
                   ? onOpenSearch
                   : item.action === "open-playground"
                     ? onOpenPlayground
-                    : undefined
+                    : item.action === "open-settings"
+                      ? onOpenSettings
+                      : undefined
             }
             title={collapsed ? item.label : undefined}
           >

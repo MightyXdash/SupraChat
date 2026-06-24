@@ -6,6 +6,18 @@ const {
   createLlamaCppProvider,
   pipeOpenAiSseStream,
 } = require("./llama-cpp-provider.cjs")
+const {
+  CHAT_MODEL,
+  SPEECH_STT_MODEL,
+  SPEECH_TTS_MODEL,
+  TITLE_MODEL,
+  getHardwareAccelerationArgs,
+  getThreadCount,
+  resolveModelPath,
+  resolveResourceRoot,
+  resolveSpeechSttModel,
+  resolveSpeechTtsModel,
+} = require("./model-registry.cjs")
 const { checkCurrentRuntime } = require("./runtime-preflight.cjs")
 const { resolveRuntimeConfig } = require("./runtime-config.cjs")
 const { getSpeechOnnxRuntimeInfo } = require("./speech-onnx-runtime.cjs")
@@ -124,6 +136,76 @@ function sendFile(req, res, statusCode, filePath, mimeType, extraHeaders = {}) {
   fs.createReadStream(filePath).pipe(res)
 }
 
+function fileSizeBytes(filePath) {
+  try {
+    return fs.statSync(filePath).size
+  } catch {
+    return null
+  }
+}
+
+function fileExists(filePath) {
+  try {
+    return fs.existsSync(filePath)
+  } catch {
+    return false
+  }
+}
+
+function serializeModel(model, modelPath) {
+  return {
+    ...model,
+    path: modelPath,
+    installed: fileExists(modelPath),
+    sizeBytes: fileSizeBytes(modelPath),
+  }
+}
+
+function getSettingsModelsPayload() {
+  const resourceRoot = resolveResourceRoot()
+  const ttsModel = resolveSpeechTtsModel(resourceRoot)
+  const sttModel = resolveSpeechSttModel(resourceRoot)
+
+  return {
+    ok: true,
+    resourceRoot,
+    models: [
+      serializeModel(CHAT_MODEL, resolveModelPath(CHAT_MODEL, resourceRoot)),
+      serializeModel(TITLE_MODEL, resolveModelPath(TITLE_MODEL, resourceRoot)),
+      serializeModel(SPEECH_TTS_MODEL, ttsModel.modelPath),
+      serializeModel(SPEECH_STT_MODEL, sttModel.encoderPath),
+    ],
+  }
+}
+
+function getSettingsRuntimePayload(config, provider) {
+  return {
+    ok: true,
+    apiBaseUrl: `http://127.0.0.1:${config.port}`,
+    port: config.port,
+    runtime: "llama.cpp",
+    runtimePreflight: checkCurrentRuntime(),
+    platform: process.platform,
+    arch: process.arch,
+    resourceRoot: resolveResourceRoot(),
+    chatModel: provider.chatModel,
+    titleModel: provider.titleModel,
+    threadCount: getThreadCount(),
+    hardwareAccelerationArgs: getHardwareAccelerationArgs(),
+    speechRuntime: getSpeechOnnxRuntimeInfo(),
+  }
+}
+
+function getSettingsStoragePayload(config, database) {
+  return {
+    ok: true,
+    dataDir: path.dirname(config.databasePath),
+    databasePath: config.databasePath,
+    databaseSizeBytes: fileSizeBytes(config.databasePath),
+    stats: database.getStats(),
+  }
+}
+
 function createGenerationProvider() {
   const provider = createLlamaCppProvider()
 
@@ -166,6 +248,21 @@ function createServer(database, config, provider) {
       model: provider.chatModel.label,
       titleModel: provider.titleModel.label,
     })
+    return
+  }
+
+  if (req.method === "GET" && url.pathname === "/settings/runtime") {
+    sendJson(req, res, 200, getSettingsRuntimePayload(config, provider))
+    return
+  }
+
+  if (req.method === "GET" && url.pathname === "/settings/models") {
+    sendJson(req, res, 200, getSettingsModelsPayload())
+    return
+  }
+
+  if (req.method === "GET" && url.pathname === "/settings/storage") {
+    sendJson(req, res, 200, getSettingsStoragePayload(config, database))
     return
   }
 

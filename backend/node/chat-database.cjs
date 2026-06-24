@@ -184,6 +184,10 @@ function createChatDatabase(databasePath) {
   return {
     close: () => db.close(),
     deleteConversation: (conversationId) => deleteConversationStatement.run(conversationId),
+    getStats: () => ({
+      conversationCount: db.prepare("SELECT COUNT(*) AS count FROM conversations").get().count,
+      messageCount: db.prepare("SELECT COUNT(*) AS count FROM messages").get().count,
+    }),
     hasConversation: (conversationId) => Boolean(conversationExistsStatement.get(conversationId)),
     recordHealthCheck: () => recordHealthCheckStatement.run("node-backend"),
     replaceConversation,
