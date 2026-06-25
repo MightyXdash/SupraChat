@@ -107,6 +107,7 @@ export function AppShell() {
   const frostedSurfaces = useSettingsStore((state) => state.frostedSurfaces)
   const messageFont = useSettingsStore((state) => state.messageFont)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
+  const showAverageTps = useSettingsStore((state) => state.showAverageTps)
   const showContextMeter = useSettingsStore((state) => state.showContextMeter)
 
   useEffect(() => {
@@ -424,6 +425,7 @@ export function AppShell() {
             generationTokensPerSecond={generationTokensPerSecond}
             scrollRef={scrollRef}
             speechPlayback={speechPlayback}
+            showAverageTps={showAverageTps}
             showContextMeter={showContextMeter}
             onCancelEdit={handleCancelEdit}
             onDraftChange={setDraft}

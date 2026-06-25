@@ -29,7 +29,7 @@ export const settingsTabs: SettingsTab[] = [
     group: "Desktop",
     id: "appearance",
     label: "Appearance",
-    description: "Theme, density, and reading preferences.",
+    description: "Theme and display preferences.",
     icon: Palette,
   },
   {

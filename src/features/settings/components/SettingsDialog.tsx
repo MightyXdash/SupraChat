@@ -71,19 +71,15 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     () => settingsTabs.find((tab) => tab.id === activeTab) ?? settingsTabs[0],
     [activeTab],
   )
-  const defaultWorkspace = useSettingsStore((state) => state.defaultWorkspace)
-  const density = useSettingsStore((state) => state.density)
-  const frostedSurfaces = useSettingsStore((state) => state.frostedSurfaces)
-  const messageFont = useSettingsStore((state) => state.messageFont)
-  const reduceMotion = useSettingsStore((state) => state.reduceMotion)
+  const autoTitleConversations = useSettingsStore((state) => state.autoTitleConversations)
+  const confirmConversationDeletion = useSettingsStore((state) => state.confirmConversationDeletion)
+  const showAverageTps = useSettingsStore((state) => state.showAverageTps)
   const showContextMeter = useSettingsStore((state) => state.showContextMeter)
   const startWithLastConversation = useSettingsStore((state) => state.startWithLastConversation)
   const themePreference = useSettingsStore((state) => state.themePreference)
-  const setDefaultWorkspace = useSettingsStore((state) => state.setDefaultWorkspace)
-  const setDensity = useSettingsStore((state) => state.setDensity)
-  const setFrostedSurfaces = useSettingsStore((state) => state.setFrostedSurfaces)
-  const setMessageFont = useSettingsStore((state) => state.setMessageFont)
-  const setReduceMotion = useSettingsStore((state) => state.setReduceMotion)
+  const setAutoTitleConversations = useSettingsStore((state) => state.setAutoTitleConversations)
+  const setConfirmConversationDeletion = useSettingsStore((state) => state.setConfirmConversationDeletion)
+  const setShowAverageTps = useSettingsStore((state) => state.setShowAverageTps)
   const setShowContextMeter = useSettingsStore((state) => state.setShowContextMeter)
   const setStartWithLastConversation = useSettingsStore((state) => state.setStartWithLastConversation)
   const setThemePreference = useSettingsStore((state) => state.setThemePreference)
@@ -170,16 +166,11 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
           >
             <aside className="settings-sidebar">
               <div className="settings-sidebar-header">
-                <span>Settings</span>
                 <button className="settings-icon-button" type="button" aria-label="Close settings" onClick={onClose}>
                   <X className="h-4 w-4" />
                 </button>
               </div>
               <SettingsNav activeTab={activeTab} onChange={setActiveTab} />
-              <div className="settings-sidebar-footer">
-                <span>SupraChat Desktop</span>
-                <span>v0.1.0</span>
-              </div>
             </aside>
 
             <div className="settings-content">
@@ -207,29 +198,31 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
               <div className="settings-content-scroll scrollbar-reveal">
                 {activeTab === "general" ? (
                   <>
-                    <SettingsSection title="Workspace" description="Choose how SupraChat opens and behaves during normal use.">
-                      <SettingsRow label="Opening view" description="Choose the workspace shown first when the app starts.">
-                        <SettingsSegmentedControl
-                          aria-label="Opening view"
-                          value={defaultWorkspace}
-                          options={[
-                            { label: "Chat", value: "chat" },
-                            { label: "Playground", value: "playground" },
-                          ]}
-                          onChange={setDefaultWorkspace}
-                        />
-                      </SettingsRow>
+                    <SettingsSection title="Workspace" description="Choose how SupraChat behaves during normal use.">
                       <SettingsRow label="Start with last conversation" description="Restore the last active conversation when possible.">
-                        <SettingsToggle checked={startWithLastConversation} onChange={setStartWithLastConversation} />
+                        <SettingsToggle
+                          aria-label="Start with last conversation"
+                          checked={startWithLastConversation}
+                          onChange={setStartWithLastConversation}
+                        />
                       </SettingsRow>
                     </SettingsSection>
 
                     <SettingsSection title="Conversation Controls">
                       <SettingsRow label="Auto-title conversations" description="Conversation titles are generated locally with the bundled title model.">
-                        <SettingsBadge tone="success">Enabled</SettingsBadge>
+                        <SettingsToggle
+                          aria-label="Auto-title conversations"
+                          checked={autoTitleConversations}
+                          title="Generate a name for the chat thread automatically using AI"
+                          onChange={setAutoTitleConversations}
+                        />
                       </SettingsRow>
                       <SettingsRow label="Delete confirmation" description="Conversation deletion currently uses a native confirmation prompt.">
-                        <SettingsBadge>Active</SettingsBadge>
+                        <SettingsToggle
+                          aria-label="Delete confirmation"
+                          checked={confirmConversationDeletion}
+                          onChange={setConfirmConversationDeletion}
+                        />
                       </SettingsRow>
                     </SettingsSection>
                   </>
@@ -250,47 +243,22 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                           onChange={setThemePreference}
                         />
                       </SettingsRow>
-                      <SettingsRow label="Frosted surfaces" description="Reduce translucent surfaces if you prefer a flatter interface.">
-                        <SettingsSegmentedControl
-                          aria-label="Frosted surfaces"
-                          value={frostedSurfaces}
-                          options={[
-                            { label: "Standard", value: "standard" },
-                            { label: "Reduced", value: "reduced" },
-                          ]}
-                          onChange={setFrostedSurfaces}
-                        />
-                      </SettingsRow>
                     </SettingsSection>
 
-                    <SettingsSection title="Reading">
-                      <SettingsRow label="Interface density">
-                        <SettingsSegmentedControl
-                          aria-label="Interface density"
-                          value={density}
-                          options={[
-                            { label: "Comfortable", value: "comfortable" },
-                            { label: "Compact", value: "compact" },
-                          ]}
-                          onChange={setDensity}
-                        />
-                      </SettingsRow>
-                      <SettingsRow label="Message font">
-                        <SettingsSegmentedControl
-                          aria-label="Message font"
-                          value={messageFont}
-                          options={[
-                            { label: "Sans", value: "sans" },
-                            { label: "Serif", value: "serif" },
-                          ]}
-                          onChange={setMessageFont}
-                        />
-                      </SettingsRow>
-                      <SettingsRow label="Reduce motion">
-                        <SettingsToggle checked={reduceMotion} onChange={setReduceMotion} />
-                      </SettingsRow>
+                    <SettingsSection title="Display">
                       <SettingsRow label="Show context meter">
-                        <SettingsToggle checked={showContextMeter} onChange={setShowContextMeter} />
+                        <SettingsToggle
+                          aria-label="Show context meter"
+                          checked={showContextMeter}
+                          onChange={setShowContextMeter}
+                        />
+                      </SettingsRow>
+                      <SettingsRow label="Show average TPS" description="Display the average token throughput for the latest response.">
+                        <SettingsToggle
+                          aria-label="Show average TPS"
+                          checked={showAverageTps}
+                          onChange={setShowAverageTps}
+                        />
                       </SettingsRow>
                     </SettingsSection>
                   </>

@@ -17,6 +17,7 @@ import {
   updateStoredConversation,
 } from "@/features/chat/services/chat-service"
 import { ChatMessage, Conversation } from "@/features/chat/types"
+import { useSettingsStore } from "@/features/settings/store/use-settings-store"
 
 const TITLE_RETRY_MAX_ATTEMPTS = 12
 const TITLE_RETRY_TEMPERATURE = 0.35
@@ -909,6 +910,7 @@ export const useChatStore = create<ChatState>((set) => ({
     activeGenerationController?.abort()
     activeGenerationController = generationController
     let shouldGenerateTitle = false
+    const autoTitleConversations = useSettingsStore.getState().autoTitleConversations
     let generatedTitlePayload = ""
     const shouldDeferTitleGeneration = shouldDeferInitialTitleGeneration(trimmedContent)
 
@@ -916,7 +918,9 @@ export const useChatStore = create<ChatState>((set) => ({
       const activeConversation = state.conversations.find(
         (conversation) => conversation.id === conversationId,
       )
-      shouldGenerateTitle = Boolean(activeConversation && activeConversation.messages.length === 0)
+      shouldGenerateTitle = Boolean(
+        autoTitleConversations && activeConversation && activeConversation.messages.length === 0,
+      )
 
       return {
         error: null,

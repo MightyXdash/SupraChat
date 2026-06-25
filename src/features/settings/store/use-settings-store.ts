@@ -9,33 +9,42 @@ export type DefaultWorkspacePreference = "chat" | "playground"
 const SETTINGS_STORAGE_KEY = "suprachat.settings"
 
 type PersistedSettings = {
+  autoTitleConversations: boolean
+  confirmConversationDeletion: boolean
   defaultWorkspace: DefaultWorkspacePreference
   density: InterfaceDensity
   frostedSurfaces: FrostedSurfacePreference
   messageFont: MessageFontPreference
   reduceMotion: boolean
+  showAverageTps: boolean
   showContextMeter: boolean
   startWithLastConversation: boolean
   themePreference: ThemePreference
 }
 
 type SettingsState = PersistedSettings & {
+  setAutoTitleConversations: (value: boolean) => void
+  setConfirmConversationDeletion: (value: boolean) => void
   setDefaultWorkspace: (value: DefaultWorkspacePreference) => void
   setDensity: (value: InterfaceDensity) => void
   setFrostedSurfaces: (value: FrostedSurfacePreference) => void
   setMessageFont: (value: MessageFontPreference) => void
   setReduceMotion: (value: boolean) => void
+  setShowAverageTps: (value: boolean) => void
   setShowContextMeter: (value: boolean) => void
   setStartWithLastConversation: (value: boolean) => void
   setThemePreference: (value: ThemePreference) => void
 }
 
 const defaultSettings: PersistedSettings = {
+  autoTitleConversations: true,
+  confirmConversationDeletion: true,
   defaultWorkspace: "chat",
   density: "comfortable",
   frostedSurfaces: "standard",
   messageFont: "sans",
   reduceMotion: false,
+  showAverageTps: true,
   showContextMeter: true,
   startWithLastConversation: true,
   themePreference: "system",
@@ -66,6 +75,14 @@ function readStoredSettings(): PersistedSettings {
     const parsed = JSON.parse(window.localStorage.getItem(SETTINGS_STORAGE_KEY) ?? "{}")
 
     return {
+      autoTitleConversations:
+        typeof parsed.autoTitleConversations === "boolean"
+          ? parsed.autoTitleConversations
+          : defaultSettings.autoTitleConversations,
+      confirmConversationDeletion:
+        typeof parsed.confirmConversationDeletion === "boolean"
+          ? parsed.confirmConversationDeletion
+          : defaultSettings.confirmConversationDeletion,
       defaultWorkspace: isDefaultWorkspace(parsed.defaultWorkspace)
         ? parsed.defaultWorkspace
         : defaultSettings.defaultWorkspace,
@@ -78,6 +95,8 @@ function readStoredSettings(): PersistedSettings {
         : defaultSettings.messageFont,
       reduceMotion:
         typeof parsed.reduceMotion === "boolean" ? parsed.reduceMotion : defaultSettings.reduceMotion,
+      showAverageTps:
+        typeof parsed.showAverageTps === "boolean" ? parsed.showAverageTps : defaultSettings.showAverageTps,
       showContextMeter:
         typeof parsed.showContextMeter === "boolean"
           ? parsed.showContextMeter
@@ -107,11 +126,14 @@ function updateSetting<T extends keyof PersistedSettings>(
   set((state) => {
     const nextSettings = { ...state, [key]: value }
     persistSettings({
+      autoTitleConversations: nextSettings.autoTitleConversations,
+      confirmConversationDeletion: nextSettings.confirmConversationDeletion,
       defaultWorkspace: nextSettings.defaultWorkspace,
       density: nextSettings.density,
       frostedSurfaces: nextSettings.frostedSurfaces,
       messageFont: nextSettings.messageFont,
       reduceMotion: nextSettings.reduceMotion,
+      showAverageTps: nextSettings.showAverageTps,
       showContextMeter: nextSettings.showContextMeter,
       startWithLastConversation: nextSettings.startWithLastConversation,
       themePreference: nextSettings.themePreference,
@@ -122,11 +144,14 @@ function updateSetting<T extends keyof PersistedSettings>(
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   ...readStoredSettings(),
+  setAutoTitleConversations: (value) => updateSetting(set, "autoTitleConversations", value),
+  setConfirmConversationDeletion: (value) => updateSetting(set, "confirmConversationDeletion", value),
   setDefaultWorkspace: (value) => updateSetting(set, "defaultWorkspace", value),
   setDensity: (value) => updateSetting(set, "density", value),
   setFrostedSurfaces: (value) => updateSetting(set, "frostedSurfaces", value),
   setMessageFont: (value) => updateSetting(set, "messageFont", value),
   setReduceMotion: (value) => updateSetting(set, "reduceMotion", value),
+  setShowAverageTps: (value) => updateSetting(set, "showAverageTps", value),
   setShowContextMeter: (value) => updateSetting(set, "showContextMeter", value),
   setStartWithLastConversation: (value) => updateSetting(set, "startWithLastConversation", value),
   setThemePreference: (value) => updateSetting(set, "themePreference", value),

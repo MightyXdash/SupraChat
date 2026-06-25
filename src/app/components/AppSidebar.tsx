@@ -7,6 +7,7 @@ import { TITLE_PENDING_LABEL } from "@/features/chat/config/ui"
 import { useScrollVisibility } from "@/features/chat/hooks/useScrollVisibility"
 import { truncateConversationTitle } from "@/features/chat/lib/chat-records"
 import { Conversation } from "@/features/chat/types"
+import { useSettingsStore } from "@/features/settings/store/use-settings-store"
 
 type AppSidebarProps = {
   activePanel: "chat" | "playground"
@@ -61,6 +62,7 @@ export function AppSidebar({
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const recentsScrollRef = useRef<HTMLDivElement | null>(null)
   const isRecentsScrolling = useScrollVisibility(recentsScrollRef)
+  const confirmConversationDeletion = useSettingsStore((state) => state.confirmConversationDeletion)
   const displayedConversations = isLoading
     ? []
     : conversations.filter((conversation) => conversation.messages.length > 0)
@@ -142,7 +144,7 @@ export function AppSidebar({
   }
 
   async function handleDeleteConversation(conversationId: string) {
-    const confirmed = window.confirm("Delete this conversation? This cannot be undone.")
+    const confirmed = !confirmConversationDeletion || window.confirm("Delete this conversation? This cannot be undone.")
 
     if (!confirmed) {
       return

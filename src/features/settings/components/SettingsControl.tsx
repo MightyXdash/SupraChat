@@ -14,7 +14,9 @@ type SettingsSegmentedControlProps<T extends string> = {
 }
 
 type SettingsToggleProps = {
+  "aria-label"?: string
   checked: boolean
+  title?: string
   onChange: (checked: boolean) => void
 }
 
@@ -48,14 +50,16 @@ export function SettingsSegmentedControl<T extends string>({
   )
 }
 
-export function SettingsToggle({ checked, onChange }: SettingsToggleProps) {
+export function SettingsToggle({ "aria-label": ariaLabel, checked, onChange, title }: SettingsToggleProps) {
   return (
     <button
       className="settings-toggle"
       type="button"
-      role="switch"
+      role="checkbox"
+      aria-label={ariaLabel}
       aria-checked={checked}
       data-checked={checked}
+      title={title}
       onClick={() => onChange(!checked)}
     >
       <span>

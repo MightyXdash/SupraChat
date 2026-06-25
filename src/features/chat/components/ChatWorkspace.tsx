@@ -15,6 +15,7 @@ type ChatWorkspaceProps = {
   isGenerating: boolean
   scrollRef: RefObject<HTMLDivElement | null>
   speechPlayback: SpeechPlaybackState
+  showAverageTps: boolean
   showContextMeter: boolean
   onCancelEdit: () => void
   onDraftChange: (value: string) => void
@@ -37,6 +38,7 @@ export function ChatWorkspace({
   isGenerating,
   scrollRef,
   speechPlayback,
+  showAverageTps,
   showContextMeter,
   onCancelEdit,
   onDraftChange,
@@ -139,6 +141,7 @@ export function ChatWorkspace({
           }}
           isEditing={Boolean(editingMessageId)}
           speechPlayback={speechPlayback}
+          showAverageTps={showAverageTps}
           showContextMeter={showContextMeter}
           onCancelEdit={onCancelEdit}
           onDraftChange={onDraftChange}

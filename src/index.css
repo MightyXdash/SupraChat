@@ -17,14 +17,14 @@
   --text-secondary: #5f5f5f;
   --text-muted: #8a8a8a;
   --border: #e7e7e7;
-  --accent-primary: #c49a6c;
-  --accent-light: #f1ede7;
-  --accent-hover: #b88b59;
+  --accent-primary: #9f8a73;
+  --accent-light: #eee7dd;
+  --accent-hover: #8f7962;
   --highlight: #eeeeee;
   --sidebar-item-hover: #f1f1f1;
   --sidebar-item-active: #ececec;
   --success: #6e8b74;
-  --warning: #c4873a;
+  --warning: #a98455;
   --error: #b85c4a;
   --info: #5b7da8;
   --glass-top: rgba(255, 255, 255, 0.9);
@@ -43,7 +43,7 @@
   --composer-ring: rgba(0, 0, 0, 0.06);
   --composer-ring-focus: rgba(0, 0, 0, 0.08);
   --ctx-system: #5f8c6f;
-  --ctx-user: #c4873a;
+  --ctx-user: #9f8a73;
   --ctx-assistant: #5b7da8;
   --ctx-unused: rgba(0, 0, 0, 0.1);
   --ctx-ring-center: rgba(247, 247, 247, 0.6);
@@ -79,9 +79,9 @@
   --text-secondary: #c5c5c5;
   --text-muted: #9b9b9b;
   --border: #373737;
-  --accent-primary: #b8b8b8;
-  --accent-light: #2f2f2f;
-  --accent-hover: #d7d7d7;
+  --accent-primary: #b7a287;
+  --accent-light: #342f28;
+  --accent-hover: #ccbca3;
   --highlight: #2f2f2f;
   --sidebar-item-hover: #2b2b2b;
   --sidebar-item-active: #303030;
@@ -129,9 +129,9 @@
     --text-secondary: #c5c5c5;
     --text-muted: #9b9b9b;
     --border: #373737;
-    --accent-primary: #b8b8b8;
-    --accent-light: #2f2f2f;
-    --accent-hover: #d7d7d7;
+    --accent-primary: #b7a287;
+    --accent-light: #342f28;
+    --accent-hover: #ccbca3;
     --highlight: #2f2f2f;
     --sidebar-item-hover: #2b2b2b;
     --sidebar-item-active: #303030;
@@ -2666,6 +2666,9 @@ button:disabled {
 }
 
 .settings-dialog {
+  --settings-text-strong: color-mix(in srgb, var(--text-secondary) 74%, var(--text-muted));
+  --settings-text: color-mix(in srgb, var(--text-secondary) 64%, var(--text-muted));
+  --settings-text-muted: color-mix(in srgb, var(--text-muted) 78%, var(--surface));
   background: var(--surface);
   backdrop-filter: blur(18px) saturate(1.03);
   -webkit-backdrop-filter: blur(18px) saturate(1.03);
@@ -2686,11 +2689,11 @@ button:disabled {
 }
 
 .settings-sidebar-header {
-  color: var(--text-secondary);
+  color: var(--settings-text-muted);
   font-size: 0.84rem;
-  font-weight: 720;
-  margin-bottom: 0.55rem;
-  min-height: 2rem;
+  font-weight: 560;
+  margin-bottom: 0.12rem;
+  min-height: 0.25rem;
   padding: 0 0.28rem;
 }
 
@@ -2709,9 +2712,9 @@ button:disabled {
 }
 
 .settings-nav-group p {
-  color: var(--text-secondary);
+  color: var(--settings-text-muted);
   font-size: 0.78rem;
-  font-weight: 760;
+  font-weight: 560;
   line-height: 1.2;
   margin: 0 0 0.26rem;
   padding: 0 0.3rem;
@@ -2719,16 +2722,16 @@ button:disabled {
 
 .settings-nav-item {
   border-radius: 5px;
-  color: var(--text-secondary);
+  color: var(--settings-text);
   font-size: 0.88rem;
-  font-weight: 650;
+  font-weight: 520;
   gap: 0.68rem;
   min-height: 2rem;
   padding: 0 0.46rem;
 }
 
 .settings-nav-item svg {
-  color: var(--text-muted);
+  color: var(--settings-text-muted);
   height: 1rem;
   width: 1rem;
 }
@@ -2740,10 +2743,11 @@ button:disabled {
 .settings-nav-item-active {
   background: color-mix(in srgb, var(--highlight) 82%, var(--surface));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 62%, transparent);
+  color: var(--settings-text-strong);
 }
 
 .settings-nav-item-active svg {
-  color: var(--text-secondary);
+  color: var(--settings-text);
 }
 
 .settings-sidebar-footer {
@@ -2770,8 +2774,9 @@ button:disabled {
 }
 
 .settings-content-header h2 {
+  color: var(--settings-text-strong);
   font-size: 1rem;
-  font-weight: 760;
+  font-weight: 590;
 }
 
 .settings-content-header p {
@@ -2825,14 +2830,15 @@ button:disabled {
 }
 
 .settings-row-copy > span {
+  color: var(--settings-text-strong);
   font-size: 0.91rem;
-  font-weight: 720;
+  font-weight: 540;
 }
 
 .settings-row-copy p {
-  color: var(--text-secondary);
+  color: var(--settings-text-muted);
   font-size: 0.8rem;
-  font-weight: 560;
+  font-weight: 460;
   line-height: 1.25;
   margin-top: 0.18rem;
 }
@@ -2847,8 +2853,9 @@ button:disabled {
 .settings-segmented-option {
   background: transparent;
   border-radius: 5px;
-  color: var(--text-secondary);
+  color: var(--settings-text);
   font-size: 0.86rem;
+  font-weight: 510;
   min-height: 1.9rem;
   padding: 0 0.5rem;
 }
@@ -2856,39 +2863,54 @@ button:disabled {
 .settings-segmented-option[data-active="true"] {
   background: color-mix(in srgb, var(--highlight) 72%, var(--surface));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 54%, transparent);
+  color: var(--settings-text-strong);
 }
 
 .settings-toggle {
   background: color-mix(in srgb, var(--surface) 68%, var(--surface-elevated));
   border-color: color-mix(in srgb, var(--border) 82%, transparent);
-  height: 1.18rem;
-  padding: 0.08rem;
-  width: 2rem;
+  border-radius: 3px;
+  height: 1.08rem;
+  padding: 0;
+  width: 1.08rem;
 }
 
 .settings-toggle span {
-  height: 0.92rem;
-  width: 0.92rem;
+  align-items: center;
+  background: transparent;
+  border-radius: 2px;
+  box-shadow: none;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+  transform: none;
+  width: 100%;
 }
 
 .settings-toggle span svg {
-  display: none;
+  color: var(--surface);
+  display: block;
+  opacity: 0;
 }
 
 .settings-toggle[data-checked="true"] {
-  background: color-mix(in srgb, var(--info) 72%, var(--accent-primary));
-  border-color: color-mix(in srgb, var(--info) 54%, var(--border));
+  background: color-mix(in srgb, var(--accent-primary) 84%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent-primary) 54%, var(--border));
 }
 
 .settings-toggle[data-checked="true"] span {
-  transform: translateX(0.82rem);
+  transform: none;
+}
+
+.settings-toggle[data-checked="true"] span svg {
+  opacity: 1;
 }
 
 .settings-badge {
   background: transparent;
   border: 0;
   border-radius: 5px;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-size: 0.88rem;
   font-weight: 720;
   min-height: 1.7rem;

@@ -18,6 +18,7 @@ type ChatComposerProps = {
   isGenerating: boolean
   contextUsage: ContextUsageSummary
   speechPlayback: SpeechPlaybackState
+  showAverageTps: boolean
   showContextMeter: boolean
   onCancelEdit: () => void
   onDraftChange: (value: string) => void
@@ -36,6 +37,7 @@ export function ChatComposer({
   isGenerating,
   contextUsage,
   speechPlayback,
+  showAverageTps,
   showContextMeter,
   onCancelEdit,
   onDraftChange,
@@ -231,7 +233,7 @@ export function ChatComposer({
                 <span>{contextUsage.percentage}%</span>
               </div>
             ) : null}
-            {generationTokensPerSecond !== null ? (
+            {showAverageTps && generationTokensPerSecond !== null ? (
               <span className="chat-throughput-label">
                 {generationTokensPerSecond.toFixed(1)} t/s
               </span>
