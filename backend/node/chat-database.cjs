@@ -33,6 +33,7 @@ function createChatDatabase(databasePath) {
       role TEXT NOT NULL,
       content TEXT NOT NULL,
       created_at TEXT NOT NULL,
+      tokens_per_second REAL,
       position INTEGER NOT NULL,
       FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
     );
@@ -51,6 +52,13 @@ function createChatDatabase(databasePath) {
     db.exec(`ALTER TABLE conversations ADD COLUMN title_status TEXT NOT NULL DEFAULT 'idle'`)
   }
 
+  const messageTableInfo = db.prepare("PRAGMA table_info(messages)").all()
+  const hasTokensPerSecond = messageTableInfo.some((col) => col.name === "tokens_per_second")
+
+  if (!hasTokensPerSecond) {
+    db.exec(`ALTER TABLE messages ADD COLUMN tokens_per_second REAL`)
+  }
+
   const listConversationsStatement = db.prepare(`
     SELECT
       conversations.id AS conversation_id,
@@ -61,7 +69,8 @@ function createChatDatabase(databasePath) {
       messages.id AS message_id,
       messages.role AS message_role,
       messages.content AS message_content,
-      messages.created_at AS message_created_at
+      messages.created_at AS message_created_at,
+      messages.tokens_per_second AS message_tokens_per_second
     FROM conversations
     LEFT JOIN messages
       ON messages.conversation_id = conversations.id
@@ -79,8 +88,8 @@ function createChatDatabase(databasePath) {
   `)
 
   const insertMessageStatement = db.prepare(`
-    INSERT INTO messages (id, conversation_id, role, content, created_at, position)
-    VALUES (@id, @conversation_id, @role, @content, @created_at, @position)
+    INSERT INTO messages (id, conversation_id, role, content, created_at, tokens_per_second, position)
+    VALUES (@id, @conversation_id, @role, @content, @created_at, @tokens_per_second, @position)
   `)
 
   const updateConversationStatement = db.prepare(`
@@ -121,6 +130,7 @@ function createChatDatabase(databasePath) {
         role: message.role,
         content: message.content,
         created_at: message.createdAt,
+        tokens_per_second: message.tokensPerSecond ?? null,
         position: index,
       })
     })
@@ -142,6 +152,7 @@ function createChatDatabase(databasePath) {
         role: message.role,
         content: message.content,
         created_at: message.createdAt,
+        tokens_per_second: message.tokensPerSecond ?? null,
         position: index,
       })
     })
@@ -174,6 +185,7 @@ function createChatDatabase(databasePath) {
           role: row.message_role,
           content: row.message_content,
           createdAt: row.message_created_at,
+          tokensPerSecond: row.message_tokens_per_second,
         })
       }
     }

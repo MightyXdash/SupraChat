@@ -184,6 +184,7 @@ type ChatState = {
   activeConversationId: string
   isLoading: boolean
   isGenerating: boolean
+  generationTokensPerSecond: number | null
   error: string | null
   initialize: () => Promise<void>
   createConversation: () => Promise<string>
@@ -236,8 +237,43 @@ function updateAssistantMessage(
   }))
 }
 
+function updateAssistantMessageMetadata(
+  conversations: Conversation[],
+  conversationId: string,
+  assistantMessageId: string,
+  updater: (message: ChatMessage) => ChatMessage,
+) {
+  return updateConversationById(conversations, conversationId, (conversation) => ({
+    ...conversation,
+    messages: conversation.messages.map((message) =>
+      message.id === assistantMessageId && message.role === "assistant"
+        ? updater(message)
+        : message,
+    ),
+    updatedAt: new Date().toISOString(),
+  }))
+}
+
 function sortConversationsByUpdatedAt(conversations: Conversation[]) {
   return [...conversations].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+}
+
+function createGenerationThroughputTracker(setTokensPerSecond: (value: number) => void) {
+  const startedAt = performance.now()
+  let estimatedTokens = 0
+  let latestTokensPerSecond: number | null = null
+
+  const recordChunk = (chunk: string) => {
+    estimatedTokens += chunk.length / 4
+    const elapsedSeconds = Math.max((performance.now() - startedAt) / 1000, 0.1)
+    latestTokensPerSecond = estimatedTokens / elapsedSeconds
+    setTokensPerSecond(latestTokensPerSecond)
+  }
+
+  return {
+    getTokensPerSecond: () => latestTokensPerSecond,
+    recordChunk,
+  }
 }
 
 const initialConversation = createConversationRecord()
@@ -278,6 +314,7 @@ export const useChatStore = create<ChatState>((set) => ({
   activeConversationId: initialConversation.id,
   isLoading: true,
   isGenerating: false,
+  generationTokensPerSecond: null,
   error: null,
   stopGeneration: () => {
     activeGenerationController?.abort()
@@ -308,6 +345,7 @@ export const useChatStore = create<ChatState>((set) => ({
     set((state) => ({
       error: null,
       isGenerating: true,
+      generationTokensPerSecond: null,
       conversations: sortConversationsByUpdatedAt(
         updateConversationById(state.conversations, conversationId, (conversation) => ({
           ...conversation,
@@ -319,7 +357,12 @@ export const useChatStore = create<ChatState>((set) => ({
       ),
     }))
 
+    const throughputTracker = createGenerationThroughputTracker((value) => {
+      set({ generationTokensPerSecond: value })
+    })
+
     const appendAssistantChunk = (chunk: string) => {
+      throughputTracker.recordChunk(chunk)
       set((state) => ({
         conversations: sortConversationsByUpdatedAt(
           updateAssistantMessage(
@@ -354,6 +397,20 @@ export const useChatStore = create<ChatState>((set) => ({
         onChunk: appendAssistantChunk,
         signal: generationController.signal,
       })
+
+      const finalTokensPerSecond = throughputTracker.getTokensPerSecond()
+      if (finalTokensPerSecond !== null) {
+        set((state) => ({
+          conversations: sortConversationsByUpdatedAt(
+            updateAssistantMessageMetadata(
+              state.conversations,
+              conversationId,
+              messageId,
+              (message) => ({ ...message, tokensPerSecond: finalTokensPerSecond }),
+            ),
+          ),
+        }))
+      }
 
       finalizeAssistantMessage(cleanIncompleteMarkdown)
 
@@ -427,6 +484,7 @@ export const useChatStore = create<ChatState>((set) => ({
     set((state) => ({
       error: null,
       isGenerating: true,
+      generationTokensPerSecond: null,
       conversations: sortConversationsByUpdatedAt(
         updateConversationById(state.conversations, conversationId, (conversation) => ({
           ...conversation,
@@ -436,7 +494,12 @@ export const useChatStore = create<ChatState>((set) => ({
       ),
     }))
 
+    const throughputTracker = createGenerationThroughputTracker((value) => {
+      set({ generationTokensPerSecond: value })
+    })
+
     const appendAssistantChunk = (chunk: string) => {
+      throughputTracker.recordChunk(chunk)
       set((state) => ({
         conversations: sortConversationsByUpdatedAt(
           updateAssistantMessage(
@@ -471,6 +534,20 @@ export const useChatStore = create<ChatState>((set) => ({
         onChunk: appendAssistantChunk,
         signal: generationController.signal,
       })
+
+      const finalTokensPerSecond = throughputTracker.getTokensPerSecond()
+      if (finalTokensPerSecond !== null) {
+        set((state) => ({
+          conversations: sortConversationsByUpdatedAt(
+            updateAssistantMessageMetadata(
+              state.conversations,
+              conversationId,
+              assistantMessage.id,
+              (message) => ({ ...message, tokensPerSecond: finalTokensPerSecond }),
+            ),
+          ),
+        }))
+      }
 
       finalizeAssistantMessage(cleanIncompleteMarkdown)
 
@@ -844,6 +921,7 @@ export const useChatStore = create<ChatState>((set) => ({
       return {
         error: null,
         isGenerating: true,
+        generationTokensPerSecond: null,
         conversations: sortConversationsByUpdatedAt(
           updateConversationById(state.conversations, conversationId, (conversation) => ({
             ...conversation,
@@ -880,20 +958,27 @@ export const useChatStore = create<ChatState>((set) => ({
         await persistConversation(conversationAfterPrompt)
       } else {
         set({
-          isGenerating: false,
-          error: "Unable to find the active conversation. Create a new conversation and try again.",
+        generationTokensPerSecond: null,
+        isGenerating: false,
+        error: "Unable to find the active conversation. Create a new conversation and try again.",
         })
         return
       }
     } catch {
       set({
+        generationTokensPerSecond: null,
         isGenerating: false,
         error: "Unable to save the conversation before generation started.",
       })
       return
     }
 
+    const throughputTracker = createGenerationThroughputTracker((value) => {
+      set({ generationTokensPerSecond: value })
+    })
+
     const appendAssistantChunk = (chunk: string) => {
+      throughputTracker.recordChunk(chunk)
       set((state) => ({
         conversations: sortConversationsByUpdatedAt(
           updateAssistantMessage(
@@ -1010,6 +1095,20 @@ export const useChatStore = create<ChatState>((set) => ({
 
       if (generationController.signal.aborted) {
         throw new DOMException("Generation stopped.", "AbortError")
+      }
+
+      const finalTokensPerSecond = throughputTracker.getTokensPerSecond()
+      if (finalTokensPerSecond !== null) {
+        set((state) => ({
+          conversations: sortConversationsByUpdatedAt(
+            updateAssistantMessageMetadata(
+              state.conversations,
+              conversationId,
+              assistantMessage.id,
+              (message) => ({ ...message, tokensPerSecond: finalTokensPerSecond }),
+            ),
+          ),
+        }))
       }
 
       finalizeAssistantMessage(cleanIncompleteMarkdown)

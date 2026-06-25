@@ -72,7 +72,12 @@ function isValidConversation(payload) {
         typeof message.id === "string" &&
         (message.role === "user" || message.role === "assistant") &&
         typeof message.content === "string" &&
-        typeof message.createdAt === "string",
+        typeof message.createdAt === "string" &&
+        (
+          message.tokensPerSecond === undefined ||
+          message.tokensPerSecond === null ||
+          typeof message.tokensPerSecond === "number"
+        ),
     )
   )
 }

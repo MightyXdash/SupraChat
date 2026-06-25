@@ -11,6 +11,7 @@ type ChatWorkspaceProps = {
   draft: string
   editingMessageId: string | null
   error: string | null
+  generationTokensPerSecond: number | null
   isGenerating: boolean
   scrollRef: RefObject<HTMLDivElement | null>
   speechPlayback: SpeechPlaybackState
@@ -32,6 +33,7 @@ export function ChatWorkspace({
   draft,
   editingMessageId,
   error,
+  generationTokensPerSecond,
   isGenerating,
   scrollRef,
   speechPlayback,
@@ -71,6 +73,14 @@ export function ChatWorkspace({
     (latestMessageId, message) => message.role === "user" ? message.id : latestMessageId,
     null,
   )
+  const latestAssistantTokensPerSecond = conversation?.messages.reduce<number | null>(
+    (latestValue, message) =>
+      message.role === "assistant" && typeof message.tokensPerSecond === "number"
+        ? message.tokensPerSecond
+        : latestValue,
+    null,
+  ) ?? null
+  const displayedTokensPerSecond = generationTokensPerSecond ?? latestAssistantTokensPerSecond
   const conversationAnimationKey = conversation?.id ?? "initial-conversation"
 
   return (
@@ -112,18 +122,15 @@ export function ChatWorkspace({
         <span className="chat-workspace-bottom-glass-layer" />
       </div>
 
-      <motion.div
-        key={`composer-${conversationAnimationKey}`}
+      <div
         className="chat-composer-dock pointer-events-none absolute inset-x-0 px-5"
-        data-position={hasMessages ? "bottom" : "center"}
-        initial={{ opacity: 0, scale: 0.992, y: hasMessages ? 5 : 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+        data-position="bottom"
       >
         <ChatComposer
           draft={draft}
           error={error}
           isGenerating={isGenerating}
+          generationTokensPerSecond={displayedTokensPerSecond}
           contextUsage={{
             estimatedTokens,
             maxTokens: chatRuntimeConfig.contextWindowTokens,
@@ -141,7 +148,7 @@ export function ChatWorkspace({
           onSubmit={onSubmit}
           onToggleSpeech={onToggleSpeech}
         />
-      </motion.div>
+      </div>
     </section>
   )
 }

@@ -13,6 +13,7 @@ export type ContextUsageSummary = {
 type ChatComposerProps = {
   draft: string
   error: string | null
+  generationTokensPerSecond: number | null
   isEditing: boolean
   isGenerating: boolean
   contextUsage: ContextUsageSummary
@@ -30,6 +31,7 @@ type ChatComposerProps = {
 export function ChatComposer({
   draft,
   error,
+  generationTokensPerSecond,
   isEditing,
   isGenerating,
   contextUsage,
@@ -228,6 +230,11 @@ export function ChatComposer({
                 />
                 <span>{contextUsage.percentage}%</span>
               </div>
+            ) : null}
+            {generationTokensPerSecond !== null ? (
+              <span className="chat-throughput-label">
+                {generationTokensPerSecond.toFixed(1)} t/s
+              </span>
             ) : null}
           </div>
           <div className="chat-composer-footer-end">

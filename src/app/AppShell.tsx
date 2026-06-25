@@ -99,6 +99,7 @@ export function AppShell() {
   const stopGeneration = useChatStore((state) => state.stopGeneration)
   const isLoading = useChatStore((state) => state.isLoading)
   const isGenerating = useChatStore((state) => state.isGenerating)
+  const generationTokensPerSecond = useChatStore((state) => state.generationTokensPerSecond)
   const error = useChatStore((state) => state.error)
   const themePreference = useSettingsStore((state) => state.themePreference)
   const setThemePreference = useSettingsStore((state) => state.setThemePreference)
@@ -420,6 +421,7 @@ export function AppShell() {
             editingMessageId={editingMessageId}
             error={error}
             isGenerating={isGenerating}
+            generationTokensPerSecond={generationTokensPerSecond}
             scrollRef={scrollRef}
             speechPlayback={speechPlayback}
             showContextMeter={showContextMeter}
