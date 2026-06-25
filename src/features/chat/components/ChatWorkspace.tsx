@@ -1,5 +1,5 @@
 import { RefObject } from "react"
-import { AnimatePresence } from "framer-motion"
+import { AnimatePresence, motion } from "framer-motion"
 import { ChatBubble } from "@/features/chat/components/ChatBubble"
 import { ChatComposer } from "@/features/chat/components/ChatComposer"
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
@@ -71,6 +71,7 @@ export function ChatWorkspace({
     (latestMessageId, message) => message.role === "user" ? message.id : latestMessageId,
     null,
   )
+  const conversationAnimationKey = conversation?.id ?? "initial-conversation"
 
   return (
     <section className="relative flex min-h-0 flex-col bg-[var(--surface)]">
@@ -81,7 +82,13 @@ export function ChatWorkspace({
         data-scrolling={isChatScrolling}
       >
         {hasMessages && (
-          <div className="mx-auto flex max-w-3xl flex-col gap-5">
+          <motion.div
+            key={`messages-${conversationAnimationKey}`}
+            className="mx-auto flex max-w-3xl flex-col gap-5"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          >
             <AnimatePresence>
               {conversation?.messages.map((message, index) => (
                 <ChatBubble
@@ -97,7 +104,7 @@ export function ChatWorkspace({
               ))}
             </AnimatePresence>
             
-          </div>
+          </motion.div>
         )}
       </div>
 
@@ -105,9 +112,13 @@ export function ChatWorkspace({
         <span className="chat-workspace-bottom-glass-layer" />
       </div>
 
-      <div
+      <motion.div
+        key={`composer-${conversationAnimationKey}`}
         className="chat-composer-dock pointer-events-none absolute inset-x-0 px-5"
         data-position={hasMessages ? "bottom" : "center"}
+        initial={{ opacity: 0, scale: 0.992, y: hasMessages ? 5 : 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       >
         <ChatComposer
           draft={draft}
@@ -130,7 +141,7 @@ export function ChatWorkspace({
           onSubmit={onSubmit}
           onToggleSpeech={onToggleSpeech}
         />
-      </div>
+      </motion.div>
     </section>
   )
 }
