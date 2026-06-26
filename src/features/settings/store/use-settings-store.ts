@@ -12,6 +12,7 @@ const SETTINGS_STORAGE_KEY = "suprachat.settings"
 type PersistedSettings = {
   autoTitleConversations: boolean
   confirmConversationDeletion: boolean
+  experimentalUpdatesWarningSeen: boolean
   defaultWorkspace: DefaultWorkspacePreference
   density: InterfaceDensity
   frostedSurfaces: FrostedSurfacePreference
@@ -30,6 +31,7 @@ type SettingsState = PersistedSettings & {
   setConfirmExperimentalInstall: (value: boolean) => void
   setAutoTitleConversations: (value: boolean) => void
   setConfirmConversationDeletion: (value: boolean) => void
+  setExperimentalUpdatesWarningSeen: (value: boolean) => void
   setDefaultWorkspace: (value: DefaultWorkspacePreference) => void
   setDensity: (value: InterfaceDensity) => void
   setFrostedSurfaces: (value: FrostedSurfacePreference) => void
@@ -46,6 +48,7 @@ const defaultSettings: PersistedSettings = {
   autoTitleConversations: true,
   confirmExperimentalInstall: true,
   confirmConversationDeletion: true,
+  experimentalUpdatesWarningSeen: false,
   defaultWorkspace: "chat",
   density: "comfortable",
   frostedSurfaces: "standard",
@@ -99,6 +102,10 @@ function readStoredSettings(): PersistedSettings {
         typeof parsed.confirmConversationDeletion === "boolean"
           ? parsed.confirmConversationDeletion
           : defaultSettings.confirmConversationDeletion,
+      experimentalUpdatesWarningSeen:
+        typeof parsed.experimentalUpdatesWarningSeen === "boolean"
+          ? parsed.experimentalUpdatesWarningSeen
+          : defaultSettings.experimentalUpdatesWarningSeen,
       defaultWorkspace: isDefaultWorkspace(parsed.defaultWorkspace)
         ? parsed.defaultWorkspace
         : defaultSettings.defaultWorkspace,
@@ -146,6 +153,7 @@ function updateSetting<T extends keyof PersistedSettings>(
       autoTitleConversations: nextSettings.autoTitleConversations,
       confirmExperimentalInstall: nextSettings.confirmExperimentalInstall,
       confirmConversationDeletion: nextSettings.confirmConversationDeletion,
+      experimentalUpdatesWarningSeen: nextSettings.experimentalUpdatesWarningSeen,
       defaultWorkspace: nextSettings.defaultWorkspace,
       density: nextSettings.density,
       frostedSurfaces: nextSettings.frostedSurfaces,
@@ -180,6 +188,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         autoTitleConversations: nextSettings.autoTitleConversations,
         confirmExperimentalInstall: nextSettings.confirmExperimentalInstall,
         confirmConversationDeletion: nextSettings.confirmConversationDeletion,
+        experimentalUpdatesWarningSeen: nextSettings.experimentalUpdatesWarningSeen,
         defaultWorkspace: nextSettings.defaultWorkspace,
         density: nextSettings.density,
         frostedSurfaces: nextSettings.frostedSurfaces,
@@ -200,6 +209,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setAutoTitleConversations: (value) => updateSetting(set, "autoTitleConversations", value),
   setConfirmExperimentalInstall: (value) => updateSetting(set, "confirmExperimentalInstall", value),
   setConfirmConversationDeletion: (value) => updateSetting(set, "confirmConversationDeletion", value),
+  setExperimentalUpdatesWarningSeen: (value) => updateSetting(set, "experimentalUpdatesWarningSeen", value),
   setDefaultWorkspace: (value) => updateSetting(set, "defaultWorkspace", value),
   setDensity: (value) => updateSetting(set, "density", value),
   setFrostedSurfaces: (value) => updateSetting(set, "frostedSurfaces", value),

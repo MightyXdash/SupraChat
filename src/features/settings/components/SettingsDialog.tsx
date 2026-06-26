@@ -1,7 +1,6 @@
 import { type CSSProperties, useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { RefreshCcw, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { settingsTabs, type SettingsTabId } from "@/features/settings/config/settings-tabs"
 import { SettingsBadge, SettingsPath, SettingsSegmentedControl, SettingsToggle } from "@/features/settings/components/SettingsControl"
 import { SettingsNav } from "@/features/settings/components/SettingsNav"
@@ -68,6 +67,7 @@ function statusTone(ok?: boolean) {
 
 export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const [activeTab, setActiveTab] = useState<SettingsTabId>("general")
+  const [pendingExperimentalTrack, setPendingExperimentalTrack] = useState<UpdateTrack | null>(null)
   const [dataState, setDataState] = useState<SettingsDataState>({
     error: null,
     isLoading: false,
@@ -103,14 +103,25 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const updaterStatus = useUpdaterStore((state) => state.status)
   const experimentalConfirmationLocked = updateTrack === "final"
 
-  async function handleUpdateTrackChange(nextTrack: UpdateTrack) {
+  async function applyUpdateTrack(nextTrack: UpdateTrack) {
     setUpdateTrack(nextTrack)
+
     if (nextTrack === "final") {
       setConfirmExperimentalInstall(true)
     }
+
     const nextPreferences = await persistUpdateTrack(nextTrack)
     setUpdateTrack(nextPreferences.updateTrack)
     setConfirmExperimentalInstall(nextPreferences.confirmExperimentalInstall)
+  }
+
+  async function handleUpdateTrackChange(nextTrack: UpdateTrack) {
+    if (nextTrack !== "final" && nextTrack !== updateTrack) {
+      setPendingExperimentalTrack(nextTrack)
+      return
+    }
+
+    await applyUpdateTrack(nextTrack)
   }
 
   async function handleExperimentalInstallPreferenceChange(checked: boolean) {
@@ -136,6 +147,11 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     } finally {
       setIsCheckingUpdates(false)
     }
+  }
+
+  async function applyExperimentalTrackSelection(nextTrack: UpdateTrack) {
+    setPendingExperimentalTrack(null)
+    await applyUpdateTrack(nextTrack)
   }
 
   async function handleInstallUpdate() {
@@ -266,6 +282,65 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
             exit={{ opacity: 0, scale: 1.11, y: 0 }}
             transition={{ duration: 0.72, ease: [0.16, 1, 0.3, 1] }}
           >
+            <AnimatePresence>
+              {pendingExperimentalTrack ? (
+                <motion.div
+                  className="settings-inline-warning-shell"
+                  role="presentation"
+                  initial={{
+                    WebkitBackdropFilter: "blur(0px) saturate(0.92)",
+                    backdropFilter: "blur(0px) saturate(0.92)",
+                    opacity: 0,
+                    "--settings-warning-dim": "0",
+                  } as CSSProperties}
+                  animate={{
+                    WebkitBackdropFilter: "blur(14px) saturate(0.92)",
+                    backdropFilter: "blur(14px) saturate(0.92)",
+                    opacity: 1,
+                    "--settings-warning-dim": "1",
+                  } as CSSProperties}
+                  exit={{
+                    WebkitBackdropFilter: "blur(0px) saturate(0.92)",
+                    backdropFilter: "blur(0px) saturate(0.92)",
+                    opacity: 0,
+                    "--settings-warning-dim": "0",
+                  } as CSSProperties}
+                  transition={{ duration: 0.92, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <motion.div
+                    className="settings-inline-warning-card"
+                    role="alertdialog"
+                    aria-modal="true"
+                    aria-label="Experimental updates warning"
+                    initial={{ opacity: 0, scale: 1.26, y: 0 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 1.22, y: 0 }}
+                    transition={{ duration: 1.04, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                    <div className="settings-inline-warning-copy">
+                      <h3>Experimental builds may be unstable.</h3>
+                      <p>We recommend the Final installation option for most users.</p>
+                    </div>
+                    <div className="settings-inline-warning-actions">
+                      <button
+                        className="settings-secondary-button"
+                        type="button"
+                        onClick={() => setPendingExperimentalTrack(null)}
+                      >
+                        Keep Final
+                      </button>
+                      <button
+                        className="settings-secondary-button"
+                        type="button"
+                        onClick={() => void applyExperimentalTrackSelection(pendingExperimentalTrack)}
+                      >
+                        I know what I am doing
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
             <aside className="settings-sidebar">
               <div className="settings-sidebar-header">
                 <button className="settings-icon-button" type="button" aria-label="Close settings" onClick={onClose}>
@@ -412,12 +487,6 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                       </SettingsRow>
                     </SettingsSection>
 
-                    {updateTrack !== "final" ? (
-                      <div className="settings-status-panel settings-note-panel" role="note">
-                        Experimental updates are enabled for this device. SupraChat will only consider the channels allowed by the selected track.
-                      </div>
-                    ) : null}
-
                     <SettingsSection title="Status" description="SupraChat checks GitHub Releases and downloads eligible updates in the background.">
                       <SettingsRow label="Current version">
                         <SettingsBadge>{updaterStatus.currentVersion}</SettingsBadge>
@@ -440,31 +509,37 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                       ) : null}
                     </SettingsSection>
 
-                    {updaterStatus.errorMessage ? (
+                    {updaterStatus.errorMessage && updaterStatus.state === "error" ? (
                       <div className="settings-status-panel" role="status">
                         {updaterStatus.errorMessage}
                       </div>
                     ) : null}
 
                     <SettingsSection title="Actions">
-                      <div className="settings-action-row">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          type="button"
-                          disabled={isCheckingUpdates}
-                          onClick={() => void handleCheckForUpdates()}
-                        >
-                          {isCheckingUpdates ? "Checking" : "Check for Updates"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          type="button"
-                          disabled={updaterStatus.state !== "downloaded" || isInstallingUpdate}
-                          onClick={() => void handleInstallUpdate()}
-                        >
-                          {isInstallingUpdate ? "Restarting" : "Restart to Install"}
-                        </Button>
+                      <div className="settings-action-card">
+                        <div className="settings-action-row">
+                          <button
+                            className="settings-secondary-button"
+                            type="button"
+                            disabled={isCheckingUpdates}
+                            onClick={() => void handleCheckForUpdates()}
+                          >
+                            {isCheckingUpdates ? "Checking" : "Check for Updates"}
+                          </button>
+                          <button
+                            className="settings-primary-button"
+                            type="button"
+                            disabled={updaterStatus.state !== "downloaded" || isInstallingUpdate}
+                            onClick={() => void handleInstallUpdate()}
+                          >
+                            {isInstallingUpdate ? "Restarting" : "Restart to Install"}
+                          </button>
+                        </div>
+                        <p className="settings-action-note">
+                          {updateTrack === "final"
+                            ? "Final releases are recommended for most users."
+                            : "This track may include less stable builds and requires explicit confirmation before install."}
+                        </p>
                       </div>
                     </SettingsSection>
                   </>

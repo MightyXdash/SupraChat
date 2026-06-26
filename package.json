@@ -1,7 +1,15 @@
 {
   "name": "suprachat",
+  "productName": "SupraChat",
   "version": "0.1.0",
   "private": true,
+  "description": "Interface to try SupraLabs' models",
+  "author": {
+    "name": "SupraLabs",
+    "url": "https://github.com/MightyXdash/SupraChat"
+  },
+  "homepage": "https://github.com/MightyXdash/SupraChat",
+  "license": "GPL-3.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/MightyXdash/SupraChat.git"
@@ -65,7 +73,9 @@
     "wait-on": "^9.0.1"
   },
   "build": {
-    "appId": "com.suprachat.app",
+    "appId": "com.supralabs.suprachat",
+    "productName": "SupraChat",
+    "copyright": "Copyright © 2026 SupraLabs. Licensed under the GNU General Public License v3.0 (GPL-3.0).",
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -93,9 +103,11 @@
       }
     ],
     "win": {
+      "publisherName": "SupraLabs",
       "target": "nsis"
     },
     "mac": {
+      "category": "public.app-category.productivity",
       "target": "dmg"
     },
     "linux": {
