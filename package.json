@@ -2,6 +2,10 @@
   "name": "suprachat",
   "version": "0.1.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MightyXdash/SupraChat.git"
+  },
   "type": "module",
   "main": "electron/main.cjs",
   "engines": {
@@ -16,8 +20,12 @@
     "rebuild:electron": "electron-rebuild --force --only better-sqlite3",
     "build:electron": "npm run models:download && npm run rebuild:electron && vite build && electron-builder",
     "models:download": "node scripts/download-llama-models.cjs",
+    "publish:release": "cross-env EP_DRAFT=false EP_PRE_RELEASE=false npm run build:electron -- --publish always",
+    "publish:prerelease": "cross-env EP_DRAFT=false EP_PRE_RELEASE=true npm run build:electron -- --publish always",
+    "release:validate": "node scripts/validate-release-tag.cjs",
     "runtime:check": "node scripts/check-runtime.cjs",
     "runtime:check:all": "node scripts/check-runtime.cjs --all",
+    "test:updater": "node --test electron/updater/__tests__/*.test.cjs",
     "preview": "vite preview",
     "postinstall": "node -e \"console.log('Skipping Electron native rebuild on install; run npm run rebuild:electron before packaging.')\""
   },
@@ -77,6 +85,13 @@
     "directories": {
       "buildResources": "build"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "MightyXdash",
+        "repo": "SupraChat"
+      }
+    ],
     "win": {
       "target": "nsis"
     },

@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import type { UpdatePreferences, UpdateTrack } from "@/features/updates/types"
 
 export type ThemePreference = "system" | "light" | "dark"
 export type InterfaceDensity = "comfortable" | "compact"
@@ -20,9 +21,13 @@ type PersistedSettings = {
   showContextMeter: boolean
   startWithLastConversation: boolean
   themePreference: ThemePreference
+  updateTrack: UpdateTrack
+  confirmExperimentalInstall: boolean
 }
 
 type SettingsState = PersistedSettings & {
+  hydrateUpdatePreferences: (preferences: UpdatePreferences) => void
+  setConfirmExperimentalInstall: (value: boolean) => void
   setAutoTitleConversations: (value: boolean) => void
   setConfirmConversationDeletion: (value: boolean) => void
   setDefaultWorkspace: (value: DefaultWorkspacePreference) => void
@@ -34,10 +39,12 @@ type SettingsState = PersistedSettings & {
   setShowContextMeter: (value: boolean) => void
   setStartWithLastConversation: (value: boolean) => void
   setThemePreference: (value: ThemePreference) => void
+  setUpdateTrack: (value: UpdateTrack) => void
 }
 
 const defaultSettings: PersistedSettings = {
   autoTitleConversations: true,
+  confirmExperimentalInstall: true,
   confirmConversationDeletion: true,
   defaultWorkspace: "chat",
   density: "comfortable",
@@ -48,6 +55,7 @@ const defaultSettings: PersistedSettings = {
   showContextMeter: true,
   startWithLastConversation: true,
   themePreference: "system",
+  updateTrack: "final",
 }
 
 function isThemePreference(value: unknown): value is ThemePreference {
@@ -70,6 +78,10 @@ function isDefaultWorkspace(value: unknown): value is DefaultWorkspacePreference
   return value === "chat" || value === "playground"
 }
 
+function isUpdateTrack(value: unknown): value is UpdateTrack {
+  return value === "final" || value === "beta" || value === "alpha" || value === "dalpha"
+}
+
 function readStoredSettings(): PersistedSettings {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(SETTINGS_STORAGE_KEY) ?? "{}")
@@ -79,6 +91,10 @@ function readStoredSettings(): PersistedSettings {
         typeof parsed.autoTitleConversations === "boolean"
           ? parsed.autoTitleConversations
           : defaultSettings.autoTitleConversations,
+      confirmExperimentalInstall:
+        typeof parsed.confirmExperimentalInstall === "boolean"
+          ? parsed.confirmExperimentalInstall
+          : defaultSettings.confirmExperimentalInstall,
       confirmConversationDeletion:
         typeof parsed.confirmConversationDeletion === "boolean"
           ? parsed.confirmConversationDeletion
@@ -108,6 +124,7 @@ function readStoredSettings(): PersistedSettings {
       themePreference: isThemePreference(parsed.themePreference)
         ? parsed.themePreference
         : defaultSettings.themePreference,
+      updateTrack: isUpdateTrack(parsed.updateTrack) ? parsed.updateTrack : defaultSettings.updateTrack,
     }
   } catch {
     return defaultSettings
@@ -127,6 +144,7 @@ function updateSetting<T extends keyof PersistedSettings>(
     const nextSettings = { ...state, [key]: value }
     persistSettings({
       autoTitleConversations: nextSettings.autoTitleConversations,
+      confirmExperimentalInstall: nextSettings.confirmExperimentalInstall,
       confirmConversationDeletion: nextSettings.confirmConversationDeletion,
       defaultWorkspace: nextSettings.defaultWorkspace,
       density: nextSettings.density,
@@ -137,6 +155,7 @@ function updateSetting<T extends keyof PersistedSettings>(
       showContextMeter: nextSettings.showContextMeter,
       startWithLastConversation: nextSettings.startWithLastConversation,
       themePreference: nextSettings.themePreference,
+      updateTrack: nextSettings.updateTrack,
     })
     return { [key]: value } as Partial<SettingsState>
   })
@@ -144,7 +163,42 @@ function updateSetting<T extends keyof PersistedSettings>(
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   ...readStoredSettings(),
+  hydrateUpdatePreferences: (preferences) =>
+    set((state) => {
+      const normalizedPreferences =
+        preferences.updateTrack === "final"
+          ? { ...preferences, confirmExperimentalInstall: true }
+          : preferences
+
+      const nextSettings = {
+        ...state,
+        confirmExperimentalInstall: normalizedPreferences.confirmExperimentalInstall,
+        updateTrack: normalizedPreferences.updateTrack,
+      }
+
+      persistSettings({
+        autoTitleConversations: nextSettings.autoTitleConversations,
+        confirmExperimentalInstall: nextSettings.confirmExperimentalInstall,
+        confirmConversationDeletion: nextSettings.confirmConversationDeletion,
+        defaultWorkspace: nextSettings.defaultWorkspace,
+        density: nextSettings.density,
+        frostedSurfaces: nextSettings.frostedSurfaces,
+        messageFont: nextSettings.messageFont,
+        reduceMotion: nextSettings.reduceMotion,
+        showAverageTps: nextSettings.showAverageTps,
+        showContextMeter: nextSettings.showContextMeter,
+        startWithLastConversation: nextSettings.startWithLastConversation,
+        themePreference: nextSettings.themePreference,
+        updateTrack: nextSettings.updateTrack,
+      })
+
+      return {
+        confirmExperimentalInstall: normalizedPreferences.confirmExperimentalInstall,
+        updateTrack: normalizedPreferences.updateTrack,
+      }
+    }),
   setAutoTitleConversations: (value) => updateSetting(set, "autoTitleConversations", value),
+  setConfirmExperimentalInstall: (value) => updateSetting(set, "confirmExperimentalInstall", value),
   setConfirmConversationDeletion: (value) => updateSetting(set, "confirmConversationDeletion", value),
   setDefaultWorkspace: (value) => updateSetting(set, "defaultWorkspace", value),
   setDensity: (value) => updateSetting(set, "density", value),
@@ -155,4 +209,5 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setShowContextMeter: (value) => updateSetting(set, "showContextMeter", value),
   setStartWithLastConversation: (value) => updateSetting(set, "startWithLastConversation", value),
   setThemePreference: (value) => updateSetting(set, "themePreference", value),
+  setUpdateTrack: (value) => updateSetting(set, "updateTrack", value),
 }))

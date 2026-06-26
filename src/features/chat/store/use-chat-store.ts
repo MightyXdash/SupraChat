@@ -4,6 +4,7 @@ import {
   cleanIncompleteMarkdown,
   createConversationRecord,
   createMessage,
+  titleFromPromptPreview,
   titleFromGeneratedPayload,
   titleFromMessage,
 } from "@/features/chat/lib/chat-records"
@@ -946,6 +947,7 @@ export const useChatStore = create<ChatState>((set) => ({
     const autoTitleConversations = useSettingsStore.getState().autoTitleConversations
     let generatedTitlePayload = ""
     const shouldDeferTitleGeneration = shouldDeferInitialTitleGeneration(trimmedContent)
+    let promptPreviewTitle = ""
 
     set((state) => {
       const activeConversation = state.conversations.find(
@@ -954,6 +956,9 @@ export const useChatStore = create<ChatState>((set) => ({
       shouldGenerateTitle = Boolean(
         autoTitleConversations && activeConversation && activeConversation.messages.length === 0,
       )
+      promptPreviewTitle = activeConversation && !autoTitleConversations && activeConversation.messages.length === 0
+        ? titleFromPromptPreview(trimmedContent)
+        : ""
 
       return {
         error: null,
@@ -962,8 +967,8 @@ export const useChatStore = create<ChatState>((set) => ({
         conversations: sortConversationsByUpdatedAt(
           updateConversationById(state.conversations, conversationId, (conversation) => ({
             ...conversation,
-            title: shouldGenerateTitle ? "" : conversation.title,
-            titleStatus: shouldGenerateTitle ? "generating" : conversation.titleStatus,
+            title: shouldGenerateTitle ? "" : promptPreviewTitle || conversation.title,
+            titleStatus: shouldGenerateTitle ? "generating" : promptPreviewTitle ? "complete" : conversation.titleStatus,
             messages: [...conversation.messages, userMessage],
             updatedAt: userMessage.createdAt,
           })),

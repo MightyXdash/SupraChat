@@ -1,12 +1,13 @@
 import {
   Bot,
   Database,
+  Download,
   Palette,
   Settings2,
   type LucideIcon,
 } from "lucide-react"
 
-export type SettingsTabId = "general" | "appearance" | "models" | "data"
+export type SettingsTabId = "general" | "appearance" | "updates" | "models" | "data"
 
 export type SettingsTab = {
   group: "Desktop" | "Local"
@@ -30,6 +31,13 @@ export const settingsTabs: SettingsTab[] = [
     label: "Appearance",
     description: "Theme and display preferences.",
     icon: Palette,
+  },
+  {
+    group: "Desktop",
+    id: "updates",
+    label: "Updates",
+    description: "Release channel and installation preferences.",
+    icon: Download,
   },
   {
     group: "Local",

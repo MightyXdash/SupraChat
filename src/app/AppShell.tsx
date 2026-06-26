@@ -20,6 +20,15 @@ import {
 } from "@/features/playground/components/PlaygroundWorkspace"
 import { SettingsDialog } from "@/features/settings/components/SettingsDialog"
 import { useSettingsStore } from "@/features/settings/store/use-settings-store"
+import { UpdateInstallPrompt } from "@/features/updates/components/UpdateInstallPrompt"
+import {
+  dismissReadyUpdateState,
+  fetchUpdatePreferences,
+  fetchUpdateStatus,
+  installDownloadedUpdate,
+  subscribeToUpdateStatus,
+} from "@/features/updates/services/update-service"
+import { useUpdaterStore } from "@/features/updates/store/use-updater-store"
 
 type AppPanel = "chat" | "playground"
 
@@ -103,18 +112,55 @@ export function AppShell() {
   const isGenerating = useChatStore((state) => state.isGenerating)
   const generationTokensPerSecond = useChatStore((state) => state.generationTokensPerSecond)
   const error = useChatStore((state) => state.error)
+  const confirmExperimentalInstall = useSettingsStore((state) => state.confirmExperimentalInstall)
+  const hydrateUpdatePreferences = useSettingsStore((state) => state.hydrateUpdatePreferences)
   const themePreference = useSettingsStore((state) => state.themePreference)
   const setThemePreference = useSettingsStore((state) => state.setThemePreference)
+  const updateTrack = useSettingsStore((state) => state.updateTrack)
   const density = useSettingsStore((state) => state.density)
   const frostedSurfaces = useSettingsStore((state) => state.frostedSurfaces)
   const messageFont = useSettingsStore((state) => state.messageFont)
   const reduceMotion = useSettingsStore((state) => state.reduceMotion)
   const showAverageTps = useSettingsStore((state) => state.showAverageTps)
   const showContextMeter = useSettingsStore((state) => state.showContextMeter)
+  const isInstallingUpdate = useUpdaterStore((state) => state.isInstalling)
+  const setHydratedUpdater = useUpdaterStore((state) => state.setHydrated)
+  const setInstallingUpdate = useUpdaterStore((state) => state.setInstalling)
+  const setUpdaterStatus = useUpdaterStore((state) => state.setStatus)
+  const updaterStatus = useUpdaterStore((state) => state.status)
 
   useEffect(() => {
     void initialize()
   }, [initialize])
+
+  useEffect(() => {
+    let isMounted = true
+
+    void Promise.all([fetchUpdatePreferences(), fetchUpdateStatus()])
+      .then(([preferences, status]) => {
+        if (!isMounted) {
+          return
+        }
+
+        hydrateUpdatePreferences(preferences)
+        setUpdaterStatus(status)
+        setHydratedUpdater(true)
+      })
+      .catch(() => {
+        if (isMounted) {
+          setHydratedUpdater(true)
+        }
+      })
+
+    const unsubscribe = subscribeToUpdateStatus((status) => {
+      setUpdaterStatus(status)
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
+  }, [hydrateUpdatePreferences, setHydratedUpdater, setUpdaterStatus])
 
   useEffect(() => {
     const mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)")
@@ -404,6 +450,31 @@ export function AppShell() {
     setActiveConversation(conversationId)
   }
 
+  async function handleInstallDownloadedUpdate() {
+    if (updateTrack !== "final" && confirmExperimentalInstall) {
+      const shouldInstallExperimentalUpdate = window.confirm(
+        "Install this experimental SupraChat build now? Experimental updates can change more often and may be less stable.",
+      )
+
+      if (!shouldInstallExperimentalUpdate) {
+        return
+      }
+    }
+
+    setInstallingUpdate(true)
+
+    try {
+      await installDownloadedUpdate()
+    } finally {
+      setInstallingUpdate(false)
+    }
+  }
+
+  async function handleDismissReadyUpdate() {
+    const status = await dismissReadyUpdateState()
+    setUpdaterStatus(status)
+  }
+
   return (
     <main
       className="app-shell min-h-screen overflow-hidden bg-[var(--background)] text-[var(--text-primary)]"
@@ -470,6 +541,12 @@ export function AppShell() {
         onClose={() => setIsSearchOpen(false)}
         onCreateConversation={handleCreateConversation}
         onSelectConversation={handleSelectConversation}
+      />
+      <UpdateInstallPrompt
+        isInstalling={isInstallingUpdate}
+        status={updaterStatus}
+        onDismiss={() => void handleDismissReadyUpdate()}
+        onInstall={() => void handleInstallDownloadedUpdate()}
       />
       <SettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </main>

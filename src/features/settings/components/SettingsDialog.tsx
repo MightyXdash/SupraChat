@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { RefreshCcw, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { settingsTabs, type SettingsTabId } from "@/features/settings/config/settings-tabs"
 import { SettingsBadge, SettingsPath, SettingsSegmentedControl, SettingsToggle } from "@/features/settings/components/SettingsControl"
 import { SettingsNav } from "@/features/settings/components/SettingsNav"
@@ -14,6 +15,14 @@ import {
 } from "@/features/settings/services/settings-service"
 import { useChatStore } from "@/features/chat/store/use-chat-store"
 import { useSettingsStore } from "@/features/settings/store/use-settings-store"
+import {
+  checkForUpdatesNow,
+  installDownloadedUpdate,
+  setConfirmExperimentalInstall as persistConfirmExperimentalInstall,
+  setUpdateTrack as persistUpdateTrack,
+} from "@/features/updates/services/update-service"
+import { useUpdaterStore } from "@/features/updates/store/use-updater-store"
+import type { UpdateTrack } from "@/features/updates/types"
 import { cn } from "@/lib/utils"
 
 type SettingsDialogProps = {
@@ -66,24 +75,92 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     storage: null,
   })
   const [isDeletingAllChats, setIsDeletingAllChats] = useState(false)
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false)
+  const [isInstallingUpdate, setIsInstallingUpdate] = useState(false)
   const activeTabDefinition = useMemo(
     () => settingsTabs.find((tab) => tab.id === activeTab) ?? settingsTabs[0],
     [activeTab],
   )
   const localTabs = useMemo(() => settingsTabs.filter((tab) => tab.group === "Local"), [])
   const autoTitleConversations = useSettingsStore((state) => state.autoTitleConversations)
+  const confirmExperimentalInstall = useSettingsStore((state) => state.confirmExperimentalInstall)
   const confirmConversationDeletion = useSettingsStore((state) => state.confirmConversationDeletion)
   const deleteAllConversations = useChatStore((state) => state.deleteAllConversations)
   const showAverageTps = useSettingsStore((state) => state.showAverageTps)
   const showContextMeter = useSettingsStore((state) => state.showContextMeter)
   const startWithLastConversation = useSettingsStore((state) => state.startWithLastConversation)
   const themePreference = useSettingsStore((state) => state.themePreference)
+  const updateTrack = useSettingsStore((state) => state.updateTrack)
   const setAutoTitleConversations = useSettingsStore((state) => state.setAutoTitleConversations)
+  const setConfirmExperimentalInstall = useSettingsStore((state) => state.setConfirmExperimentalInstall)
   const setConfirmConversationDeletion = useSettingsStore((state) => state.setConfirmConversationDeletion)
   const setShowAverageTps = useSettingsStore((state) => state.setShowAverageTps)
   const setShowContextMeter = useSettingsStore((state) => state.setShowContextMeter)
   const setStartWithLastConversation = useSettingsStore((state) => state.setStartWithLastConversation)
   const setThemePreference = useSettingsStore((state) => state.setThemePreference)
+  const setUpdateTrack = useSettingsStore((state) => state.setUpdateTrack)
+  const setUpdaterStatus = useUpdaterStore((state) => state.setStatus)
+  const updaterStatus = useUpdaterStore((state) => state.status)
+  const experimentalConfirmationLocked = updateTrack === "final"
+
+  async function handleUpdateTrackChange(nextTrack: UpdateTrack) {
+    setUpdateTrack(nextTrack)
+    if (nextTrack === "final") {
+      setConfirmExperimentalInstall(true)
+    }
+    const nextPreferences = await persistUpdateTrack(nextTrack)
+    setUpdateTrack(nextPreferences.updateTrack)
+    setConfirmExperimentalInstall(nextPreferences.confirmExperimentalInstall)
+  }
+
+  async function handleExperimentalInstallPreferenceChange(checked: boolean) {
+    if (experimentalConfirmationLocked) {
+      return
+    }
+
+    setConfirmExperimentalInstall(checked)
+    const nextPreferences = await persistConfirmExperimentalInstall(checked)
+    setConfirmExperimentalInstall(nextPreferences.confirmExperimentalInstall)
+  }
+
+  async function handleCheckForUpdates() {
+    if (isCheckingUpdates) {
+      return
+    }
+
+    setIsCheckingUpdates(true)
+
+    try {
+      const nextStatus = await checkForUpdatesNow()
+      setUpdaterStatus(nextStatus)
+    } finally {
+      setIsCheckingUpdates(false)
+    }
+  }
+
+  async function handleInstallUpdate() {
+    if (isInstallingUpdate || updaterStatus.state !== "downloaded") {
+      return
+    }
+
+    if (updateTrack !== "final" && confirmExperimentalInstall) {
+      const shouldInstallExperimentalUpdate = window.confirm(
+        "Install this experimental SupraChat build now? Experimental updates can change more often and may be less stable.",
+      )
+
+      if (!shouldInstallExperimentalUpdate) {
+        return
+      }
+    }
+
+    setIsInstallingUpdate(true)
+
+    try {
+      await installDownloadedUpdate()
+    } finally {
+      setIsInstallingUpdate(false)
+    }
+  }
 
   async function loadSettingsData() {
     setDataState((current) => ({ ...current, error: null, isLoading: true }))
@@ -299,6 +376,96 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                           onChange={setShowAverageTps}
                         />
                       </SettingsRow>
+                    </SettingsSection>
+                  </>
+                ) : null}
+
+                {activeTab === "updates" ? (
+                  <>
+                    <SettingsSection
+                      title="Release Channel"
+                      description="Final releases remain selected by default. Experimental tracks require explicit opt-in."
+                    >
+                      <SettingsRow label="Update track">
+                        <SettingsSegmentedControl
+                          aria-label="Update track"
+                          value={updateTrack}
+                          options={[
+                            { label: "Final", value: "final" },
+                            { label: "Beta", value: "beta" },
+                            { label: "Alpha", value: "alpha" },
+                            { label: "Developer Alpha", value: "dalpha" },
+                          ]}
+                          onChange={(value) => void handleUpdateTrackChange(value)}
+                        />
+                      </SettingsRow>
+                      <SettingsRow
+                        label="Ask me before installing experimental updates"
+                        description="Experimental builds remain optional and require an extra confirmation before install."
+                      >
+                        <SettingsToggle
+                          aria-label="Ask before installing experimental updates"
+                          checked={confirmExperimentalInstall}
+                          disabled={experimentalConfirmationLocked}
+                          onChange={(checked) => void handleExperimentalInstallPreferenceChange(checked)}
+                        />
+                      </SettingsRow>
+                    </SettingsSection>
+
+                    {updateTrack !== "final" ? (
+                      <div className="settings-status-panel settings-note-panel" role="note">
+                        Experimental updates are enabled for this device. SupraChat will only consider the channels allowed by the selected track.
+                      </div>
+                    ) : null}
+
+                    <SettingsSection title="Status" description="SupraChat checks GitHub Releases and downloads eligible updates in the background.">
+                      <SettingsRow label="Current version">
+                        <SettingsBadge>{updaterStatus.currentVersion}</SettingsBadge>
+                      </SettingsRow>
+                      <SettingsRow label="Updater status">
+                        <SettingsBadge tone={updaterStatus.state === "error" ? "error" : "neutral"}>
+                          {updaterStatus.state.replace(/-/g, " ")}
+                        </SettingsBadge>
+                      </SettingsRow>
+                      <SettingsRow label="Available version">
+                        <SettingsBadge>{updaterStatus.availableVersion ?? "None"}</SettingsBadge>
+                      </SettingsRow>
+                      <SettingsRow label="Last checked">
+                        <SettingsBadge>{updaterStatus.checkedAt ? new Date(updaterStatus.checkedAt).toLocaleString() : "Not yet"}</SettingsBadge>
+                      </SettingsRow>
+                      {updaterStatus.downloadProgress ? (
+                        <SettingsRow label="Download progress">
+                          <SettingsBadge>{`${Math.round(updaterStatus.downloadProgress.percent)}%`}</SettingsBadge>
+                        </SettingsRow>
+                      ) : null}
+                    </SettingsSection>
+
+                    {updaterStatus.errorMessage ? (
+                      <div className="settings-status-panel" role="status">
+                        {updaterStatus.errorMessage}
+                      </div>
+                    ) : null}
+
+                    <SettingsSection title="Actions">
+                      <div className="settings-action-row">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          disabled={isCheckingUpdates}
+                          onClick={() => void handleCheckForUpdates()}
+                        >
+                          {isCheckingUpdates ? "Checking" : "Check for Updates"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          type="button"
+                          disabled={updaterStatus.state !== "downloaded" || isInstallingUpdate}
+                          onClick={() => void handleInstallUpdate()}
+                        >
+                          {isInstallingUpdate ? "Restarting" : "Restart to Install"}
+                        </Button>
+                      </div>
                     </SettingsSection>
                   </>
                 ) : null}

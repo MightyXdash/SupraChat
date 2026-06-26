@@ -68,7 +68,9 @@ export type SettingsStoragePayload = {
 }
 
 async function readSettingsJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${chatRuntimeConfig.apiBaseUrl}${path}`)
+  const response = await fetch(`${chatRuntimeConfig.apiBaseUrl}${path}`, {
+    headers: chatRuntimeConfig.localApiHeaders,
+  })
 
   if (!response.ok) {
     throw new Error("Unable to load settings information.")

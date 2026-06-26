@@ -24,6 +24,19 @@ export class ChatServiceError extends Error {
   }
 }
 
+function withLocalApiHeaders(init?: RequestInit): RequestInit | undefined {
+  const headers = new Headers(init?.headers)
+
+  for (const [key, value] of Object.entries(chatRuntimeConfig.localApiHeaders)) {
+    headers.set(key, value)
+  }
+
+  return {
+    ...init,
+    headers,
+  }
+}
+
 async function delay(ms: number) {
   await new Promise((resolve) => window.setTimeout(resolve, ms))
 }
@@ -73,19 +86,25 @@ async function readJson<T>(response: Response) {
 }
 
 export async function fetchConversations() {
-  const response = await fetchWithRetry(`${chatRuntimeConfig.apiBaseUrl}/conversations`)
+  const response = await fetchWithRetry(
+    `${chatRuntimeConfig.apiBaseUrl}/conversations`,
+    withLocalApiHeaders(),
+  )
   const data = await readJson<{ conversations: Conversation[] }>(response)
   return data.conversations
 }
 
 export async function createStoredConversation(conversation: Conversation) {
-  const response = await fetchWithRetry(`${chatRuntimeConfig.apiBaseUrl}/conversations`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ conversation }),
-  })
+  const response = await fetchWithRetry(
+    `${chatRuntimeConfig.apiBaseUrl}/conversations`,
+    withLocalApiHeaders({
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ conversation }),
+    }),
+  )
 
   await readJson<{ conversation: Conversation }>(response)
   return conversation
@@ -94,13 +113,13 @@ export async function createStoredConversation(conversation: Conversation) {
 export async function updateStoredConversation(conversation: Conversation) {
   const response = await fetchWithRetry(
     `${chatRuntimeConfig.apiBaseUrl}/conversations/${encodeURIComponent(conversation.id)}`,
-    {
+    withLocalApiHeaders({
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ conversation }),
-    },
+    }),
   )
 
   await readJson<{ conversation: Conversation }>(response)
@@ -110,22 +129,25 @@ export async function updateStoredConversation(conversation: Conversation) {
 export async function deleteStoredConversation(conversationId: string) {
   const response = await fetchWithRetry(
     `${chatRuntimeConfig.apiBaseUrl}/conversations/${encodeURIComponent(conversationId)}`,
-    {
+    withLocalApiHeaders({
       method: "DELETE",
-    },
+    }),
   )
 
   await readJson<{ ok: true }>(response)
 }
 
 export async function synthesizeSpeech(text: string) {
-  const response = await fetchWithRetry(`${chatRuntimeConfig.apiBaseUrl}/speech/tts`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ text }),
-  })
+  const response = await fetchWithRetry(
+    `${chatRuntimeConfig.apiBaseUrl}/speech/tts`,
+    withLocalApiHeaders({
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text }),
+    }),
+  )
 
   if (!response.ok) {
     throw new Error(await readErrorDetail(response))
@@ -143,14 +165,17 @@ export async function streamChatCompletion({
   onChunk,
   signal,
 }: StreamChatCompletionOptions) {
-  const response = await fetchWithRetry(chatRuntimeConfig.endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ messages, thinking: true }),
-    signal,
-  })
+  const response = await fetchWithRetry(
+    chatRuntimeConfig.endpoint,
+    withLocalApiHeaders({
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ messages, thinking: true }),
+      signal,
+    }),
+  )
 
   if (!response.ok || !response.body) {
     throw new Error(await readErrorDetail(response))
@@ -289,14 +314,17 @@ export async function streamConversationTitle({
   temperature,
   signal,
 }: StreamConversationTitleOptions) {
-  const response = await fetchWithRetry(chatRuntimeConfig.titleEndpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ message: userMessage, temperature }),
-    signal,
-  })
+  const response = await fetchWithRetry(
+    chatRuntimeConfig.titleEndpoint,
+    withLocalApiHeaders({
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message: userMessage, temperature }),
+      signal,
+    }),
+  )
 
   if (!response.ok || !response.body) {
     throw new Error(await readErrorDetail(response))

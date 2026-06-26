@@ -1,9 +1,14 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron")
+const { randomBytes } = require("node:crypto")
 const net = require("node:net")
 const path = require("node:path")
 const { startServer, stopServer } = require("../backend/node/server.cjs")
+const { createUpdateService } = require("./updater/index.cjs")
 
 let backendPort = null
+let backendClientToken = null
+let isAppQuitting = false
+const updateService = createUpdateService()
 
 function findAvailablePort(startPort) {
   return new Promise((resolve, reject) => {
@@ -36,23 +41,30 @@ async function startBackend() {
   }
 
   backendPort = await findAvailablePort(3001)
+  backendClientToken = randomBytes(32).toString("hex")
   const resourceDirectory = app.isPackaged
     ? path.join(process.resourcesPath, "resources")
     : path.join(__dirname, "..", "resources")
 
   Object.assign(process.env, {
+    SUPRACHAT_CLIENT_TOKEN: backendClientToken,
     SUPRACHAT_DATA_DIR: app.getPath("userData"),
     SUPRACHAT_NODE_PORT: String(backendPort),
     SUPRACHAT_RESOURCE_DIR: resourceDirectory,
   })
 
-  startServer({ dataDir: app.getPath("userData"), port: backendPort })
+  startServer({
+    clientToken: backendClientToken,
+    dataDir: app.getPath("userData"),
+    port: backendPort,
+  })
 
   return backendPort
 }
 
 function createWindow() {
   const isMac = process.platform === "darwin"
+  let allowWindowClose = false
   const window = new BrowserWindow({
     width: 1500,
     height: 940,
@@ -66,7 +78,10 @@ function createWindow() {
     titleBarStyle: "hidden",
     trafficLightPosition: isMac ? { x: 13, y: 10 } : undefined,
     webPreferences: {
-      additionalArguments: [`--suprachat-backend-port=${backendPort ?? 3001}`],
+      additionalArguments: [
+        `--suprachat-backend-port=${backendPort ?? 3001}`,
+        `--suprachat-client-token=${backendClientToken ?? ""}`,
+      ],
       preload: path.join(__dirname, "preload.cjs"),
     },
   })
@@ -79,7 +94,30 @@ function createWindow() {
 
   window.on("ready-to-show", () => {
     window.show()
+    updateService.handleWindowShown(window)
   })
+
+  window.on("close", (event) => {
+    if (isAppQuitting || allowWindowClose) {
+      return
+    }
+
+    event.preventDefault()
+
+    void updateService.handleWindowCloseRequest(window).then(({ shouldClose }) => {
+      if (!shouldClose) {
+        return
+      }
+
+      allowWindowClose = true
+      window.close()
+      setImmediate(() => {
+        allowWindowClose = false
+      })
+    })
+  })
+
+  return window
 }
 
 function getFocusedWindow() {
@@ -111,6 +149,7 @@ ipcMain.handle("window:close", () => {
 
 function stopBackend() {
   stopServer()
+  backendClientToken = null
   backendPort = null
 }
 
@@ -127,9 +166,19 @@ app.whenReady().then(async () => {
     app.quit()
     return
   }
+  updateService.initialize()
   createWindow()
 
   app.on("activate", () => {
+    const existingWindow = BrowserWindow.getAllWindows()[0]
+
+    if (existingWindow) {
+      existingWindow.show()
+      existingWindow.focus()
+      updateService.handleWindowShown(existingWindow)
+      return
+    }
+
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow()
     }
@@ -137,6 +186,7 @@ app.whenReady().then(async () => {
 })
 
 app.on("before-quit", () => {
+  isAppQuitting = true
   stopBackend()
 })
 

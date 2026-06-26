@@ -2,12 +2,21 @@ node_modules/
 dist/
 dist-electron/
 .venv/
+.codex/
+.env
+.env.*
+*.local
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
 __pycache__/
 *.pyc
 build/
 release/
 .DS_Store
+*.log
+*.err
 
 # Generated local runtime assets.
 resources/models/**/*.gguf

@@ -48,10 +48,16 @@ let serverInstance = null
 let databaseInstance = null
 let runtimeConfig = null
 let generationProvider = null
+const ALLOWED_HEADERS = "Content-Type, X-SupraChat-Client-Token"
 
 function getAllowedOrigin(req, config) {
   const origin = req.headers.origin
   return config.allowedOrigins.has(origin) ? origin : "http://127.0.0.1:5173"
+}
+
+function hasValidClientToken(req, config) {
+  const requestToken = req.headers["x-suprachat-client-token"]
+  return typeof requestToken === "string" && requestToken === config.clientToken
 }
 
 function buildUrl(req) {
@@ -85,7 +91,7 @@ function isValidConversation(payload) {
 function sendJson(req, res, statusCode, payload) {
   res.writeHead(statusCode, {
     "Access-Control-Allow-Origin": getAllowedOrigin(req, runtimeConfig),
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": ALLOWED_HEADERS,
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     "Content-Type": "application/json",
   })
@@ -122,7 +128,7 @@ function readJsonBody(req) {
 function writeStreamHeaders(req, res, config) {
   res.writeHead(200, {
     "Access-Control-Allow-Origin": getAllowedOrigin(req, config),
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": ALLOWED_HEADERS,
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     "Content-Type": "text/plain; charset=utf-8",
   })
@@ -131,7 +137,7 @@ function writeStreamHeaders(req, res, config) {
 function sendFile(req, res, statusCode, filePath, mimeType, extraHeaders = {}) {
   res.writeHead(statusCode, {
     "Access-Control-Allow-Origin": getAllowedOrigin(req, runtimeConfig),
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": ALLOWED_HEADERS,
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     "Cache-Control": "private, max-age=31536000, immutable",
     "Content-Type": mimeType,
@@ -239,6 +245,15 @@ function createServer(database, config, provider) {
 
   if (req.method === "OPTIONS") {
     sendJson(req, res, 204, {})
+    return
+  }
+
+  if (!hasValidClientToken(req, config)) {
+    sendJson(req, res, 401, {
+      ok: false,
+      error: "unauthorized_client",
+      detail: "This local SupraChat backend rejected an unauthorized client request.",
+    })
     return
   }
 

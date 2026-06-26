@@ -1,5 +1,6 @@
 const os = require("node:os")
 const path = require("node:path")
+const { randomBytes } = require("node:crypto")
 
 const DEFAULT_APP_DATA_DIRECTORY = "SupraChat"
 const DEFAULT_CHAT_MODEL = "lfm2.5-1.2b-thinking-q5-k-m"
@@ -42,6 +43,10 @@ function resolveRuntimeConfig(options = {}) {
       "null",
     ]),
     chatModel: options.chatModel ?? process.env.SUPRACHAT_CHAT_MODEL ?? DEFAULT_CHAT_MODEL,
+    clientToken:
+      options.clientToken ??
+      process.env.SUPRACHAT_CLIENT_TOKEN ??
+      randomBytes(32).toString("hex"),
     titleModel:
       options.titleModel ?? process.env.SUPRACHAT_TITLE_MODEL ?? DEFAULT_TITLE_MODEL,
     databasePath,

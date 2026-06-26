@@ -1,0 +1,29 @@
+name: Release Validation
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      current_version:
+        description: Current packaged app version
+        required: true
+      next_tag:
+        description: Candidate release tag
+        required: true
+
+jobs:
+  validate-release-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate release tag
+        run: node scripts/validate-release-tag.cjs "${{ github.event.inputs.current_version || '0.1.0' }}" "${{ github.event.inputs.next_tag || github.ref_name }}"

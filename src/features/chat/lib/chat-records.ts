@@ -44,6 +44,20 @@ export function titleFromMessage(content: string) {
   return words.length > 0 ? words.join(" ") : DEFAULT_CONVERSATION_TITLE
 }
 
+export function titleFromPromptPreview(content: string, maxCharacters = 100) {
+  const normalizedContent = content.replace(/\s+/g, " ").trim()
+
+  if (!normalizedContent) {
+    return DEFAULT_CONVERSATION_TITLE
+  }
+
+  if (normalizedContent.length <= maxCharacters) {
+    return normalizedContent
+  }
+
+  return normalizedContent.slice(0, maxCharacters).trimEnd()
+}
+
 export function sanitizeGeneratedTitle(content: string) {
   return content
     .replace(GENERATED_TITLE_DISALLOWED_CHARACTERS, " ")
