@@ -1,13 +1,12 @@
 import {
   Bot,
   Database,
-  MonitorCog,
   Palette,
   Settings2,
   type LucideIcon,
 } from "lucide-react"
 
-export type SettingsTabId = "general" | "appearance" | "models" | "runtime" | "data"
+export type SettingsTabId = "general" | "appearance" | "models" | "data"
 
 export type SettingsTab = {
   group: "Desktop" | "Local"
@@ -38,13 +37,6 @@ export const settingsTabs: SettingsTab[] = [
     label: "Models",
     description: "Bundled SupraLabs models and local assets.",
     icon: Bot,
-  },
-  {
-    group: "Local",
-    id: "runtime",
-    label: "Runtime",
-    description: "Local llama.cpp execution status.",
-    icon: MonitorCog,
   },
   {
     group: "Local",

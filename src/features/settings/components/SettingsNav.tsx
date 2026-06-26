@@ -7,27 +7,19 @@ type SettingsNavProps = {
 }
 
 export function SettingsNav({ activeTab, onChange }: SettingsNavProps) {
-  const groupedTabs = settingsTabs.reduce<Record<SettingsTab["group"], SettingsTab[]>>(
-    (groups, tab) => {
-      groups[tab.group].push(tab)
-      return groups
-    },
-    {
-      Desktop: [],
-      Local: [],
-    },
-  )
+  const desktopTabs = settingsTabs.filter((tab) => tab.group === "Desktop")
 
   return (
     <nav className="settings-nav" aria-label="Settings">
-      {Object.entries(groupedTabs).map(([group, tabs]) => (
-        <div className="settings-nav-group" key={group}>
-          <p>{group}</p>
-          {tabs.map((tab) => (
+      <div className="settings-nav-primary">
+        <div className="settings-nav-group" data-group="desktop">
+          <p>Desktop</p>
+          {desktopTabs.map((tab) => (
             <button
               key={tab.id}
               className={cn("settings-nav-item", activeTab === tab.id && "settings-nav-item-active")}
               type="button"
+              aria-label={tab.label}
               onClick={() => onChange(tab.id)}
             >
               <tab.icon className="h-4 w-4" aria-hidden="true" />
@@ -35,7 +27,7 @@ export function SettingsNav({ activeTab, onChange }: SettingsNavProps) {
             </button>
           ))}
         </div>
-      ))}
+      </div>
     </nav>
   )
 }

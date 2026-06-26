@@ -194,6 +194,7 @@ type ChatState = {
   regenerateAssistantMessage: (messageId: string) => Promise<void>
   editUserMessage: (messageId: string, content: string) => Promise<void>
   deleteConversation: (conversationId: string) => Promise<boolean>
+  deleteAllConversations: () => Promise<boolean>
   sendMessage: (content: string, options?: { beforeGeneration?: () => Promise<void> | void }) => Promise<void>
   stopGeneration: () => void
   setActiveConversation: (conversationId: string) => void
@@ -882,6 +883,38 @@ export const useChatStore = create<ChatState>((set) => ({
         state.activeConversationId === conversationId
           ? nextConversations[0].id
           : state.activeConversationId,
+      error: null,
+    })
+
+    return true
+  },
+  deleteAllConversations: async () => {
+    const state = useChatStore.getState()
+
+    if (state.isGenerating) {
+      return false
+    }
+
+    const persistedConversations = state.conversations.filter(
+      (conversation) => conversation.messages.length > 0,
+    )
+
+    try {
+      await Promise.all(
+        persistedConversations.map((conversation) => deleteStoredConversation(conversation.id)),
+      )
+    } catch {
+      set({
+        error: "Unable to delete saved conversations. Check the local database connection and try again.",
+      })
+      return false
+    }
+
+    const replacementConversation = createConversationRecord()
+
+    set({
+      conversations: [replacementConversation],
+      activeConversationId: replacementConversation.id,
       error: null,
     })
 

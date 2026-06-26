@@ -84,6 +84,8 @@ export function AppShell() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const speechCacheRef = useRef<Map<string, CachedSpeechClip>>(new Map())
   const speechRequestRef = useRef(0)
+  const hasAppliedInitialThemeRef = useRef(false)
+  const themeRef = useRef<AppTheme>(theme)
   const { clearSubmitScrollSpace, scrollLatestUserTurnIntoView, scrollRef } = useAutoScroll()
   const conversations = useChatStore((state) => state.conversations)
   const activeConversationId = useChatStore((state) => state.activeConversationId)
@@ -117,21 +119,43 @@ export function AppShell() {
   useEffect(() => {
     const mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)")
 
-    function resolveTheme() {
-      const nextTheme = themePreference === "system" ? getSystemTheme() : themePreference
+    function commitTheme(nextTheme: AppTheme) {
+      themeRef.current = nextTheme
       setTheme(nextTheme)
       applyAppTheme(nextTheme)
     }
 
-    resolveTheme()
+    function resolveTheme() {
+      const nextTheme = themePreference === "system" ? getSystemTheme() : themePreference
 
-    if (themePreference !== "system" || !mediaQuery) {
-      return
+      if (!hasAppliedInitialThemeRef.current) {
+        hasAppliedInitialThemeRef.current = true
+        themeRef.current = nextTheme
+        setTheme(nextTheme)
+        applyAppTheme(nextTheme)
+        return
+      }
+
+      if (nextTheme === themeRef.current) {
+        return
+      }
+
+      commitTheme(nextTheme)
     }
 
-    mediaQuery.addEventListener("change", resolveTheme)
+    resolveTheme()
 
-    return () => mediaQuery.removeEventListener("change", resolveTheme)
+    const shouldListenToSystemTheme = themePreference === "system" && mediaQuery
+
+    if (shouldListenToSystemTheme) {
+      mediaQuery.addEventListener("change", resolveTheme)
+    }
+
+    return () => {
+      if (shouldListenToSystemTheme) {
+        mediaQuery.removeEventListener("change", resolveTheme)
+      }
+    }
   }, [themePreference])
 
   useEffect(() => {

@@ -8,13 +8,13 @@ import { SettingsRow } from "@/features/settings/components/SettingsRow"
 import { SettingsSection } from "@/features/settings/components/SettingsSection"
 import {
   fetchSettingsModels,
-  fetchSettingsRuntime,
   fetchSettingsStorage,
   type SettingsModelsPayload,
-  type SettingsRuntimePayload,
   type SettingsStoragePayload,
 } from "@/features/settings/services/settings-service"
+import { useChatStore } from "@/features/chat/store/use-chat-store"
 import { useSettingsStore } from "@/features/settings/store/use-settings-store"
+import { cn } from "@/lib/utils"
 
 type SettingsDialogProps = {
   isOpen: boolean
@@ -25,7 +25,6 @@ type SettingsDataState = {
   error: string | null
   isLoading: boolean
   models: SettingsModelsPayload | null
-  runtime: SettingsRuntimePayload | null
   storage: SettingsStoragePayload | null
 }
 
@@ -64,15 +63,17 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     error: null,
     isLoading: false,
     models: null,
-    runtime: null,
     storage: null,
   })
+  const [isDeletingAllChats, setIsDeletingAllChats] = useState(false)
   const activeTabDefinition = useMemo(
     () => settingsTabs.find((tab) => tab.id === activeTab) ?? settingsTabs[0],
     [activeTab],
   )
+  const localTabs = useMemo(() => settingsTabs.filter((tab) => tab.group === "Local"), [])
   const autoTitleConversations = useSettingsStore((state) => state.autoTitleConversations)
   const confirmConversationDeletion = useSettingsStore((state) => state.confirmConversationDeletion)
+  const deleteAllConversations = useChatStore((state) => state.deleteAllConversations)
   const showAverageTps = useSettingsStore((state) => state.showAverageTps)
   const showContextMeter = useSettingsStore((state) => state.showContextMeter)
   const startWithLastConversation = useSettingsStore((state) => state.startWithLastConversation)
@@ -88,8 +89,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     setDataState((current) => ({ ...current, error: null, isLoading: true }))
 
     try {
-      const [runtime, models, storage] = await Promise.all([
-        fetchSettingsRuntime(),
+      const [models, storage] = await Promise.all([
         fetchSettingsModels(),
         fetchSettingsStorage(),
       ])
@@ -98,7 +98,6 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
         error: null,
         isLoading: false,
         models,
-        runtime,
         storage,
       })
     } catch (error) {
@@ -107,6 +106,32 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
         error: error instanceof Error ? error.message : "Unable to load settings information.",
         isLoading: false,
       }))
+    }
+  }
+
+  async function handleDeleteAllChats() {
+    if (isDeletingAllChats) {
+      return
+    }
+
+    const shouldDelete = window.confirm(
+      "Delete all saved chats from this device? This action cannot be undone.",
+    )
+
+    if (!shouldDelete) {
+      return
+    }
+
+    setIsDeletingAllChats(true)
+
+    try {
+      const deleted = await deleteAllConversations()
+
+      if (deleted) {
+        await loadSettingsData()
+      }
+    } finally {
+      setIsDeletingAllChats(false)
     }
   }
 
@@ -171,6 +196,20 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                 </button>
               </div>
               <SettingsNav activeTab={activeTab} onChange={setActiveTab} />
+              <div className="settings-sidebar-local-nav" aria-label="Local settings">
+                {localTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    className={cn("settings-nav-item", activeTab === tab.id && "settings-nav-item-active")}
+                    type="button"
+                    aria-label={tab.label}
+                    title={tab.label}
+                    onClick={() => setActiveTab(tab.id)}
+                  >
+                    <tab.icon className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
             </aside>
 
             <div className="settings-content">
@@ -283,35 +322,6 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                   </SettingsSection>
                 ) : null}
 
-                {activeTab === "runtime" ? (
-                  <>
-                    <SettingsSection title="Status" description="Local execution uses the bundled llama.cpp runtime.">
-                      <SettingsRow label="Runtime">
-                        <SettingsBadge tone={statusTone(dataState.runtime?.runtimePreflight.ok)}>
-                          {dataState.runtime?.runtimePreflight.ok ? "Ready" : "Attention Required"}
-                        </SettingsBadge>
-                      </SettingsRow>
-                      <SettingsRow label="API endpoint">
-                        <SettingsPath value={dataState.runtime?.apiBaseUrl ?? "Loading"} />
-                      </SettingsRow>
-                      <SettingsRow label="Platform">
-                        <SettingsBadge>{dataState.runtime ? `${dataState.runtime.platform}-${dataState.runtime.arch}` : "Loading"}</SettingsBadge>
-                      </SettingsRow>
-                      <SettingsRow label="Threads">
-                        <SettingsBadge>{dataState.runtime ? String(dataState.runtime.threadCount) : "Loading"}</SettingsBadge>
-                      </SettingsRow>
-                    </SettingsSection>
-
-                    <SettingsSection title="Runtime Files">
-                      {(dataState.runtime?.runtimePreflight.checks ?? []).map((check) => (
-                        <SettingsRow key={check.path} label={check.label} description={check.path}>
-                          <SettingsBadge tone={statusTone(check.ok)}>{check.ok ? "Ready" : "Missing"}</SettingsBadge>
-                        </SettingsRow>
-                      ))}
-                    </SettingsSection>
-                  </>
-                ) : null}
-
                 {activeTab === "data" ? (
                   <>
                     <SettingsSection title="Local Storage" description="Conversation data is stored on this device.">
@@ -333,6 +343,28 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                       <SettingsRow label="Messages">
                         <SettingsBadge>{String(dataState.storage?.stats.messageCount ?? 0)}</SettingsBadge>
                       </SettingsRow>
+                    </SettingsSection>
+
+                    <SettingsSection title="Delete">
+                      <div className="settings-danger-section-heading">Delete</div>
+                      <div className="settings-section-rows settings-danger-rows">
+                        <div className="settings-row settings-danger-row">
+                          <div className="settings-row-copy">
+                            <span>Delete all chats</span>
+                            <p>Remove all saved conversations and messages from this device.</p>
+                          </div>
+                          <div className="settings-row-control">
+                            <button
+                              className="settings-danger-button"
+                              type="button"
+                              onClick={() => void handleDeleteAllChats()}
+                              disabled={isDeletingAllChats}
+                            >
+                              {isDeletingAllChats ? "Deleting" : "Delete all chats"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </SettingsSection>
                   </>
                 ) : null}
