@@ -9,11 +9,11 @@ const CHAT_MODEL = {
   repo: "unsloth/LFM2.5-1.2B-Thinking-GGUF",
   filename: "LFM2.5-1.2B-Thinking-Q5_K_M.gguf",
   contextWindowTokens: 16384,
-  maxTokens: 2048,
-  temperature: 0.35,
+  maxTokens: 4096,
+  temperature: 0.75,
   topK: 50,
-  topP: 0.9,
-  repeatPenalty: 1.08,
+  topP: 0.8,
+  repeatPenalty: 1.1,
 }
 
 const TITLE_MODEL = {
@@ -24,10 +24,10 @@ const TITLE_MODEL = {
   repo: "SupraLabs/Supra-Title-350M-exp-GGUF",
   filename: "LiquidAI_LFM2.5-350M-Base_1781204855.Q4_K_M.gguf",
   contextWindowTokens: 4096,
-  maxTokens: 24,
-  temperature: 0.1,
-  topK: 40,
-  repeatPenalty: 1.08,
+  maxTokens: 12,
+  temperature: 0.35,
+  topK: 15,
+  repeatPenalty: 1.1,
 }
 
 const SPEECH_TTS_MODEL = {
