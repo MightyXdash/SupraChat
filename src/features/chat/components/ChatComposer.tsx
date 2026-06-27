@@ -15,6 +15,7 @@ export type ContextUsageSummary = {
 type ChatComposerProps = {
   draft: string
   draftRevealKey: number
+  shouldRevealDraft: boolean
   error: string | null
   generationTokensPerSecond: number | null
   isEditing: boolean
@@ -40,6 +41,7 @@ type ChatComposerProps = {
 export function ChatComposer({
   draft,
   draftRevealKey,
+  shouldRevealDraft,
   error,
   generationTokensPerSecond,
   isEditing,
@@ -213,7 +215,7 @@ export function ChatComposer({
         <div className="chat-composer-main">
           <div
             className="chat-composer-text-reveal-shell"
-            data-revealing={draftRevealKey > 0 || undefined}
+            data-revealing={shouldRevealDraft || undefined}
             key={`draft-reveal-${draftRevealKey}`}
           >
             <textarea

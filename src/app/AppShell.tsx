@@ -77,6 +77,7 @@ function getSilentSpeechPrimerUrl() {
 export function AppShell() {
   const [draft, setDraft] = useState("")
   const [draftRevealKey, setDraftRevealKey] = useState(0)
+  const [shouldRevealDraft, setShouldRevealDraft] = useState(false)
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [activePanel, setActivePanel] = useState<AppPanel>(() => useSettingsStore.getState().defaultWorkspace)
   const [playgroundView, setPlaygroundView] = useState<PlaygroundView>("featured")
@@ -191,6 +192,7 @@ export function AppShell() {
 
           return `${current}${/\s$/.test(current) ? "" : " "}${normalizedText}`
         })
+        setShouldRevealDraft(true)
         setDraftRevealKey((current) => current + 1)
       },
       onError: (error) => {
@@ -343,6 +345,7 @@ export function AppShell() {
     }
 
     setDraft("")
+    setShouldRevealDraft(false)
     try {
       if (editingMessageId) {
         const messageId = editingMessageId
@@ -364,11 +367,18 @@ export function AppShell() {
     setActivePanel("chat")
     setEditingMessageId(message.id)
     setDraft(message.content)
+    setShouldRevealDraft(false)
   }
 
   function handleCancelEdit() {
     setEditingMessageId(null)
     setDraft("")
+    setShouldRevealDraft(false)
+  }
+
+  function handleDraftChange(value: string) {
+    setShouldRevealDraft(false)
+    setDraft(value)
   }
 
   function handleVoiceVadStart() {
@@ -528,6 +538,7 @@ export function AppShell() {
     setActivePanel("chat")
     setEditingMessageId(null)
     setDraft("")
+    setShouldRevealDraft(false)
     return createConversation()
   }
 
@@ -535,6 +546,7 @@ export function AppShell() {
     setActivePanel("chat")
     setEditingMessageId(null)
     setDraft("")
+    setShouldRevealDraft(false)
     setActiveConversation(conversationId)
   }
 
@@ -603,6 +615,7 @@ export function AppShell() {
             conversation={activeConversation}
             draft={draft}
             draftRevealKey={draftRevealKey}
+            shouldRevealDraft={shouldRevealDraft}
             editingMessageId={editingMessageId}
             error={voiceError ?? error}
             isGenerating={isGenerating}
@@ -615,7 +628,7 @@ export function AppShell() {
             voiceWaveformData={voiceWaveformData}
             hasActiveVoiceHotkey={isVoiceHotkeyActive}
             onCancelEdit={handleCancelEdit}
-            onDraftChange={setDraft}
+            onDraftChange={handleDraftChange}
             onEditUserMessage={handleEditUserMessage}
             onRegenerateAssistantMessage={regenerateAssistantMessage}
             onSeekSpeech={seekSpeechPlayback}

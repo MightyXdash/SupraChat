@@ -10,6 +10,7 @@ type ChatWorkspaceProps = {
   conversation?: Conversation
   draft: string
   draftRevealKey: number
+  shouldRevealDraft: boolean
   editingMessageId: string | null
   error: string | null
   generationTokensPerSecond: number | null
@@ -39,6 +40,7 @@ export function ChatWorkspace({
   conversation,
   draft,
   draftRevealKey,
+  shouldRevealDraft,
   editingMessageId,
   error,
   generationTokensPerSecond,
@@ -143,6 +145,7 @@ export function ChatWorkspace({
         <ChatComposer
           draft={draft}
           draftRevealKey={draftRevealKey}
+          shouldRevealDraft={shouldRevealDraft}
           error={error}
           isGenerating={isGenerating}
           generationTokensPerSecond={displayedTokensPerSecond}

@@ -20,6 +20,8 @@ type VoiceStore = {
   setHotkeyActive: (active: boolean) => void
 }
 
+let activeCallbacks: Pick<VoiceServiceCallbacks, "onTranscriptionResult" | "onError"> | null = null
+
 export const useVoiceStore = create<VoiceStore>((set, get) => ({
   voiceState: "idle",
   waveformData: null,
@@ -27,6 +29,8 @@ export const useVoiceStore = create<VoiceStore>((set, get) => ({
   isHotkeyActive: false,
 
   initialize: (callbacks) => {
+    activeCallbacks = callbacks
+
     if (get().voiceService) return
 
     const serviceCallbacks: VoiceServiceCallbacks = {
@@ -38,11 +42,11 @@ export const useVoiceStore = create<VoiceStore>((set, get) => ({
       },
       onTranscriptionResult: (text) => {
         set({ waveformData: null })
-        callbacks.onTranscriptionResult(text)
+        activeCallbacks?.onTranscriptionResult(text)
       },
       onError: (error) => {
         set({ waveformData: null })
-        callbacks.onError(error)
+        activeCallbacks?.onError(error)
       },
     }
 
