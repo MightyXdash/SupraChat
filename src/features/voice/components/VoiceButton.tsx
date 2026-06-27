@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react"
-import { Loader2, Mic, X } from "lucide-react"
+import { Loader2, Mic, Square } from "lucide-react"
 import { STT_HOTKEY } from "@/features/voice/store/use-voice-store"
 
 type VoiceButtonProps = {
   voiceState: "idle" | "recording" | "processing"
   hasActiveHotkey: boolean
   onVadStart: () => void
-  onCancel: () => void
+  onFinish: () => void
 }
 
 const TOOLTIP_DELAY_MS = 1750
@@ -15,7 +15,7 @@ export function VoiceButton({
   voiceState,
   hasActiveHotkey,
   onVadStart,
-  onCancel,
+  onFinish,
 }: VoiceButtonProps) {
   const [showTooltip, setShowTooltip] = useState(false)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -49,7 +49,7 @@ export function VoiceButton({
 
   function handleClick() {
     if (isRecording) {
-      onCancel()
+      onFinish()
       return
     }
 
@@ -72,7 +72,7 @@ export function VoiceButton({
         onClick={handleClick}
       >
         {isRecording ? (
-          <X className="h-4 w-4" />
+          <Square className="h-3.5 w-3.5 fill-current" />
         ) : isProcessing ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (

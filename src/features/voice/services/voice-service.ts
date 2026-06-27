@@ -89,6 +89,7 @@ export function createVoiceService(callbacks: VoiceServiceCallbacks) {
   let state: VoiceState = "idle"
   let audioChunks: Float32Array[] = []
   let totalSamples = 0
+  let recordingSampleRate = SAMPLE_RATE
 
   let vadSilenceStart: number | null = null
   let vadTimer: ReturnType<typeof setInterval> | null = null
@@ -224,6 +225,7 @@ export function createVoiceService(callbacks: VoiceServiceCallbacks) {
 
     const ctx = new AudioContext({ sampleRate: SAMPLE_RATE })
     audioContext = ctx
+    recordingSampleRate = ctx.sampleRate
     sourceNode = ctx.createMediaStreamSource(mediaStream)
 
     analyserNode = ctx.createAnalyser()
@@ -240,6 +242,10 @@ export function createVoiceService(callbacks: VoiceServiceCallbacks) {
       pushAudioSamples(new Float32Array(inputData))
     }
 
+    if (ctx.state === "suspended") {
+      await ctx.resume()
+    }
+
     return ctx
   }
 
@@ -250,6 +256,7 @@ export function createVoiceService(callbacks: VoiceServiceCallbacks) {
     setState("processing")
 
     const samples = flushAudioBuffer()
+    const sampleRate = recordingSampleRate
 
     if (currentMode === "vad" && vadTimer) {
       clearInterval(vadTimer)
@@ -259,16 +266,22 @@ export function createVoiceService(callbacks: VoiceServiceCallbacks) {
 
     cleanupMedia()
 
-    if (samples.length < SAMPLE_RATE * 0.3) {
+    if (samples.length < sampleRate * 0.3) {
       setState("idle")
       callbacks.onError("Recording was too short. Please try again.")
       return
     }
 
     try {
-      const wavBuffer = encodeWav(samples, SAMPLE_RATE)
+      const wavBuffer = encodeWav(samples, sampleRate)
       const text = await transcribeAudio(wavBuffer)
       setState("idle")
+
+      if (!text.trim()) {
+        callbacks.onError("No speech was detected. Try again with a little more input.")
+        return
+      }
+
       callbacks.onTranscriptionResult(text)
     } catch (error) {
       setState("idle")
@@ -319,10 +332,16 @@ export function createVoiceService(callbacks: VoiceServiceCallbacks) {
     void stopAndTranscribe()
   }
 
+  function finishRecording() {
+    if (state !== "recording") return
+    void stopAndTranscribe()
+  }
+
   return {
     startVadRecording,
     startPttRecording,
     stopPttRecording,
+    finishRecording,
     cancelRecording,
     get state() {
       return state

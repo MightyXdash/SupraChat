@@ -3909,66 +3909,92 @@ html[data-theme-switching] *::after {
 .voice-dictation-surface {
   align-items: center;
   animation: voice-dictation-enter 260ms var(--ease-sidebar-content) both;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--glass-top) 78%, transparent), color-mix(in srgb, var(--glass-bottom) 74%, transparent)),
-    color-mix(in srgb, var(--surface) 84%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, var(--border));
-  border-radius: 999px;
-  box-shadow:
-    0 10px 28px color-mix(in srgb, var(--shadow-soft) 58%, transparent),
-    inset 0 1px 0 var(--glass-inset);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   display: grid;
-  gap: 0.62rem;
-  grid-template-columns: auto minmax(3rem, 0.42fr) minmax(9rem, 1fr) auto auto;
-  inset: 0.12rem 0.18rem auto;
-  min-height: 2.55rem;
+  gap: 0.52rem;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  inset: 0.08rem 0.14rem auto;
+  min-height: 2.2rem;
   overflow: hidden;
-  padding: 0.38rem 0.48rem;
+  padding: 0.1rem 0.18rem;
   position: absolute;
   z-index: 2;
 }
 
 .voice-dictation-surface[data-processing] {
-  border-color: color-mix(in srgb, var(--info) 24%, var(--border));
+  color: var(--info);
 }
 
-.voice-dictation-action,
-.voice-dictation-commit {
+.voice-dictation-action {
   align-items: center;
-  background: color-mix(in srgb, var(--surface-elevated) 72%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 64%, transparent);
   border: 0;
-  border-radius: 999px;
+  border-radius: 8px;
   color: var(--text-secondary);
   display: inline-flex;
-  height: 1.75rem;
+  height: 1.95rem;
   justify-content: center;
   transition:
     background var(--motion-fast) ease-out,
     color var(--motion-fast) ease-out,
     transform var(--motion-fast) ease-out;
-  width: 1.75rem;
+  width: 1.95rem;
 }
 
-.voice-dictation-action:hover {
+.voice-dictation-cancel:hover {
   background: color-mix(in srgb, var(--error) 14%, var(--surface-elevated));
   color: var(--error);
+}
+
+.voice-dictation-finish {
+  background: color-mix(in srgb, var(--accent-primary) 13%, transparent);
+  color: var(--accent-primary);
+}
+
+.voice-dictation-finish:hover {
+  background: color-mix(in srgb, var(--accent-primary) 21%, transparent);
+  color: var(--accent-hover);
 }
 
 .voice-dictation-action:disabled {
   opacity: 0.44;
 }
 
-.voice-dictation-quiet-line {
-  background-image: radial-gradient(circle, color-mix(in srgb, var(--text-muted) 64%, transparent) 1.2px, transparent 1.4px);
-  background-position: center;
-  background-size: 8px 2px;
-  height: 0.28rem;
-  opacity: 0.68;
+.voice-dictation-plus {
+  height: 1rem;
+  opacity: 0.38;
+  position: relative;
+  width: 1rem;
+}
+
+.voice-dictation-plus::before,
+.voice-dictation-plus::after {
+  background: var(--text-muted);
+  border-radius: 999px;
+  content: "";
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.voice-dictation-plus::before {
+  height: 1px;
+  width: 0.82rem;
+}
+
+.voice-dictation-plus::after {
+  height: 0.82rem;
+  width: 1px;
 }
 
 .voice-dictation-surface .voice-waveform-canvas {
   max-width: 100%;
-  width: min(280px, 100%) !important;
+  opacity: 0.9;
+  width: min(470px, 100%) !important;
 }
 
 .voice-dictation-status {
@@ -3990,11 +4016,6 @@ html[data-theme-switching] *::after {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-primary) 12%, transparent);
   height: 0.42rem;
   width: 0.42rem;
-}
-
-.voice-dictation-commit {
-  color: var(--success);
-  opacity: 0.66;
 }
 
 .voice-tooltip {

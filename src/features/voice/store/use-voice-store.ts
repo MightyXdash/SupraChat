@@ -15,6 +15,7 @@ type VoiceStore = {
   startVadRecording: () => void
   startPttRecording: () => void
   stopPttRecording: () => void
+  finishRecording: () => void
   cancelRecording: () => void
   setHotkeyActive: (active: boolean) => void
 }
@@ -62,6 +63,11 @@ export const useVoiceStore = create<VoiceStore>((set, get) => ({
   stopPttRecording: () => {
     const { voiceService } = get()
     voiceService?.stopPttRecording()
+  },
+
+  finishRecording: () => {
+    const { voiceService } = get()
+    voiceService?.finishRecording()
   },
 
   cancelRecording: () => {

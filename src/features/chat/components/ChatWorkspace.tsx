@@ -32,6 +32,7 @@ type ChatWorkspaceProps = {
   onSubmit: () => Promise<void> | void
   onToggleSpeech: () => void
   onVoiceVadStart: () => void
+  onVoiceFinish: () => void
   onVoiceCancel: () => void
 }
 
@@ -61,6 +62,7 @@ export function ChatWorkspace({
   onSubmit,
   onToggleSpeech,
   onVoiceVadStart,
+  onVoiceFinish,
   onVoiceCancel,
 }: ChatWorkspaceProps) {
   const isChatScrolling = useScrollVisibility(scrollRef)
@@ -167,6 +169,7 @@ export function ChatWorkspace({
           onSubmit={onSubmit}
           onToggleSpeech={onToggleSpeech}
           onVoiceVadStart={onVoiceVadStart}
+          onVoiceFinish={onVoiceFinish}
           onVoiceCancel={onVoiceCancel}
         />
       </div>

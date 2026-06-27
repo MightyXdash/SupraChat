@@ -77,6 +77,7 @@ function getSilentSpeechPrimerUrl() {
 export function AppShell() {
   const [draft, setDraft] = useState("")
   const [draftRevealKey, setDraftRevealKey] = useState(0)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
   const [activePanel, setActivePanel] = useState<AppPanel>(() => useSettingsStore.getState().defaultWorkspace)
   const [playgroundView, setPlaygroundView] = useState<PlaygroundView>("featured")
   const [isSearchOpen, setIsSearchOpen] = useState(false)
@@ -136,6 +137,7 @@ export function AppShell() {
   const initializeVoice = useVoiceStore((state) => state.initialize)
   const startPttRecording = useVoiceStore((state) => state.startPttRecording)
   const stopPttRecording = useVoiceStore((state) => state.stopPttRecording)
+  const finishVoiceRecording = useVoiceStore((state) => state.finishRecording)
   const startVadRecording = useVoiceStore((state) => state.startVadRecording)
   const cancelVoiceRecording = useVoiceStore((state) => state.cancelRecording)
   const setHotkeyActive = useVoiceStore((state) => state.setHotkeyActive)
@@ -182,6 +184,7 @@ export function AppShell() {
           return
         }
 
+        setVoiceError(null)
         setDraft((current) => {
           if (!current.trim()) {
             return normalizedText
@@ -192,6 +195,7 @@ export function AppShell() {
         setDraftRevealKey((current) => current + 1)
       },
       onError: (error) => {
+        setVoiceError(error)
         console.error("Voice transcription error:", error)
       },
     })
@@ -213,6 +217,7 @@ export function AppShell() {
 
       event.preventDefault()
       event.stopPropagation()
+      setVoiceError(null)
       setHotkeyActive(true)
       startPttRecording()
     }
@@ -223,6 +228,7 @@ export function AppShell() {
       }
 
       setHotkeyActive(false)
+      setVoiceError(null)
       stopPttRecording()
     }
 
@@ -364,6 +370,21 @@ export function AppShell() {
   function handleCancelEdit() {
     setEditingMessageId(null)
     setDraft("")
+  }
+
+  function handleVoiceVadStart() {
+    setVoiceError(null)
+    startVadRecording()
+  }
+
+  function handleVoiceFinish() {
+    setVoiceError(null)
+    finishVoiceRecording()
+  }
+
+  function handleVoiceCancel() {
+    setVoiceError(null)
+    cancelVoiceRecording()
   }
 
   async function playSpeechClip(message: ChatMessage) {
@@ -589,7 +610,7 @@ export function AppShell() {
             draft={draft}
             draftRevealKey={draftRevealKey}
             editingMessageId={editingMessageId}
-            error={error}
+            error={voiceError ?? error}
             isGenerating={isGenerating}
             generationTokensPerSecond={generationTokensPerSecond}
             scrollRef={scrollRef}
@@ -609,8 +630,9 @@ export function AppShell() {
             onStopGeneration={stopGeneration}
             onSubmit={handleSubmit}
             onToggleSpeech={toggleSpeechPlayback}
-            onVoiceVadStart={startVadRecording}
-            onVoiceCancel={cancelVoiceRecording}
+            onVoiceVadStart={handleVoiceVadStart}
+            onVoiceFinish={handleVoiceFinish}
+            onVoiceCancel={handleVoiceCancel}
           />
         )}
       </div>

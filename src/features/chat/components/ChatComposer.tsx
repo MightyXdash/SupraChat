@@ -34,6 +34,7 @@ type ChatComposerProps = {
   onSubmit: () => Promise<void> | void
   onToggleSpeech: () => void
   onVoiceVadStart: () => void
+  onVoiceFinish: () => void
   onVoiceCancel: () => void
 }
 
@@ -59,6 +60,7 @@ export function ChatComposer({
   onSubmit,
   onToggleSpeech,
   onVoiceVadStart,
+  onVoiceFinish,
   onVoiceCancel,
 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -237,6 +239,7 @@ export function ChatComposer({
             <VoiceDictationSurface
               voiceState={activeVoiceState}
               waveformData={voiceWaveformData}
+              onFinish={onVoiceFinish}
               onCancel={onVoiceCancel}
             />
           ) : null}
@@ -271,7 +274,7 @@ export function ChatComposer({
               voiceState={voiceState}
               hasActiveHotkey={hasActiveVoiceHotkey}
               onVadStart={onVoiceVadStart}
-              onCancel={onVoiceCancel}
+              onFinish={onVoiceFinish}
             />
             <Button
               aria-label={isGenerating ? "Stop response" : "Send message"}
