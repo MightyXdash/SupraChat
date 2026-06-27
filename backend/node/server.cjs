@@ -22,6 +22,7 @@ const { checkCurrentRuntime } = require("./runtime-preflight.cjs")
 const { resolveRuntimeConfig } = require("./runtime-config.cjs")
 const { getSpeechOnnxRuntimeInfo } = require("./speech-onnx-runtime.cjs")
 const { synthesizeSpeechClip } = require("./speech-service.cjs")
+const { transcribeSpeech } = require("./speech-stt-service.cjs")
 
 function getSystemPrompt() {
   const possiblePaths = [
@@ -486,6 +487,43 @@ function createServer(database, config, provider) {
         ok: false,
         error: "speech_synthesis_failed",
         detail: error?.message ?? "Unable to synthesize speech playback.",
+      })
+    }
+
+    return
+  }
+
+  if (req.method === "POST" && url.pathname === "/speech/stt") {
+    try {
+      const chunks = []
+
+      for await (const chunk of req) {
+        chunks.push(chunk)
+
+        if (Buffer.byteLength(Buffer.concat(chunks)) > 25 * 1024 * 1024) {
+          req.destroy(new Error("payload_too_large"))
+          return
+        }
+      }
+
+      const audioBuffer = Buffer.concat(chunks)
+
+      if (audioBuffer.length === 0) {
+        sendJson(req, res, 400, {
+          ok: false,
+          error: "stt_audio_required",
+          detail: "Send audio data to transcribe.",
+        })
+        return
+      }
+
+      const text = await transcribeSpeech(audioBuffer)
+      sendJson(req, res, 200, { ok: true, text })
+    } catch (error) {
+      sendJson(req, res, 502, {
+        ok: false,
+        error: "stt_transcription_failed",
+        detail: error?.message ?? "Unable to transcribe audio.",
       })
     }
 

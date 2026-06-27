@@ -9,6 +9,7 @@ import { ChatMessage, Conversation, SpeechPlaybackState } from "@/features/chat/
 type ChatWorkspaceProps = {
   conversation?: Conversation
   draft: string
+  draftRevealKey: number
   editingMessageId: string | null
   error: string | null
   generationTokensPerSecond: number | null
@@ -17,6 +18,9 @@ type ChatWorkspaceProps = {
   speechPlayback: SpeechPlaybackState
   showAverageTps: boolean
   showContextMeter: boolean
+  voiceState: "idle" | "recording" | "processing"
+  voiceWaveformData: Uint8Array | null
+  hasActiveVoiceHotkey: boolean
   onCancelEdit: () => void
   onDraftChange: (value: string) => void
   onEditUserMessage: (message: ChatMessage) => void
@@ -27,11 +31,14 @@ type ChatWorkspaceProps = {
   onStopGeneration: () => void
   onSubmit: () => Promise<void> | void
   onToggleSpeech: () => void
+  onVoiceVadStart: () => void
+  onVoiceCancel: () => void
 }
 
 export function ChatWorkspace({
   conversation,
   draft,
+  draftRevealKey,
   editingMessageId,
   error,
   generationTokensPerSecond,
@@ -40,6 +47,9 @@ export function ChatWorkspace({
   speechPlayback,
   showAverageTps,
   showContextMeter,
+  voiceState,
+  voiceWaveformData,
+  hasActiveVoiceHotkey,
   onCancelEdit,
   onDraftChange,
   onEditUserMessage,
@@ -50,6 +60,8 @@ export function ChatWorkspace({
   onStopGeneration,
   onSubmit,
   onToggleSpeech,
+  onVoiceVadStart,
+  onVoiceCancel,
 }: ChatWorkspaceProps) {
   const isChatScrolling = useScrollVisibility(scrollRef)
   const hasMessages = Boolean(conversation && conversation.messages.length > 0)
@@ -130,6 +142,7 @@ export function ChatWorkspace({
       >
         <ChatComposer
           draft={draft}
+          draftRevealKey={draftRevealKey}
           error={error}
           isGenerating={isGenerating}
           generationTokensPerSecond={displayedTokensPerSecond}
@@ -143,6 +156,9 @@ export function ChatWorkspace({
           speechPlayback={speechPlayback}
           showAverageTps={showAverageTps}
           showContextMeter={showContextMeter}
+          voiceState={voiceState}
+          voiceWaveformData={voiceWaveformData}
+          hasActiveVoiceHotkey={hasActiveVoiceHotkey}
           onCancelEdit={onCancelEdit}
           onDraftChange={onDraftChange}
           onSeekSpeech={onSeekSpeech}
@@ -150,6 +166,8 @@ export function ChatWorkspace({
           onStopGeneration={onStopGeneration}
           onSubmit={onSubmit}
           onToggleSpeech={onToggleSpeech}
+          onVoiceVadStart={onVoiceVadStart}
+          onVoiceCancel={onVoiceCancel}
         />
       </div>
     </section>

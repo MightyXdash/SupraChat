@@ -29,6 +29,7 @@ import {
   subscribeToUpdateStatus,
 } from "@/features/updates/services/update-service"
 import { useUpdaterStore } from "@/features/updates/store/use-updater-store"
+import { useVoiceStore } from "@/features/voice/store/use-voice-store"
 
 type AppPanel = "chat" | "playground"
 
@@ -75,6 +76,7 @@ function getSilentSpeechPrimerUrl() {
 
 export function AppShell() {
   const [draft, setDraft] = useState("")
+  const [draftRevealKey, setDraftRevealKey] = useState(0)
   const [activePanel, setActivePanel] = useState<AppPanel>(() => useSettingsStore.getState().defaultWorkspace)
   const [playgroundView, setPlaygroundView] = useState<PlaygroundView>("featured")
   const [isSearchOpen, setIsSearchOpen] = useState(false)
@@ -128,6 +130,15 @@ export function AppShell() {
   const setInstallingUpdate = useUpdaterStore((state) => state.setInstalling)
   const setUpdaterStatus = useUpdaterStore((state) => state.setStatus)
   const updaterStatus = useUpdaterStore((state) => state.status)
+  const voiceState = useVoiceStore((state) => state.voiceState)
+  const voiceWaveformData = useVoiceStore((state) => state.waveformData)
+  const isVoiceHotkeyActive = useVoiceStore((state) => state.isHotkeyActive)
+  const initializeVoice = useVoiceStore((state) => state.initialize)
+  const startPttRecording = useVoiceStore((state) => state.startPttRecording)
+  const stopPttRecording = useVoiceStore((state) => state.stopPttRecording)
+  const startVadRecording = useVoiceStore((state) => state.startVadRecording)
+  const cancelVoiceRecording = useVoiceStore((state) => state.cancelRecording)
+  const setHotkeyActive = useVoiceStore((state) => state.setHotkeyActive)
 
   useEffect(() => {
     void initialize()
@@ -161,6 +172,68 @@ export function AppShell() {
       unsubscribe()
     }
   }, [hydrateUpdatePreferences, setHydratedUpdater, setUpdaterStatus])
+
+  useEffect(() => {
+    initializeVoice({
+      onTranscriptionResult: (text) => {
+        const normalizedText = text.trim()
+
+        if (!normalizedText) {
+          return
+        }
+
+        setDraft((current) => {
+          if (!current.trim()) {
+            return normalizedText
+          }
+
+          return `${current}${/\s$/.test(current) ? "" : " "}${normalizedText}`
+        })
+        setDraftRevealKey((current) => current + 1)
+      },
+      onError: (error) => {
+        console.error("Voice transcription error:", error)
+      },
+    })
+  }, [initializeVoice])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.code !== "KeyM") {
+        return
+      }
+
+      if (voiceState === "processing") {
+        return
+      }
+
+      if (voiceState === "recording") {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      setHotkeyActive(true)
+      startPttRecording()
+    }
+
+    function handleKeyUp(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.code !== "KeyM") {
+        return
+      }
+
+      setHotkeyActive(false)
+      stopPttRecording()
+    }
+
+    window.addEventListener("keydown", handleKeyDown, { capture: true })
+    window.addEventListener("keyup", handleKeyUp, { capture: true })
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, { capture: true })
+      window.removeEventListener("keyup", handleKeyUp, { capture: true })
+    }
+  }, [voiceState, startPttRecording, stopPttRecording, setHotkeyActive])
 
   useEffect(() => {
     const mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)")
@@ -514,6 +587,7 @@ export function AppShell() {
           <ChatWorkspace
             conversation={activeConversation}
             draft={draft}
+            draftRevealKey={draftRevealKey}
             editingMessageId={editingMessageId}
             error={error}
             isGenerating={isGenerating}
@@ -522,6 +596,9 @@ export function AppShell() {
             speechPlayback={speechPlayback}
             showAverageTps={showAverageTps}
             showContextMeter={showContextMeter}
+            voiceState={voiceState}
+            voiceWaveformData={voiceWaveformData}
+            hasActiveVoiceHotkey={isVoiceHotkeyActive}
             onCancelEdit={handleCancelEdit}
             onDraftChange={setDraft}
             onEditUserMessage={handleEditUserMessage}
@@ -532,6 +609,8 @@ export function AppShell() {
             onStopGeneration={stopGeneration}
             onSubmit={handleSubmit}
             onToggleSpeech={toggleSpeechPlayback}
+            onVoiceVadStart={startVadRecording}
+            onVoiceCancel={cancelVoiceRecording}
           />
         )}
       </div>

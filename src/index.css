@@ -480,6 +480,14 @@ body {
   border-color: color-mix(in srgb, var(--border) 82%, transparent);
 }
 
+.chat-composer[data-dictating] {
+  border-color: color-mix(in srgb, var(--accent-primary) 38%, var(--border));
+  box-shadow:
+    0 16px 38px color-mix(in srgb, var(--shadow-soft) 72%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent-primary) 12%, transparent),
+    inset 0 1px 0 var(--glass-inset);
+}
+
 .chat-composer *:focus-visible {
   outline: none;
   box-shadow: none;
@@ -508,6 +516,47 @@ body {
   min-height: 7rem;
 }
 
+.chat-composer-text-reveal-shell {
+  position: relative;
+  transition:
+    filter var(--motion-base) var(--ease-sidebar),
+    opacity var(--motion-base) var(--ease-sidebar),
+    transform var(--motion-base) var(--ease-sidebar);
+}
+
+.chat-composer-text-reveal-shell::after {
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--info) 18%, transparent),
+      color-mix(in srgb, var(--accent-primary) 32%, transparent),
+      color-mix(in srgb, var(--error) 14%, transparent),
+      transparent
+    );
+  border-radius: 10px;
+  content: "";
+  inset: -0.2rem -0.05rem;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-42%) skewX(-10deg);
+}
+
+.chat-composer-text-reveal-shell[data-revealing]::after {
+  animation: composer-text-sheen 760ms var(--ease-sidebar-content) both;
+}
+
+.chat-composer-text-reveal-shell[data-revealing] .chat-composer-textarea {
+  animation: composer-text-materialize 720ms var(--ease-sidebar-content) both;
+}
+
+.chat-composer[data-dictating] .chat-composer-text-reveal-shell {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.12rem);
+}
+
 .chat-composer-textarea {
   background: transparent;
   color: var(--text-primary);
@@ -522,6 +571,10 @@ body {
   resize: none;
   transition: height var(--motion-base) var(--ease-sidebar);
   width: 100%;
+}
+
+.chat-composer-textarea[readonly] {
+  cursor: default;
 }
 
 .chat-composer[data-size="small"] .chat-composer-textarea {
@@ -3793,4 +3846,240 @@ html[data-theme-switching] *::after {
 
 .markdown-thought-paragraph.thought-reveal {
   animation: thought-reveal var(--motion-thought-reveal) var(--ease-sidebar-content) both;
+}
+
+.voice-button-wrapper {
+  position: relative;
+}
+
+.voice-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  height: 2.2rem;
+  justify-content: center;
+  position: relative;
+  transition:
+    background var(--motion-fast) ease-out,
+    color var(--motion-fast) ease-out,
+    transform var(--motion-fast) ease-out;
+  width: 2.2rem;
+  z-index: 1;
+}
+
+.chat-composer[data-size="small"] .voice-button {
+  height: 1.95rem;
+  width: 1.95rem;
+}
+
+.voice-button:hover {
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  color: var(--text-primary);
+}
+
+.voice-button[data-recording] {
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  color: var(--accent-hover);
+}
+
+.voice-button[data-recording]:hover {
+  background: color-mix(in srgb, var(--accent-primary) 26%, transparent);
+}
+
+.voice-button[data-processing] {
+  cursor: default;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.voice-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.voice-waveform-canvas {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.voice-dictation-surface {
+  align-items: center;
+  animation: voice-dictation-enter 260ms var(--ease-sidebar-content) both;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--glass-top) 78%, transparent), color-mix(in srgb, var(--glass-bottom) 74%, transparent)),
+    color-mix(in srgb, var(--surface) 84%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, var(--border));
+  border-radius: 999px;
+  box-shadow:
+    0 10px 28px color-mix(in srgb, var(--shadow-soft) 58%, transparent),
+    inset 0 1px 0 var(--glass-inset);
+  display: grid;
+  gap: 0.62rem;
+  grid-template-columns: auto minmax(3rem, 0.42fr) minmax(9rem, 1fr) auto auto;
+  inset: 0.12rem 0.18rem auto;
+  min-height: 2.55rem;
+  overflow: hidden;
+  padding: 0.38rem 0.48rem;
+  position: absolute;
+  z-index: 2;
+}
+
+.voice-dictation-surface[data-processing] {
+  border-color: color-mix(in srgb, var(--info) 24%, var(--border));
+}
+
+.voice-dictation-action,
+.voice-dictation-commit {
+  align-items: center;
+  background: color-mix(in srgb, var(--surface-elevated) 72%, transparent);
+  border: 0;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  display: inline-flex;
+  height: 1.75rem;
+  justify-content: center;
+  transition:
+    background var(--motion-fast) ease-out,
+    color var(--motion-fast) ease-out,
+    transform var(--motion-fast) ease-out;
+  width: 1.75rem;
+}
+
+.voice-dictation-action:hover {
+  background: color-mix(in srgb, var(--error) 14%, var(--surface-elevated));
+  color: var(--error);
+}
+
+.voice-dictation-action:disabled {
+  opacity: 0.44;
+}
+
+.voice-dictation-quiet-line {
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--text-muted) 64%, transparent) 1.2px, transparent 1.4px);
+  background-position: center;
+  background-size: 8px 2px;
+  height: 0.28rem;
+  opacity: 0.68;
+}
+
+.voice-dictation-surface .voice-waveform-canvas {
+  max-width: 100%;
+  width: min(280px, 100%) !important;
+}
+
+.voice-dictation-status {
+  align-items: center;
+  color: var(--text-secondary);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 720;
+  gap: 0.36rem;
+  line-height: 1;
+  min-width: max-content;
+  white-space: nowrap;
+}
+
+.voice-dictation-live-dot {
+  animation: voice-live-dot 980ms ease-in-out infinite;
+  background: var(--accent-primary);
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  height: 0.42rem;
+  width: 0.42rem;
+}
+
+.voice-dictation-commit {
+  color: var(--success);
+  opacity: 0.66;
+}
+
+.voice-tooltip {
+  background: color-mix(in srgb, var(--surface-elevated) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 8px;
+  bottom: calc(100% + 6px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--shadow-strong) 26%, transparent);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 560;
+  left: 50%;
+  line-height: 1.4;
+  padding: 0.4rem 0.65rem;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  z-index: 100;
+}
+
+@keyframes voice-live-dot {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scale(0.86);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes voice-dictation-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.28rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes composer-text-sheen {
+  0% {
+    opacity: 0;
+    transform: translateX(-46%) skewX(-10deg);
+  }
+  18% {
+    opacity: 0.72;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(46%) skewX(-10deg);
+  }
+}
+
+@keyframes composer-text-materialize {
+  0% {
+    filter: blur(2.4px);
+    opacity: 0.12;
+    text-shadow:
+      -0.08em 0 color-mix(in srgb, var(--info) 82%, transparent),
+      0.08em 0 color-mix(in srgb, var(--error) 64%, transparent),
+      0 0 12px color-mix(in srgb, var(--accent-primary) 42%, transparent);
+    transform: translateY(0.16rem);
+  }
+  42% {
+    filter: blur(0.8px);
+    opacity: 0.92;
+    text-shadow:
+      0.045em -0.015em color-mix(in srgb, var(--info) 58%, transparent),
+      -0.045em 0.015em color-mix(in srgb, var(--error) 48%, transparent),
+      0 0 10px color-mix(in srgb, var(--accent-primary) 34%, transparent);
+  }
+  72% {
+    filter: blur(0.15px);
+    text-shadow:
+      -0.018em 0 color-mix(in srgb, var(--info) 32%, transparent),
+      0.018em 0 color-mix(in srgb, var(--error) 28%, transparent);
+  }
+  100% {
+    filter: blur(0);
+    opacity: 1;
+    text-shadow: none;
+    transform: translateY(0);
+  }
 }

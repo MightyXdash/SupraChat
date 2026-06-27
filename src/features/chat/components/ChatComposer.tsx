@@ -1,6 +1,8 @@
-import { CSSProperties, FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { CSSProperties, FormEvent, KeyboardEvent, useLayoutEffect, useRef, useState } from "react"
 import { ArrowUp, Loader2, Pause, Pencil, Play, Square, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { VoiceButton } from "@/features/voice/components/VoiceButton"
+import { VoiceDictationSurface } from "@/features/voice/components/VoiceDictationSurface"
 import { SpeechPlaybackState } from "@/features/chat/types"
 
 export type ContextUsageSummary = {
@@ -12,6 +14,7 @@ export type ContextUsageSummary = {
 
 type ChatComposerProps = {
   draft: string
+  draftRevealKey: number
   error: string | null
   generationTokensPerSecond: number | null
   isEditing: boolean
@@ -20,6 +23,9 @@ type ChatComposerProps = {
   speechPlayback: SpeechPlaybackState
   showAverageTps: boolean
   showContextMeter: boolean
+  voiceState: "idle" | "recording" | "processing"
+  voiceWaveformData: Uint8Array | null
+  hasActiveVoiceHotkey: boolean
   onCancelEdit: () => void
   onDraftChange: (value: string) => void
   onSeekSpeech: (value: number) => void
@@ -27,10 +33,13 @@ type ChatComposerProps = {
   onStopGeneration: () => void
   onSubmit: () => Promise<void> | void
   onToggleSpeech: () => void
+  onVoiceVadStart: () => void
+  onVoiceCancel: () => void
 }
 
 export function ChatComposer({
   draft,
+  draftRevealKey,
   error,
   generationTokensPerSecond,
   isEditing,
@@ -39,6 +48,9 @@ export function ChatComposer({
   speechPlayback,
   showAverageTps,
   showContextMeter,
+  voiceState,
+  voiceWaveformData,
+  hasActiveVoiceHotkey,
   onCancelEdit,
   onDraftChange,
   onSeekSpeech,
@@ -46,29 +58,13 @@ export function ChatComposer({
   onStopGeneration,
   onSubmit,
   onToggleSpeech,
+  onVoiceVadStart,
+  onVoiceCancel,
 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const [composerSize, setComposerSize] = useState<"small" | "small-medium" | "medium-long" | "long">("small")
-
-  useEffect(() => {
-    const textarea = textareaRef.current
-
-    if (!textarea) {
-      return
-    }
-
-    function syncDraftFromTextarea() {
-      onDraftChange(textarea?.value ?? "")
-    }
-
-    textarea.addEventListener("input", syncDraftFromTextarea)
-    textarea.addEventListener("keyup", syncDraftFromTextarea)
-
-    return () => {
-      textarea.removeEventListener("input", syncDraftFromTextarea)
-      textarea.removeEventListener("keyup", syncDraftFromTextarea)
-    }
-  }, [onDraftChange])
+  const activeVoiceState = voiceState === "idle" ? null : voiceState
+  const isVoiceActive = activeVoiceState !== null
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current
@@ -119,6 +115,10 @@ export function ChatComposer({
 
   function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isVoiceActive) {
+      return
+    }
+
     if (isGenerating) {
       onStopGeneration()
       return
@@ -128,6 +128,11 @@ export function ChatComposer({
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (isVoiceActive) {
+      event.preventDefault()
+      return
+    }
+
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       event.currentTarget.form?.requestSubmit()
@@ -146,7 +151,12 @@ export function ChatComposer({
           {error}
         </p>
       )}
-      <form className="chat-composer" data-size={composerSize} onSubmit={handleFormSubmit}>
+      <form
+        className="chat-composer"
+        data-dictating={isVoiceActive || undefined}
+        data-size={composerSize}
+        onSubmit={handleFormSubmit}
+      >
         <div className="chat-composer-speech-player" data-visible={isSpeechVisible}>
           <div className="chat-composer-speech-status">
             <span>{speechPlayback.isPreparing ? "Preparing audio" : "Reading response"}</span>
@@ -201,18 +211,35 @@ export function ChatComposer({
           </div>
         ) : null}
         <div className="chat-composer-main">
-          <textarea
-            ref={textareaRef}
-            aria-label="Message SupraChat"
-            className="chat-composer-textarea"
-            placeholder="Send a message..."
-            rows={1}
-            value={draft}
-            onChange={(event) => onDraftChange(event.target.value)}
-            onInput={(event) => onDraftChange(event.currentTarget.value)}
-            onKeyDown={handleKeyDown}
-            onKeyUp={(event) => onDraftChange(event.currentTarget.value)}
-          />
+          <div
+            className="chat-composer-text-reveal-shell"
+            data-revealing={draftRevealKey > 0 || undefined}
+            key={`draft-reveal-${draftRevealKey}`}
+          >
+            <textarea
+              ref={textareaRef}
+              aria-label="Message SupraChat"
+              aria-readonly={isVoiceActive}
+              className="chat-composer-textarea"
+              placeholder="Send a message..."
+              readOnly={isVoiceActive}
+              rows={1}
+              value={draft}
+              onChange={(event) => {
+                if (!isVoiceActive) {
+                  onDraftChange(event.target.value)
+                }
+              }}
+              onKeyDown={handleKeyDown}
+            />
+          </div>
+          {activeVoiceState ? (
+            <VoiceDictationSurface
+              voiceState={activeVoiceState}
+              waveformData={voiceWaveformData}
+              onCancel={onVoiceCancel}
+            />
+          ) : null}
         </div>
 
         <div className="chat-composer-footer">
@@ -240,10 +267,16 @@ export function ChatComposer({
             ) : null}
           </div>
           <div className="chat-composer-footer-end">
+            <VoiceButton
+              voiceState={voiceState}
+              hasActiveHotkey={hasActiveVoiceHotkey}
+              onVadStart={onVoiceVadStart}
+              onCancel={onVoiceCancel}
+            />
             <Button
               aria-label={isGenerating ? "Stop response" : "Send message"}
               className="chat-composer-voice-button"
-              disabled={!draft.trim() && !isGenerating}
+              disabled={isVoiceActive || (!draft.trim() && !isGenerating)}
               size="icon"
               type="submit"
               variant="ghost"

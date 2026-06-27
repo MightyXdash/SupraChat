@@ -70,49 +70,58 @@ Implement the design system with semantic tokens first, then map tokens to theme
 Do not hardcode palette values throughout components when a token can be used instead.
 Light and dark themes must be expressed through CSS custom properties on the document root. Feature components should consume semantic tokens, not choose theme-specific values directly.
 
-### Dark Theme Reference
-
-- `--background`: `#171511`
-- `--surface`: `#1F1C18`
-- `--sidebar`: `#1B1814`
-- `--surface-elevated`: `#26231E`
-- `--text-primary`: `#F7F4EF`
-- `--text-secondary`: `#B8AFA2`
-- `--text-muted`: `#8F8578`
-- `--border`: `#332E27`
-- `--accent-primary`: `#D4A15D`
-- `--accent-light`: `#3A332A`
-- `--accent-hover`: `#E8CFA4`
-- `--highlight`: `#3A332A`
-- `--success`: `#7D987F`
-- `--warning`: `#D09B4C`
-- `--error`: `#C16A5A`
-- `--info`: `#7290B8`
-
 ### Light Theme Reference
 
-- `--background`: `#FCFBF8`
-- `--surface`: `#FFFFFF`
-- `--sidebar`: `#F8F5EF`
-- `--surface-elevated`: `#F1E6D2`
-- `--text-primary`: `#2A2522`
-- `--text-secondary`: `#6E655D`
-- `--text-muted`: `#8F8378`
-- `--border`: `#E4DDD5`
-- `--accent-primary`: `#C49A6C`
-- `--accent-light`: `#F1E6D2`
-- `--accent-hover`: `#B88B59`
-- `--highlight`: `#E9D7C3`
-- `--success`: `#6E8B74`
-- `--warning`: `#C4873A`
-- `--error`: `#B85C4A`
-- `--info`: `#5B7DA8`
+- `--background`: `#ffffff`
+- `--surface`: `#ffffff`
+- `--sidebar`: `#f9f9f9`
+- `--surface-elevated`: `#f3f3f3`
+- `--text-primary`: `#1f1f1f`
+- `--text-secondary`: `#5f5f5f`
+- `--text-muted`: `#8a8a8a`
+- `--border`: `#e7e7e7`
+- `--accent-primary`: `#9f8a73`
+- `--accent-light`: `#eee7dd`
+- `--accent-hover`: `#8f7962`
+- `--checkbox-accent`: `#2f80ed`
+- `--highlight`: `#eeeeee`
+- `--sidebar-item-hover`: `#f1f1f1`
+- `--sidebar-item-active`: `#ececec`
+- `--success`: `#6e8b74`
+- `--warning`: `#a98455`
+- `--error`: `#b85c4a`
+- `--info`: `#5b7da8`
+- `--danger-button-text`: `#ffffff`
+
+### Dark Theme Reference
+
+- `--background`: `#1f1f1f`
+- `--surface`: `#212121`
+- `--sidebar`: `#202020`
+- `--surface-elevated`: `#2b2b2b`
+- `--text-primary`: `#ececec`
+- `--text-secondary`: `#c5c5c5`
+- `--text-muted`: `#9b9b9b`
+- `--border`: `#373737`
+- `--accent-primary`: `#b7a287`
+- `--accent-light`: `#342f28`
+- `--accent-hover`: `#ccbca3`
+- `--checkbox-accent`: `#2f80ed`
+- `--highlight`: `#2f2f2f`
+- `--sidebar-item-hover`: `#2b2b2b`
+- `--sidebar-item-active`: `#303030`
+- `--success`: `#7d987f`
+- `--warning`: `#d09b4c`
+- `--error`: `#c16a5a`
+- `--info`: `#7290b8`
+- `--danger-button-text`: `#ffffff`
 
 ### Theme Surface Tokens
 
 - Use semantic glass and shadow tokens for translucent surfaces, popovers, composer chrome, and drag/titlebar surfaces.
-- Required shared tokens include `--glass-top`, `--glass-bottom`, `--glass-panel`, `--glass-border`, `--glass-inset`, `--glass-sheen`, `--shadow-soft`, `--shadow-strong`, and composer-specific tokens such as `--composer-border` and `--composer-ring`.
+- Required shared tokens include `--glass-top`, `--glass-bottom`, `--glass-panel`, `--glass-border`, `--glass-inset`, `--glass-sheen`, `--shadow-soft`, `--shadow-strong`, and composer-specific tokens such as `--composer-bg-start`, `--composer-bg-end`, `--composer-surface`, `--composer-border`, `--composer-border-focus`, `--composer-ring`, and `--composer-ring-focus`.
 - Context visualization colors must also be theme-aware tokens, including `--ctx-system`, `--ctx-user`, `--ctx-assistant`, `--ctx-unused`, `--ctx-ring-center`, and `--ctx-popover-bg`.
+- Additional UI surface tokens in active use include `--overlay-dim`, `--search-overlay-dim`, `--search-surface`, `--search-border`, `--search-shadow-soft`, `--search-shadow-strong`, `--sidebar-item-hover`, `--sidebar-item-active`, and `--checkbox-accent`.
 - Do not use fixed light-only RGBA shadows, white overlays, or pale borders outside canonical theme token definitions.
 
 ### Color Usage Rules
