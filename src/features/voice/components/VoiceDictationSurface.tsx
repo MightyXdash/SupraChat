@@ -1,18 +1,14 @@
-import { Loader2, Square, X } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { VoiceWaveform } from "@/features/voice/components/VoiceWaveform"
 
 type VoiceDictationSurfaceProps = {
   voiceState: "recording" | "processing"
   waveformData: Uint8Array | null
-  onFinish: () => void
-  onCancel: () => void
 }
 
 export function VoiceDictationSurface({
   voiceState,
   waveformData,
-  onFinish,
-  onCancel,
 }: VoiceDictationSurfaceProps) {
   const isProcessing = voiceState === "processing"
 
@@ -23,22 +19,11 @@ export function VoiceDictationSurface({
       data-processing={isProcessing || undefined}
       role="status"
     >
-      <button
-        aria-label="Cancel dictation"
-        className="voice-dictation-action voice-dictation-cancel"
-        disabled={isProcessing}
-        title="Cancel dictation"
-        type="button"
-        onClick={onCancel}
-      >
-        <X className="h-3.5 w-3.5" />
-      </button>
-      <span className="voice-dictation-plus" aria-hidden="true" />
       <VoiceWaveform
-        barCount={58}
+        barCount={104}
         data={waveformData}
-        height={34}
-        width={470}
+        height={50}
+        width={560}
       />
       <span className="voice-dictation-status">
         {isProcessing ? (
@@ -48,20 +33,6 @@ export function VoiceDictationSurface({
         )}
         {isProcessing ? "Transcribing" : "Listening"}
       </span>
-      <button
-        aria-label="Finish dictation"
-        className="voice-dictation-action voice-dictation-finish"
-        disabled={isProcessing}
-        title="Finish dictation"
-        type="button"
-        onClick={onFinish}
-      >
-        {isProcessing ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Square className="h-3.5 w-3.5 fill-current" />
-        )}
-      </button>
     </div>
   )
 }

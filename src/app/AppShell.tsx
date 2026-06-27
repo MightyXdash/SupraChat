@@ -139,7 +139,6 @@ export function AppShell() {
   const stopPttRecording = useVoiceStore((state) => state.stopPttRecording)
   const finishVoiceRecording = useVoiceStore((state) => state.finishRecording)
   const startVadRecording = useVoiceStore((state) => state.startVadRecording)
-  const cancelVoiceRecording = useVoiceStore((state) => state.cancelRecording)
   const setHotkeyActive = useVoiceStore((state) => state.setHotkeyActive)
 
   useEffect(() => {
@@ -380,11 +379,6 @@ export function AppShell() {
   function handleVoiceFinish() {
     setVoiceError(null)
     finishVoiceRecording()
-  }
-
-  function handleVoiceCancel() {
-    setVoiceError(null)
-    cancelVoiceRecording()
   }
 
   async function playSpeechClip(message: ChatMessage) {
@@ -632,7 +626,6 @@ export function AppShell() {
             onToggleSpeech={toggleSpeechPlayback}
             onVoiceVadStart={handleVoiceVadStart}
             onVoiceFinish={handleVoiceFinish}
-            onVoiceCancel={handleVoiceCancel}
           />
         )}
       </div>

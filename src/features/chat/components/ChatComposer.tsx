@@ -35,7 +35,6 @@ type ChatComposerProps = {
   onToggleSpeech: () => void
   onVoiceVadStart: () => void
   onVoiceFinish: () => void
-  onVoiceCancel: () => void
 }
 
 export function ChatComposer({
@@ -61,7 +60,6 @@ export function ChatComposer({
   onToggleSpeech,
   onVoiceVadStart,
   onVoiceFinish,
-  onVoiceCancel,
 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const [composerSize, setComposerSize] = useState<"small" | "small-medium" | "medium-long" | "long">("small")
@@ -239,8 +237,6 @@ export function ChatComposer({
             <VoiceDictationSurface
               voiceState={activeVoiceState}
               waveformData={voiceWaveformData}
-              onFinish={onVoiceFinish}
-              onCancel={onVoiceCancel}
             />
           ) : null}
         </div>
@@ -276,16 +272,18 @@ export function ChatComposer({
               onVadStart={onVoiceVadStart}
               onFinish={onVoiceFinish}
             />
-            <Button
-              aria-label={isGenerating ? "Stop response" : "Send message"}
-              className="chat-composer-voice-button"
-              disabled={isVoiceActive || (!draft.trim() && !isGenerating)}
-              size="icon"
-              type="submit"
-              variant="ghost"
-            >
-              {isGenerating ? <Square className="h-3.5 w-3.5 fill-current" /> : <ArrowUp className="h-4 w-4" />}
-            </Button>
+            {!isVoiceActive ? (
+              <Button
+                aria-label={isGenerating ? "Stop response" : "Send message"}
+                className="chat-composer-voice-button"
+                disabled={!draft.trim() && !isGenerating}
+                size="icon"
+                type="submit"
+                variant="ghost"
+              >
+                {isGenerating ? <Square className="h-3.5 w-3.5 fill-current" /> : <ArrowUp className="h-4 w-4" />}
+              </Button>
+            ) : null}
           </div>
         </div>
       </form>

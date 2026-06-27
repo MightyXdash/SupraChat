@@ -33,7 +33,6 @@ type ChatWorkspaceProps = {
   onToggleSpeech: () => void
   onVoiceVadStart: () => void
   onVoiceFinish: () => void
-  onVoiceCancel: () => void
 }
 
 export function ChatWorkspace({
@@ -63,7 +62,6 @@ export function ChatWorkspace({
   onToggleSpeech,
   onVoiceVadStart,
   onVoiceFinish,
-  onVoiceCancel,
 }: ChatWorkspaceProps) {
   const isChatScrolling = useScrollVisibility(scrollRef)
   const hasMessages = Boolean(conversation && conversation.messages.length > 0)
@@ -170,7 +168,6 @@ export function ChatWorkspace({
           onToggleSpeech={onToggleSpeech}
           onVoiceVadStart={onVoiceVadStart}
           onVoiceFinish={onVoiceFinish}
-          onVoiceCancel={onVoiceCancel}
         />
       </div>
     </section>
