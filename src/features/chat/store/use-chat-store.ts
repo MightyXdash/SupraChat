@@ -28,6 +28,8 @@ const TITLE_DEFERRED_FIRST_MESSAGE_MAX_CHARACTERS = 40
 const TITLE_COPY_UNIGRAM_THRESHOLD = 0.9
 const TITLE_MIN_ENGLISH_LETTER_RATIO = 0.6
 const TITLE_RECOVERY_EXPANSION_WORDS = 200
+const STREAM_CHECKPOINT_MIN_CHARACTERS = 512
+const STREAM_CHECKPOINT_MIN_MS = 1500
 let activeGenerationController: AbortController | null = null
 
 function letterUnigrams(content: string) {
@@ -189,6 +191,7 @@ type ChatState = {
   generationTokensPerSecond: number | null
   error: string | null
   initialize: () => Promise<void>
+  reloadConversations: () => Promise<void>
   createConversation: () => Promise<string>
   renameConversation: (conversationId: string, title: string) => Promise<boolean>
   regenerateConversationTitle: (conversationId: string) => Promise<boolean>
@@ -210,6 +213,66 @@ async function persistConversation(conversation: Conversation) {
     }
 
     await createStoredConversation(conversation)
+  }
+}
+
+function createStreamingCheckpoint(conversationId: string) {
+  let pendingCharacters = 0
+  let lastPersistedAt = 0
+  let persistPromise: Promise<void> | null = null
+  let shouldPersistAfterCurrentWrite = false
+
+  async function persistLatestConversation() {
+    const conversation = useChatStore
+      .getState()
+      .conversations.find((conversation) => conversation.id === conversationId)
+
+    if (conversation) {
+      await persistConversation(conversation)
+    }
+  }
+
+  function startPersist() {
+    lastPersistedAt = performance.now()
+    pendingCharacters = 0
+    persistPromise = persistLatestConversation()
+      .catch(() => undefined)
+      .finally(() => {
+        persistPromise = null
+
+        if (shouldPersistAfterCurrentWrite) {
+          shouldPersistAfterCurrentWrite = false
+          startPersist()
+        }
+      })
+  }
+
+  return {
+    recordChunk: (chunk: string) => {
+      pendingCharacters += chunk.length
+      const now = performance.now()
+
+      if (
+        pendingCharacters < STREAM_CHECKPOINT_MIN_CHARACTERS &&
+        now - lastPersistedAt < STREAM_CHECKPOINT_MIN_MS
+      ) {
+        return
+      }
+
+      if (persistPromise) {
+        shouldPersistAfterCurrentWrite = true
+        return
+      }
+
+      startPersist()
+    },
+    flush: async () => {
+      if (persistPromise) {
+        await persistPromise
+      }
+
+      await persistLatestConversation().catch(() => undefined)
+    },
   }
 }
 
@@ -363,6 +426,7 @@ export const useChatStore = create<ChatState>((set) => ({
     const throughputTracker = createGenerationThroughputTracker((value) => {
       set({ generationTokensPerSecond: value })
     })
+    const streamingCheckpoint = createStreamingCheckpoint(conversationId)
 
     const appendAssistantChunk = (chunk: string) => {
       throughputTracker.recordChunk(chunk)
@@ -376,6 +440,7 @@ export const useChatStore = create<ChatState>((set) => ({
           ),
         ),
       }))
+      streamingCheckpoint.recordChunk(chunk)
     }
 
     const finalizeAssistantMessage = (formatter: (content: string) => string) => {
@@ -416,6 +481,7 @@ export const useChatStore = create<ChatState>((set) => ({
       }
 
       finalizeAssistantMessage(cleanIncompleteMarkdown)
+      await streamingCheckpoint.flush()
 
       const completedConversation = useChatStore
         .getState()
@@ -428,6 +494,7 @@ export const useChatStore = create<ChatState>((set) => ({
       set({ isGenerating: false })
     } catch (error) {
       finalizeAssistantMessage(cleanIncompleteMarkdown)
+      await streamingCheckpoint.flush()
 
       const interruptedConversation = useChatStore
         .getState()
@@ -500,6 +567,7 @@ export const useChatStore = create<ChatState>((set) => ({
     const throughputTracker = createGenerationThroughputTracker((value) => {
       set({ generationTokensPerSecond: value })
     })
+    const streamingCheckpoint = createStreamingCheckpoint(conversationId)
 
     const appendAssistantChunk = (chunk: string) => {
       throughputTracker.recordChunk(chunk)
@@ -513,6 +581,7 @@ export const useChatStore = create<ChatState>((set) => ({
           ),
         ),
       }))
+      streamingCheckpoint.recordChunk(chunk)
     }
 
     const finalizeAssistantMessage = (formatter: (content: string) => string) => {
@@ -553,6 +622,7 @@ export const useChatStore = create<ChatState>((set) => ({
       }
 
       finalizeAssistantMessage(cleanIncompleteMarkdown)
+      await streamingCheckpoint.flush()
 
       const completedConversation = useChatStore
         .getState()
@@ -565,6 +635,7 @@ export const useChatStore = create<ChatState>((set) => ({
       set({ isGenerating: false })
     } catch (error) {
       finalizeAssistantMessage(cleanIncompleteMarkdown)
+      await streamingCheckpoint.flush()
 
       const interruptedConversation = useChatStore
         .getState()
@@ -658,6 +729,11 @@ export const useChatStore = create<ChatState>((set) => ({
     })()
 
     await initializationPromise
+  },
+  reloadConversations: async () => {
+    initializationPromise = null
+    set({ isLoading: true })
+    await useChatStore.getState().initialize()
   },
   createConversation: async () => {
     const conversation = createConversationRecord()
@@ -1018,6 +1094,7 @@ export const useChatStore = create<ChatState>((set) => ({
     const throughputTracker = createGenerationThroughputTracker((value) => {
       set({ generationTokensPerSecond: value })
     })
+    const streamingCheckpoint = createStreamingCheckpoint(conversationId)
 
     const appendAssistantChunk = (chunk: string) => {
       throughputTracker.recordChunk(chunk)
@@ -1031,6 +1108,7 @@ export const useChatStore = create<ChatState>((set) => ({
           ),
         ),
       }))
+      streamingCheckpoint.recordChunk(chunk)
     }
 
     const appendTitleChunk = (chunk: string) => {
@@ -1154,6 +1232,7 @@ export const useChatStore = create<ChatState>((set) => ({
       }
 
       finalizeAssistantMessage(cleanIncompleteMarkdown)
+      await streamingCheckpoint.flush()
 
       const conversationAfterResponse = useChatStore
         .getState()
@@ -1269,6 +1348,7 @@ export const useChatStore = create<ChatState>((set) => ({
       set({ isGenerating: false })
     } catch (error) {
       finalizeAssistantMessage(cleanIncompleteMarkdown)
+      await streamingCheckpoint.flush()
       const interruptedConversation = useChatStore
         .getState()
         .conversations.find((conversation) => conversation.id === conversationId)

@@ -1,15 +1,9 @@
 const fs = require("node:fs")
 const path = require("node:path")
 const { pipeline } = require("node:stream/promises")
+const { REQUIRED_MODEL_ASSETS } = require("../backend/node/model-registry.cjs")
 
-const models = [
-  {
-    label: "LFM 2.5 1.2B Thinking Q5 K M chat model",
-    repo: "unsloth/LFM2.5-1.2B-Thinking-GGUF",
-    filename: "LFM2.5-1.2B-Thinking-Q5_K_M.gguf",
-    destination: path.join("resources", "models", "chat", "LFM2.5-1.2B-Thinking-Q5_K_M.gguf"),
-  },
-]
+const models = REQUIRED_MODEL_ASSETS
 
 function getModelUrl(model) {
   return `https://huggingface.co/${model.repo}/resolve/main/${model.filename}`

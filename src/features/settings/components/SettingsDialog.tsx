@@ -1,15 +1,17 @@
-import { type CSSProperties, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { RefreshCcw, X } from "lucide-react"
-import { appWindowConfig } from "@/app/config/window"
+import { useConfirmationDialog } from "@/app/components/ConfirmationDialog"
 import { settingsTabs, type SettingsTabId } from "@/features/settings/config/settings-tabs"
 import { SettingsBadge, SettingsPath, SettingsSegmentedControl, SettingsToggle } from "@/features/settings/components/SettingsControl"
 import { SettingsNav } from "@/features/settings/components/SettingsNav"
 import { SettingsRow } from "@/features/settings/components/SettingsRow"
 import { SettingsSection } from "@/features/settings/components/SettingsSection"
 import {
+  exportConversationData,
   fetchSettingsModels,
   fetchSettingsStorage,
+  importConversationData,
   type SettingsModelsPayload,
   type SettingsStoragePayload,
 } from "@/features/settings/services/settings-service"
@@ -29,10 +31,6 @@ type SettingsDialogProps = {
   isOpen: boolean
   onClose: () => void
 }
-
-const isWindowsPlatform = appWindowConfig.platform === "win32"
-const settingsBackdropBlur = isWindowsPlatform ? "5px" : "8px"
-const settingsWarningBlur = isWindowsPlatform ? "7px" : "14px"
 
 type SettingsDataState = {
   error: string | null
@@ -81,7 +79,11 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   })
   const [isDeletingAllChats, setIsDeletingAllChats] = useState(false)
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false)
+  const [isExportingChats, setIsExportingChats] = useState(false)
+  const [isImportingChats, setIsImportingChats] = useState(false)
   const [isInstallingUpdate, setIsInstallingUpdate] = useState(false)
+  const importInputRef = useRef<HTMLInputElement | null>(null)
+  const { confirm, confirmationDialog } = useConfirmationDialog()
   const activeTabDefinition = useMemo(
     () => settingsTabs.find((tab) => tab.id === activeTab) ?? settingsTabs[0],
     [activeTab],
@@ -91,6 +93,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const confirmExperimentalInstall = useSettingsStore((state) => state.confirmExperimentalInstall)
   const confirmConversationDeletion = useSettingsStore((state) => state.confirmConversationDeletion)
   const deleteAllConversations = useChatStore((state) => state.deleteAllConversations)
+  const reloadConversations = useChatStore((state) => state.reloadConversations)
   const showAverageTps = useSettingsStore((state) => state.showAverageTps)
   const showContextMeter = useSettingsStore((state) => state.showContextMeter)
   const startWithLastConversation = useSettingsStore((state) => state.startWithLastConversation)
@@ -165,9 +168,12 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     }
 
     if (updateTrack !== "final" && confirmExperimentalInstall) {
-      const shouldInstallExperimentalUpdate = window.confirm(
-        "Install this experimental SupraChat build now? Experimental updates can change more often and may be less stable.",
-      )
+      const shouldInstallExperimentalUpdate = await confirm({
+        body: "Experimental updates can change more often and may be less stable.",
+        confirmLabel: "Install",
+        title: "Install experimental build?",
+        tone: "warning",
+      })
 
       if (!shouldInstallExperimentalUpdate) {
         return
@@ -212,9 +218,12 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
       return
     }
 
-    const shouldDelete = window.confirm(
-      "Delete all saved chats from this device? This action cannot be undone.",
-    )
+    const shouldDelete = await confirm({
+      body: "This removes all saved conversations and messages from this device.",
+      confirmLabel: "Delete all",
+      title: "Delete all saved chats?",
+      tone: "danger",
+    })
 
     if (!shouldDelete) {
       return
@@ -230,6 +239,73 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
       }
     } finally {
       setIsDeletingAllChats(false)
+    }
+  }
+
+  async function handleExportChats() {
+    if (isExportingChats) {
+      return
+    }
+
+    setIsExportingChats(true)
+
+    try {
+      const payload = await exportConversationData()
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      const date = new Date().toISOString().slice(0, 10)
+
+      anchor.href = url
+      anchor.download = `suprachat-conversations-${date}.json`
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      setDataState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Unable to export conversations.",
+      }))
+    } finally {
+      setIsExportingChats(false)
+    }
+  }
+
+  async function handleImportChats(file: File | null) {
+    if (!file || isImportingChats) {
+      return
+    }
+
+    const shouldImport = await confirm({
+      body: "Matching conversation IDs will be replaced. Other saved conversations will remain on this device.",
+      confirmLabel: "Import",
+      title: "Import conversations?",
+      tone: "warning",
+    })
+
+    if (!shouldImport) {
+      return
+    }
+
+    setIsImportingChats(true)
+
+    try {
+      const parsed = JSON.parse(await file.text())
+      await importConversationData(parsed)
+      await reloadConversations()
+      await loadSettingsData()
+    } catch (error) {
+      setDataState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Unable to import conversations.",
+      }))
+    } finally {
+      setIsImportingChats(false)
+
+      if (importInputRef.current) {
+        importInputRef.current.value = ""
+      }
     }
   }
 
@@ -252,6 +328,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   }, [isOpen, onClose])
 
   return (
+    <>
     <AnimatePresence>
       {isOpen ? (
         <div className="settings-layer" role="presentation">
@@ -260,67 +337,40 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
             type="button"
             aria-label="Close settings"
             onClick={onClose}
-            initial={{
-              opacity: 0,
-              "--settings-backdrop-blur": "0px",
-              "--settings-backdrop-saturate": "1",
-            } as CSSProperties}
-            animate={{
-              opacity: 1,
-              "--settings-backdrop-blur": settingsBackdropBlur,
-              "--settings-backdrop-saturate": "0.96",
-            } as CSSProperties}
-            exit={{
-              opacity: 0,
-              "--settings-backdrop-blur": "0px",
-              "--settings-backdrop-saturate": "1",
-            } as CSSProperties}
-            transition={{ duration: 0.52, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           />
           <motion.section
             className="settings-dialog"
             role="dialog"
             aria-modal="true"
             aria-label="Settings"
-            initial={{ opacity: 0, scale: 1.11, y: 0 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 1.11, y: 0 }}
-            transition={{ duration: 0.72, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, scale: 1.11 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.11 }}
+            transition={{ duration: 0.64, ease: [0.16, 1, 0.3, 1] }}
           >
             <AnimatePresence>
               {pendingExperimentalTrack ? (
                 <motion.div
                   className="settings-inline-warning-shell"
                   role="presentation"
-                  initial={{
-                    WebkitBackdropFilter: "blur(0px) saturate(0.92)",
-                    backdropFilter: "blur(0px) saturate(0.92)",
-                    opacity: 0,
-                    "--settings-warning-dim": "0",
-                  } as CSSProperties}
-                  animate={{
-                    WebkitBackdropFilter: `blur(${settingsWarningBlur}) saturate(0.92)`,
-                    backdropFilter: `blur(${settingsWarningBlur}) saturate(0.92)`,
-                    opacity: 1,
-                    "--settings-warning-dim": "1",
-                  } as CSSProperties}
-                  exit={{
-                    WebkitBackdropFilter: "blur(0px) saturate(0.92)",
-                    backdropFilter: "blur(0px) saturate(0.92)",
-                    opacity: 0,
-                    "--settings-warning-dim": "0",
-                  } as CSSProperties}
-                  transition={{ duration: 0.92, ease: [0.16, 1, 0.3, 1] }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.28, ease: "easeOut" }}
                 >
                   <motion.div
                     className="settings-inline-warning-card"
                     role="alertdialog"
                     aria-modal="true"
                     aria-label="Experimental updates warning"
-                    initial={{ opacity: 0, scale: 1.26, y: 0 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 1.22, y: 0 }}
-                    transition={{ duration: 1.04, ease: [0.16, 1, 0.3, 1] }}
+                    initial={{ opacity: 0, scale: 1.16 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.14 }}
+                    transition={{ duration: 0.48, ease: [0.16, 1, 0.3, 1] }}
                   >
                     <div className="settings-inline-warning-copy">
                       <h3>Experimental builds may be unstable.</h3>
@@ -590,6 +640,31 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                       <SettingsRow label="Messages">
                         <SettingsBadge>{String(dataState.storage?.stats.messageCount ?? 0)}</SettingsBadge>
                       </SettingsRow>
+                      <div className="settings-section-actions">
+                        <button
+                          className="settings-secondary-button"
+                          type="button"
+                          onClick={() => void handleExportChats()}
+                          disabled={isExportingChats}
+                        >
+                          {isExportingChats ? "Exporting" : "Export"}
+                        </button>
+                        <button
+                          className="settings-primary-button"
+                          type="button"
+                          onClick={() => importInputRef.current?.click()}
+                          disabled={isImportingChats}
+                        >
+                          {isImportingChats ? "Importing" : "Import"}
+                        </button>
+                        <input
+                          ref={importInputRef}
+                          accept="application/json,.json"
+                          className="sr-only"
+                          type="file"
+                          onChange={(event) => void handleImportChats(event.currentTarget.files?.[0] ?? null)}
+                        />
+                      </div>
                     </SettingsSection>
 
                     <SettingsSection title="Delete">
@@ -621,5 +696,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
         </div>
       ) : null}
     </AnimatePresence>
+    {confirmationDialog}
+    </>
   )
 }

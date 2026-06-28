@@ -2,12 +2,15 @@ const fs = require("node:fs")
 const path = require("node:path")
 const {
   CHAT_MODEL,
+  REQUIRED_SPEECH_ASSETS,
   TITLE_MODEL,
   getLlamaServerName,
   getPlatformKey,
   resolveLlamaServerPath,
   resolveModelPath,
   resolveResourceRoot,
+  resolveSpeechSttModel,
+  resolveSpeechTtsModel,
 } = require("./model-registry.cjs")
 
 function fileStatus(filePath, label, options = {}) {
@@ -70,12 +73,22 @@ function buildRuntimeEnvironment(baseEnv = process.env, resourceRoot = resolveRe
 
 function checkCurrentRuntime() {
   const resourceRoot = resolveResourceRoot()
+  const ttsModel = resolveSpeechTtsModel(resourceRoot)
+  const sttModel = resolveSpeechSttModel(resourceRoot)
+  const speechModelsByRole = {
+    stt: sttModel,
+    tts: ttsModel,
+  }
   const checks = [
     fileStatus(resolveLlamaServerPath(resourceRoot), "llama.cpp server binary", {
       executable: true,
     }),
     fileStatus(resolveModelPath(CHAT_MODEL, resourceRoot), `${CHAT_MODEL.label} GGUF model`),
     fileStatus(resolveModelPath(TITLE_MODEL, resourceRoot), `${TITLE_MODEL.label} GGUF model`),
+    ...REQUIRED_SPEECH_ASSETS.map((asset) => {
+      const model = speechModelsByRole[asset.role]
+      return fileStatus(model[asset.pathProperty], asset.label)
+    }),
   ]
 
   return {
@@ -96,6 +109,13 @@ function getExpectedRuntimeFiles(platform = process.platform, arch = process.arc
     path.join("resources", "llama.cpp", platformKey, serverName),
     path.join("resources", "models", "chat", CHAT_MODEL.filename),
     path.join("resources", "models", "title", TITLE_MODEL.filename),
+    path.join("resources", "voice", "tts", "vits-piper-en_US-amy-low-int8", "en_US-amy-low.onnx"),
+    path.join("resources", "voice", "tts", "vits-piper-en_US-amy-low-int8", "en_US-amy-low.onnx.json"),
+    path.join("resources", "voice", "tts", "vits-piper-en_US-amy-low-int8", "tokens.txt"),
+    path.join("resources", "voice", "tts", "vits-piper-en_US-amy-low-int8", "espeak-ng-data"),
+    path.join("resources", "voice", "stt", "whisper-tiny-en-int8", "tiny.en-encoder.int8.onnx"),
+    path.join("resources", "voice", "stt", "whisper-tiny-en-int8", "tiny.en-decoder.int8.onnx"),
+    path.join("resources", "voice", "stt", "whisper-tiny-en-int8", "tiny.en-tokens.txt"),
   ]
 }
 

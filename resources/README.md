@@ -17,7 +17,7 @@ resources/
     lib/*.so
     lib/*.dll
   models/
-    chat/LFM2.5-350M-Q6_K.gguf
+    chat/LFM2.5-1.2B-Thinking-Q5_K_M.gguf
     title/LiquidAI_LFM2.5-350M-Base_1781204855.Q4_K_M.gguf
   voice/
     tts/vits-piper-en_US-amy-low-int8/en_US-amy-low.onnx
@@ -34,15 +34,17 @@ Download the default GGUF model files:
 npm run models:download
 ```
 
-`llama-server` binaries still need to be supplied per platform from the
-`llama.cpp` build/release that matches the target acceleration backend.
+Speech assets are bundled under `resources/voice/` and are verified by the
+runtime preflight check. `llama-server` binaries still need to be supplied per
+platform from the `llama.cpp` build/release that matches the target
+acceleration backend.
 Run `npm run runtime:check` to verify the current machine and
 `npm run runtime:check:all` before packaging cross-platform releases.
 
 Chat model:
 
-- Repository: `LiquidAI/LFM2.5-350M-GGUF`
-- Default file: `LFM2.5-350M-Q6_K.gguf`
+- Repository: `unsloth/LFM2.5-1.2B-Thinking-GGUF`
+- Default file: `LFM2.5-1.2B-Thinking-Q5_K_M.gguf`
 
 Title model:
 

@@ -1,4 +1,5 @@
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
+import type { Conversation } from "@/features/chat/types"
 
 export type SettingsModel = {
   id: string
@@ -67,6 +68,20 @@ export type SettingsStoragePayload = {
   }
 }
 
+export type ConversationExportPayload = {
+  ok: true
+  schemaVersion: 1
+  exportedAt: string
+  conversations: Conversation[]
+}
+
+export type ConversationImportResult = {
+  ok: true
+  created: number
+  imported: number
+  replaced: number
+}
+
 async function readSettingsJson<T>(path: string): Promise<T> {
   const response = await fetch(`${chatRuntimeConfig.apiBaseUrl}${path}`, {
     headers: chatRuntimeConfig.localApiHeaders,
@@ -89,4 +104,25 @@ export function fetchSettingsModels() {
 
 export function fetchSettingsStorage() {
   return readSettingsJson<SettingsStoragePayload>("/settings/storage")
+}
+
+export function exportConversationData() {
+  return readSettingsJson<ConversationExportPayload>("/data/export")
+}
+
+export async function importConversationData(payload: ConversationExportPayload) {
+  const response = await fetch(`${chatRuntimeConfig.apiBaseUrl}/data/import`, {
+    method: "POST",
+    headers: {
+      ...chatRuntimeConfig.localApiHeaders,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    throw new Error("Unable to import conversations.")
+  }
+
+  return (await response.json()) as ConversationImportResult
 }

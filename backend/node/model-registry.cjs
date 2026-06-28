@@ -57,6 +57,70 @@ const SPEECH_STT_MODEL = {
   approximateSizeMb: 110,
 }
 
+const REQUIRED_MODEL_ASSETS = [
+  {
+    destination: path.join("resources", "models", "chat", CHAT_MODEL.filename),
+    filename: CHAT_MODEL.filename,
+    label: `${CHAT_MODEL.label} chat model`,
+    model: CHAT_MODEL,
+    repo: CHAT_MODEL.repo,
+    role: "chat",
+  },
+  {
+    destination: path.join("resources", "models", "title", TITLE_MODEL.filename),
+    filename: TITLE_MODEL.filename,
+    label: `${TITLE_MODEL.label} title model`,
+    model: TITLE_MODEL,
+    repo: TITLE_MODEL.repo,
+    role: "title",
+  },
+]
+
+const REQUIRED_SPEECH_ASSETS = [
+  {
+    key: "tts-model",
+    label: `${SPEECH_TTS_MODEL.label} ONNX model`,
+    pathProperty: "modelPath",
+    role: "tts",
+  },
+  {
+    key: "tts-config",
+    label: `${SPEECH_TTS_MODEL.label} config`,
+    pathProperty: "configPath",
+    role: "tts",
+  },
+  {
+    key: "tts-tokens",
+    label: `${SPEECH_TTS_MODEL.label} tokens`,
+    pathProperty: "tokensPath",
+    role: "tts",
+  },
+  {
+    key: "tts-espeak-data",
+    label: `${SPEECH_TTS_MODEL.label} eSpeak data`,
+    pathProperty: "dataDir",
+    role: "tts",
+  },
+  {
+    key: "stt-encoder",
+    label: `${SPEECH_STT_MODEL.label} encoder`,
+    pathProperty: "encoderPath",
+    role: "stt",
+  },
+  {
+    key: "stt-decoder",
+    label: `${SPEECH_STT_MODEL.label} decoder`,
+    pathProperty: "decoderPath",
+    role: "stt",
+  },
+  {
+    key: "stt-tokens",
+    label: `${SPEECH_STT_MODEL.label} tokens`,
+    pathProperty: "tokensPath",
+    role: "stt",
+  },
+]
+
 function getPlatformKey(platform = process.platform, arch = process.arch) {
   if (platform === "darwin") {
     return arch === "arm64" ? "darwin-arm64" : "darwin-x64"
@@ -159,6 +223,8 @@ function getThreadCount() {
 
 module.exports = {
   CHAT_MODEL,
+  REQUIRED_MODEL_ASSETS,
+  REQUIRED_SPEECH_ASSETS,
   SPEECH_STT_MODEL,
   SPEECH_TTS_MODEL,
   TITLE_MODEL,

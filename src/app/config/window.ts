@@ -18,14 +18,31 @@ type UpdaterBridge = {
   setTrack: (track: UpdateTrack) => Promise<UpdatePreferences>
 }
 
+type AppEventsBridge = {
+  onCheckUpdates: (listener: () => void) => () => void
+  onNewConversation: (listener: () => void) => () => void
+  onOpenSettings: (listener: () => void) => () => void
+}
+
+type StartupBridge = {
+  reportProgress: (payload: {
+    detail?: string
+    label?: string
+    progress?: number
+  }) => void
+  setThemePreference: (themePreference: "system" | "light" | "dark") => void
+}
+
 declare global {
   interface Window {
     suprachat?: {
+      appEvents?: AppEventsBridge
       backendPort?: number
       clientToken?: string
-    platform?: SupraChatPlatform
-    rendererReady?: () => void
-    updater?: UpdaterBridge
+      platform?: SupraChatPlatform
+      rendererReady?: () => void
+      startup?: StartupBridge
+      updater?: UpdaterBridge
       windowControls?: WindowControls
     }
   }
@@ -33,6 +50,7 @@ declare global {
 
 export const appWindowConfig = {
   title: "SupraChat",
+  appEvents: window.suprachat?.appEvents,
   platform: window.suprachat?.platform ?? "browser",
   controls: window.suprachat?.windowControls,
 } as const

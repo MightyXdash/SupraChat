@@ -195,6 +195,18 @@ body {
   position: relative;
 }
 
+.sr-only {
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
 .app-shell-grid {
   grid-template-columns: var(--sidebar-expanded-width) minmax(0, 1fr);
   height: 100vh;
@@ -2092,6 +2104,7 @@ button:disabled {
   align-items: flex-start;
   display: flex;
   inset: 0;
+  isolation: isolate;
   justify-content: center;
   padding: max(7.5rem, 18vh) 1.25rem 2rem;
   position: fixed;
@@ -2100,18 +2113,21 @@ button:disabled {
 
 .conversation-search-backdrop {
   background: var(--search-overlay-dim, var(--overlay-dim));
-  backdrop-filter: blur(var(--search-backdrop-blur, 0px)) saturate(var(--search-backdrop-saturate, 1));
-  -webkit-backdrop-filter: blur(var(--search-backdrop-blur, 0px)) saturate(var(--search-backdrop-saturate, 1));
+  backdrop-filter: blur(5px) saturate(0.96);
+  -webkit-backdrop-filter: blur(5px) saturate(0.96);
   border: 0;
   cursor: default;
   inset: 0;
   position: fixed;
+  transform: translateZ(0);
+  will-change: opacity;
 }
 
 .conversation-search-dialog {
   background: var(--search-surface);
-  backdrop-filter: blur(30px) saturate(1.14);
-  -webkit-backdrop-filter: blur(30px) saturate(1.14);
+  backdrop-filter: blur(14px) saturate(1.08);
+  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  backface-visibility: hidden;
   border: 1px solid var(--search-border);
   border-radius: 16px;
   box-shadow:
@@ -2123,6 +2139,8 @@ button:disabled {
   max-height: min(36.5rem, 74vh);
   overflow: hidden;
   position: relative;
+  transform: translateZ(0);
+  will-change: opacity, transform;
   width: min(47rem, calc(100vw - 2.5rem));
 }
 
@@ -2306,6 +2324,7 @@ button:disabled {
   align-items: center;
   display: flex;
   inset: 0;
+  isolation: isolate;
   justify-content: center;
   padding: 2rem;
   position: fixed;
@@ -2313,19 +2332,22 @@ button:disabled {
 }
 
 .settings-backdrop {
-  background: var(--search-overlay-dim, var(--overlay-dim));
-  backdrop-filter: blur(var(--settings-backdrop-blur, 0px)) saturate(var(--settings-backdrop-saturate, 1));
-  -webkit-backdrop-filter: blur(var(--settings-backdrop-blur, 0px)) saturate(var(--settings-backdrop-saturate, 1));
+  background: rgba(0, 0, 0, 0.44);
+  backdrop-filter: blur(5px) saturate(0.96);
+  -webkit-backdrop-filter: blur(5px) saturate(0.96);
   border: 0;
   cursor: default;
   inset: 0;
   position: fixed;
+  transform: translateZ(0);
+  will-change: opacity;
 }
 
 .settings-dialog {
-  background: linear-gradient(180deg, var(--glass-top), var(--glass-panel));
-  backdrop-filter: blur(28px) saturate(1.08);
-  -webkit-backdrop-filter: blur(28px) saturate(1.08);
+  background: var(--surface);
+  backdrop-filter: blur(14px) saturate(1.04);
+  -webkit-backdrop-filter: blur(14px) saturate(1.04);
+  backface-visibility: hidden;
   border: 1px solid var(--glass-border);
   border-radius: 16px;
   box-shadow:
@@ -2337,6 +2359,8 @@ button:disabled {
   height: min(42.5rem, calc(100vh - 4rem));
   overflow: hidden;
   position: relative;
+  transform: translateZ(0);
+  will-change: opacity, transform;
   width: min(57.5rem, calc(100vw - 4rem));
 }
 
@@ -2779,7 +2803,7 @@ html[data-theme-switching] *::after {
 }
 
 .settings-backdrop {
-  background: color-mix(in srgb, var(--background) 48%, rgba(0, 0, 0, 0.42));
+  background: rgba(0, 0, 0, 0.44);
 }
 
 .settings-dialog {
@@ -2787,8 +2811,8 @@ html[data-theme-switching] *::after {
   --settings-text: color-mix(in srgb, var(--text-secondary) 64%, var(--text-muted));
   --settings-text-muted: color-mix(in srgb, var(--text-muted) 78%, var(--surface));
   background: var(--surface);
-  backdrop-filter: blur(18px) saturate(1.03);
-  -webkit-backdrop-filter: blur(18px) saturate(1.03);
+  backdrop-filter: blur(14px) saturate(1.03);
+  -webkit-backdrop-filter: blur(14px) saturate(1.03);
   border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
   border-radius: 9px;
   box-shadow:
@@ -3116,6 +3140,13 @@ html[data-theme-switching] *::after {
   margin: 0.55rem 0 0;
 }
 
+.settings-section-actions {
+  display: flex;
+  gap: 0.55rem;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
 .settings-primary-button,
 .settings-secondary-button {
   align-items: center;
@@ -3160,9 +3191,97 @@ html[data-theme-switching] *::after {
   opacity: 0.52;
 }
 
+.confirmation-layer {
+  align-items: center;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1.25rem;
+  position: fixed;
+  z-index: 90;
+}
+
+.confirmation-backdrop {
+  background: var(--overlay-dim);
+  border: 0;
+  cursor: default;
+  inset: 0;
+  position: absolute;
+}
+
+.confirmation-dialog {
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  border-radius: 12px;
+  box-shadow:
+    0 24px 64px color-mix(in srgb, var(--shadow-strong) 34%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--glass-inset) 88%, transparent);
+  max-width: min(25rem, 100%);
+  padding: 1rem;
+  position: relative;
+  width: 100%;
+}
+
+.confirmation-dialog-copy h2 {
+  color: var(--text-primary);
+  font-size: 0.98rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.confirmation-dialog-copy p {
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  margin: 0.46rem 0 0;
+}
+
+.confirmation-dialog-actions {
+  display: flex;
+  gap: 0.55rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.confirmation-primary-button {
+  align-items: center;
+  border-radius: 7px;
+  display: inline-flex;
+  font-size: 0.84rem;
+  font-weight: 600;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0 0.82rem;
+  transition:
+    background var(--motion-fast) ease-out,
+    border-color var(--motion-fast) ease-out,
+    color var(--motion-fast) ease-out;
+}
+
+.confirmation-primary-button[data-tone="warning"] {
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--border));
+  color: color-mix(in srgb, var(--text-primary) 82%, var(--warning));
+}
+
+.confirmation-primary-button[data-tone="danger"] {
+  background: var(--error);
+  border: 1px solid color-mix(in srgb, var(--error) 82%, var(--border));
+  color: var(--danger-button-text);
+}
+
+.confirmation-primary-button[data-tone="warning"]:hover {
+  background: color-mix(in srgb, var(--warning) 24%, var(--surface));
+}
+
+.confirmation-primary-button[data-tone="danger"]:hover {
+  background: color-mix(in srgb, var(--error) 88%, var(--surface));
+}
+
 .settings-inline-warning-shell {
   align-items: center;
-  background: color-mix(in srgb, var(--overlay-dim) calc(82% * var(--settings-warning-dim, 1)), transparent);
+  background: rgba(0, 0, 0, calc(0.46 * var(--settings-warning-dim, 1)));
   border-radius: inherit;
   display: flex;
   inset: 0;
@@ -3173,8 +3292,7 @@ html[data-theme-switching] *::after {
 }
 
 .settings-inline-warning-card {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-elevated) 96%, transparent));
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: 14px;
   box-shadow:
@@ -3258,8 +3376,7 @@ html[data-theme-switching] *::after {
 }
 
 .update-install-prompt {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--surface-elevated) 96%, transparent));
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   border-radius: 14px;
   bottom: 1.25rem;
@@ -3309,7 +3426,18 @@ html[data-theme-switching] *::after {
 }
 
 :root[data-theme="dark"] .settings-dialog {
-  background: color-mix(in srgb, var(--surface) 94%, var(--background));
+  background: #1f1f1f;
+}
+
+:root[data-theme="dark"] .settings-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme="dark"] .settings-sidebar,
+:root[data-theme="dark"] .settings-inline-warning-card,
+:root[data-theme="dark"] .confirmation-dialog,
+:root[data-theme="dark"] .update-install-prompt {
+  background: #242424;
 }
 
 :root[data-theme="dark"] .settings-section-rows {

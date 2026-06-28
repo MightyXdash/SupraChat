@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react"
 import { Moon, Pencil, RefreshCcw, Sun, Trash2 } from "lucide-react"
+import { useConfirmationDialog } from "@/app/components/ConfirmationDialog"
 import { appNavigationItems, sidebarControlIcon as SidebarControlIcon } from "@/app/config/navigation"
 import { type AppTheme } from "@/app/config/theme"
 import { cn } from "@/lib/utils"
@@ -62,6 +63,7 @@ export function AppSidebar({
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const recentsScrollRef = useRef<HTMLDivElement | null>(null)
   const isRecentsScrolling = useScrollVisibility(recentsScrollRef)
+  const { confirm, confirmationDialog } = useConfirmationDialog()
   const confirmConversationDeletion = useSettingsStore((state) => state.confirmConversationDeletion)
   const displayedConversations = isLoading
     ? []
@@ -144,7 +146,12 @@ export function AppSidebar({
   }
 
   async function handleDeleteConversation(conversationId: string) {
-    const confirmed = !confirmConversationDeletion || window.confirm("Delete this conversation? This cannot be undone.")
+    const confirmed = !confirmConversationDeletion || await confirm({
+      body: "This removes the saved conversation from this device.",
+      confirmLabel: "Delete",
+      title: "Delete this conversation?",
+      tone: "danger",
+    })
 
     if (!confirmed) {
       return
@@ -169,6 +176,7 @@ export function AppSidebar({
   }
 
   return (
+    <>
     <aside
       className="app-sidebar flex min-h-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar)] max-[780px]:hidden"
       data-collapsed={collapsed}
@@ -348,5 +356,7 @@ export function AppSidebar({
         </div>
       ) : null}
     </aside>
+    {confirmationDialog}
+    </>
   )
 }

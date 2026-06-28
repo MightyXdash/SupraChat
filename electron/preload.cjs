@@ -23,6 +23,39 @@ contextBridge.exposeInMainWorld("suprachat", {
   backendPort: getBackendPort(),
   clientToken: getClientToken(),
   platform: process.platform,
+  appEvents: {
+    onCheckUpdates: (listener) => {
+      const handle = () => listener()
+
+      ipcRenderer.on("app:check-updates", handle)
+
+      return () => {
+        ipcRenderer.removeListener("app:check-updates", handle)
+      }
+    },
+    onNewConversation: (listener) => {
+      const handle = () => listener()
+
+      ipcRenderer.on("app:new-conversation", handle)
+
+      return () => {
+        ipcRenderer.removeListener("app:new-conversation", handle)
+      }
+    },
+    onOpenSettings: (listener) => {
+      const handle = () => listener()
+
+      ipcRenderer.on("app:open-settings", handle)
+
+      return () => {
+        ipcRenderer.removeListener("app:open-settings", handle)
+      }
+    },
+  },
+  startup: {
+    reportProgress: (payload) => ipcRenderer.send("startup:progress", payload),
+    setThemePreference: (themePreference) => ipcRenderer.send("startup:theme-preference", themePreference),
+  },
   updater: {
     checkNow: () => ipcRenderer.invoke("updates:check-now"),
     dismissReadyState: () => ipcRenderer.invoke("updates:dismiss-ready-state"),

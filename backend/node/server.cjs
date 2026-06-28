@@ -99,13 +99,14 @@ function sendJson(req, res, statusCode, payload) {
   res.end(JSON.stringify(payload))
 }
 
-function readJsonBody(req) {
+function readJsonBody(req, options = {}) {
   return new Promise((resolve, reject) => {
     let body = ""
+    const maxBytes = options.maxBytes ?? 1_000_000
 
     req.on("data", (chunk) => {
       body += chunk
-      if (body.length > 1_000_000) {
+      if (body.length > maxBytes) {
         reject(new Error("payload_too_large"))
         req.destroy()
       }
@@ -295,6 +296,57 @@ function createServer(database, config, provider) {
         ok: false,
         error: "conversation_list_failed",
         detail: "Unable to load saved conversations.",
+      })
+    }
+    return
+  }
+
+  if (req.method === "GET" && url.pathname === "/data/export") {
+    try {
+      sendJson(req, res, 200, {
+        ok: true,
+        schemaVersion: 1,
+        exportedAt: new Date().toISOString(),
+        conversations: database.serializeConversations(),
+      })
+    } catch {
+      sendJson(req, res, 500, {
+        ok: false,
+        error: "conversation_export_failed",
+        detail: "Unable to export saved conversations.",
+      })
+    }
+    return
+  }
+
+  if (req.method === "POST" && url.pathname === "/data/import") {
+    try {
+      const body = await readJsonBody(req, { maxBytes: 25 * 1024 * 1024 })
+      const conversations = Array.isArray(body.conversations) ? body.conversations : []
+
+      if (!conversations.every(isValidConversation)) {
+        sendJson(req, res, 400, {
+          ok: false,
+          error: "invalid_import",
+          detail: "Import file does not contain valid SupraChat conversations.",
+        })
+        return
+      }
+
+      const result = database.importConversations(conversations)
+      sendJson(req, res, 200, {
+        ok: true,
+        imported: conversations.length,
+        ...result,
+      })
+    } catch (error) {
+      sendJson(req, res, 500, {
+        ok: false,
+        error: "conversation_import_failed",
+        detail:
+          error?.message === "payload_too_large"
+            ? "Import file is too large."
+            : "Unable to import saved conversations.",
       })
     }
     return
@@ -609,6 +661,14 @@ function stopServer() {
   }
 }
 
+async function warmupModels(onProgress) {
+  if (!generationProvider?.warmup) {
+    return
+  }
+
+  await generationProvider.warmup(onProgress)
+}
+
 if (require.main === module) {
   startServer()
 
@@ -626,4 +686,5 @@ if (require.main === module) {
 module.exports = {
   startServer,
   stopServer,
+  warmupModels,
 }

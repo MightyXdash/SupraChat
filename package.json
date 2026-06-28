@@ -26,10 +26,13 @@
     "dev:node": "node backend/node/server.cjs",
     "build": "vite build",
     "rebuild:electron": "electron-rebuild --force --only better-sqlite3",
-    "build:electron": "npm run models:download && npm run rebuild:electron && vite build && electron-builder",
+    "build:electron": "npm run models:download && npm run runtime:check:all && npm run rebuild:electron && vite build && electron-builder",
+    "build:electron:current": "npm run models:download && npm run runtime:check && npm run rebuild:electron && vite build && electron-builder",
+    "runtime:download": "node scripts/download-llama-runtime.cjs",
     "models:download": "node scripts/download-llama-models.cjs",
     "publish:release": "cross-env EP_DRAFT=false EP_PRE_RELEASE=false npm run build:electron -- --publish always",
     "publish:prerelease": "cross-env EP_DRAFT=false EP_PRE_RELEASE=true npm run build:electron -- --publish always",
+    "release:signing:check": "node scripts/check-release-signing.cjs",
     "release:validate": "node scripts/validate-release-tag.cjs",
     "runtime:check": "node scripts/check-runtime.cjs",
     "runtime:check:all": "node scripts/check-runtime.cjs --all",
@@ -81,18 +84,21 @@
       "dist/**/*",
       "electron/**/*",
       "backend/node/**/*",
-      "resources/**/*",
       "package.json"
     ],
     "extraResources": [
-      {
-        "from": "resources",
-        "to": "resources",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
+    {
+      "from": "resources",
+      "to": "resources",
+      "filter": [
+        "**/*"
+      ]
+    },
+    {
+      "from": "build/icon.png",
+      "to": "icon.png"
+    }
+  ],
     "directories": {
       "buildResources": "build"
     },
@@ -105,8 +111,9 @@
     ],
     "win": {
       "icon": "build/icon.ico",
-      "publisherName": "SupraLabs",
-      "target": "nsis"
+      "target": [
+        "nsis"
+      ]
     },
     "nsis": {
       "installerHeader": "build/installer-header.bmp",
@@ -116,10 +123,13 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "build/icon.png",
-      "target": "dmg"
+      "target": [
+        "dmg"
+      ]
     },
     "dmg": {
       "background": "build/dmg-background.png",
+      "writeUpdateInfo": false,
       "contents": [
         {
           "x": 350,
@@ -140,7 +150,9 @@
     },
     "linux": {
       "icon": "build/icon.png",
-      "target": "AppImage"
+      "target": [
+        "AppImage"
+      ]
     }
   }
 }

@@ -158,6 +158,26 @@ function createChatDatabase(databasePath) {
     })
   })
 
+  const importConversations = db.transaction((conversations) => {
+    const result = {
+      created: 0,
+      replaced: 0,
+    }
+
+    conversations.forEach((conversation) => {
+      if (conversationExistsStatement.get(conversation.id)) {
+        replaceConversation(conversation)
+        result.replaced += 1
+        return
+      }
+
+      saveConversation(conversation)
+      result.created += 1
+    })
+
+    return result
+  })
+
   function serializeConversations() {
     const rows = listConversationsStatement.all()
     const conversations = []
@@ -201,6 +221,7 @@ function createChatDatabase(databasePath) {
       messageCount: db.prepare("SELECT COUNT(*) AS count FROM messages").get().count,
     }),
     hasConversation: (conversationId) => Boolean(conversationExistsStatement.get(conversationId)),
+    importConversations,
     recordHealthCheck: () => recordHealthCheckStatement.run("node-backend"),
     replaceConversation,
     saveConversation,

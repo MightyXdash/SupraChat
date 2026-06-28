@@ -297,6 +297,31 @@ function createLlamaCppProvider() {
   return {
     chatModel: CHAT_MODEL,
     titleModel: TITLE_MODEL,
+    async warmup(onProgress) {
+      onProgress?.({
+        id: "title-model",
+        label: `Loading ${TITLE_MODEL.label}`,
+        progress: 0.48,
+      })
+      await titleWorker.ensureReady()
+      onProgress?.({
+        id: "title-model",
+        label: `${TITLE_MODEL.label} ready`,
+        progress: 0.62,
+      })
+
+      onProgress?.({
+        id: "chat-model",
+        label: `Loading ${CHAT_MODEL.label}`,
+        progress: 0.68,
+      })
+      await chatWorker.ensureReady()
+      onProgress?.({
+        id: "chat-model",
+        label: `${CHAT_MODEL.label} ready`,
+        progress: 0.82,
+      })
+    },
     async streamChat(messages, thinking) {
       try {
         return await chatWorker.streamChat(messages, undefined, thinking)

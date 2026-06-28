@@ -27,3 +27,9 @@ jobs:
 
       - name: Validate release tag
         run: node scripts/validate-release-tag.cjs "${{ github.event.inputs.current_version || '0.1.0' }}" "${{ github.event.inputs.next_tag || github.ref_name }}"
+
+      - name: Validate runtime asset contract
+        run: npm run runtime:check:all
+
+      - name: Validate release signing environment
+        run: npm run release:signing:check

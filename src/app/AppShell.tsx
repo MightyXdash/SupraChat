@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { useConfirmationDialog } from "@/app/components/ConfirmationDialog"
 import { AppSidebar } from "@/app/components/AppSidebar"
 import { WindowTitleBar } from "@/app/components/WindowTitleBar"
 import {
@@ -22,6 +23,7 @@ import { SettingsDialog } from "@/features/settings/components/SettingsDialog"
 import { useSettingsStore } from "@/features/settings/store/use-settings-store"
 import { UpdateInstallPrompt } from "@/features/updates/components/UpdateInstallPrompt"
 import {
+  checkForUpdatesNow,
   dismissReadyUpdateState,
   fetchUpdatePreferences,
   fetchUpdateStatus,
@@ -97,6 +99,7 @@ export function AppShell() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const speechCacheRef = useRef<Map<string, CachedSpeechClip>>(new Map())
   const speechRequestRef = useRef(0)
+  const { confirm, confirmationDialog } = useConfirmationDialog()
   const hasAppliedInitialThemeRef = useRef(false)
   const themeRef = useRef<AppTheme>(theme)
   const { clearSubmitScrollSpace, scrollLatestUserTurnIntoView, scrollRef } = useAutoScroll()
@@ -203,6 +206,30 @@ export function AppShell() {
   }, [initializeVoice])
 
   useEffect(() => {
+    const appEvents = appWindowConfig.appEvents
+
+    if (!appEvents) {
+      return
+    }
+
+    const unsubscribeNewConversation = appEvents.onNewConversation(() => {
+      void handleCreateConversation()
+    })
+    const unsubscribeOpenSettings = appEvents.onOpenSettings(() => {
+      setIsSettingsOpen(true)
+    })
+    const unsubscribeCheckUpdates = appEvents.onCheckUpdates(() => {
+      void checkForUpdatesNow().then(setUpdaterStatus)
+    })
+
+    return () => {
+      unsubscribeNewConversation()
+      unsubscribeOpenSettings()
+      unsubscribeCheckUpdates()
+    }
+  }, [createConversation, setActiveConversation, setUpdaterStatus])
+
+  useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.code !== "KeyM") {
         return
@@ -243,6 +270,8 @@ export function AppShell() {
   }, [voiceState, startPttRecording, stopPttRecording, setHotkeyActive])
 
   useEffect(() => {
+    window.suprachat?.startup?.setThemePreference(themePreference)
+
     const mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)")
 
     function commitTheme(nextTheme: AppTheme) {
@@ -552,9 +581,12 @@ export function AppShell() {
 
   async function handleInstallDownloadedUpdate() {
     if (updateTrack !== "final" && confirmExperimentalInstall) {
-      const shouldInstallExperimentalUpdate = window.confirm(
-        "Install this experimental SupraChat build now? Experimental updates can change more often and may be less stable.",
-      )
+      const shouldInstallExperimentalUpdate = await confirm({
+        body: "Experimental updates can change more often and may be less stable.",
+        confirmLabel: "Install",
+        title: "Install experimental build?",
+        tone: "warning",
+      })
 
       if (!shouldInstallExperimentalUpdate) {
         return
@@ -657,6 +689,7 @@ export function AppShell() {
         onInstall={() => void handleInstallDownloadedUpdate()}
       />
       <SettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      {confirmationDialog}
     </main>
   )
 }
