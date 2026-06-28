@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld("suprachat", {
       ipcRenderer.invoke("updates:set-confirm-experimental-install", confirmExperimentalInstall),
     setTrack: (track) => ipcRenderer.invoke("updates:set-track", track),
   },
+  rendererReady: () => ipcRenderer.send("renderer:ready"),
   windowControls: {
     close: () => ipcRenderer.invoke("window:close"),
     minimize: () => ipcRenderer.invoke("window:minimize"),

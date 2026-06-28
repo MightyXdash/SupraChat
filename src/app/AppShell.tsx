@@ -583,6 +583,7 @@ export function AppShell() {
       data-frosted-surfaces={frostedSurfaces}
       data-message-font={messageFont}
       data-reduce-motion={reduceMotion}
+      data-sidebar-state={isSidebarCollapsed ? "collapsed" : "expanded"}
     >
       <WindowTitleBar />
       <div

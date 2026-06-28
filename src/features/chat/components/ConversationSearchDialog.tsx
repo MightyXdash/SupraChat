@@ -1,6 +1,7 @@
 import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { MessageCircle, Search, SquarePen, X } from "lucide-react"
+import { appWindowConfig } from "@/app/config/window"
 import { searchConversations, getSearchWords } from "@/features/chat/lib/conversation-search"
 import { truncateConversationTitle } from "@/features/chat/lib/chat-records"
 import { SEARCH_TITLE_MAX_VISIBLE_CHARACTERS } from "@/features/chat/config/ui"
@@ -13,6 +14,9 @@ type ConversationSearchDialogProps = {
   onCreateConversation: () => Promise<string>
   onSelectConversation: (conversationId: string) => void
 }
+
+const isWindowsPlatform = appWindowConfig.platform === "win32"
+const searchBackdropBlur = isWindowsPlatform ? "5px" : "10px"
 
 function relativeGroupLabel(value: string) {
   const date = new Date(value)
@@ -120,7 +124,7 @@ export function ConversationSearchDialog({
             } as CSSProperties}
             animate={{
               opacity: 1,
-              "--search-backdrop-blur": "10px",
+              "--search-backdrop-blur": searchBackdropBlur,
               "--search-backdrop-saturate": "0.94",
             } as CSSProperties}
             exit={{

@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { RefreshCcw, X } from "lucide-react"
+import { appWindowConfig } from "@/app/config/window"
 import { settingsTabs, type SettingsTabId } from "@/features/settings/config/settings-tabs"
 import { SettingsBadge, SettingsPath, SettingsSegmentedControl, SettingsToggle } from "@/features/settings/components/SettingsControl"
 import { SettingsNav } from "@/features/settings/components/SettingsNav"
@@ -28,6 +29,10 @@ type SettingsDialogProps = {
   isOpen: boolean
   onClose: () => void
 }
+
+const isWindowsPlatform = appWindowConfig.platform === "win32"
+const settingsBackdropBlur = isWindowsPlatform ? "5px" : "8px"
+const settingsWarningBlur = isWindowsPlatform ? "7px" : "14px"
 
 type SettingsDataState = {
   error: string | null
@@ -262,7 +267,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
             } as CSSProperties}
             animate={{
               opacity: 1,
-              "--settings-backdrop-blur": "8px",
+              "--settings-backdrop-blur": settingsBackdropBlur,
               "--settings-backdrop-saturate": "0.96",
             } as CSSProperties}
             exit={{
@@ -294,8 +299,8 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                     "--settings-warning-dim": "0",
                   } as CSSProperties}
                   animate={{
-                    WebkitBackdropFilter: "blur(14px) saturate(0.92)",
-                    backdropFilter: "blur(14px) saturate(0.92)",
+                    WebkitBackdropFilter: `blur(${settingsWarningBlur}) saturate(0.92)`,
+                    backdropFilter: `blur(${settingsWarningBlur}) saturate(0.92)`,
                     opacity: 1,
                     "--settings-warning-dim": "1",
                   } as CSSProperties}

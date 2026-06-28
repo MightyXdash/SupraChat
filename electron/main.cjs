@@ -8,6 +8,8 @@ const { createUpdateService } = require("./updater/index.cjs")
 let backendPort = null
 let backendClientToken = null
 let isAppQuitting = false
+let mainWindow = null
+let splashWindow = null
 const updateService = createUpdateService()
 
 function findAvailablePort(startPort) {
@@ -62,9 +64,152 @@ async function startBackend() {
   return backendPort
 }
 
+function createSplashWindow() {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    return splashWindow
+  }
+
+  splashWindow = new BrowserWindow({
+    width: 360,
+    height: 220,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    frame: false,
+    show: false,
+    transparent: false,
+    backgroundColor: "#212121",
+    title: "SupraChat",
+    webPreferences: {
+      sandbox: true,
+    },
+  })
+
+  const splashHtml = encodeURIComponent(`
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';" />
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "Segoe UI", Arial, sans-serif;
+      }
+
+      body {
+        align-items: center;
+        background:
+          linear-gradient(180deg, rgba(39, 39, 39, 0.98), rgba(31, 31, 31, 0.98));
+        color: #ececec;
+        display: flex;
+        height: 100vh;
+        justify-content: center;
+        margin: 0;
+        overflow: hidden;
+        user-select: none;
+      }
+
+      .shell {
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+        justify-content: center;
+        text-align: center;
+      }
+
+      .mark {
+        background: linear-gradient(135deg, #342f28, #b7a287);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        box-shadow: 0 0 0 5px rgba(183, 162, 135, 0.08);
+        height: 0.76rem;
+        width: 0.76rem;
+      }
+
+      h1 {
+        font-size: 0.98rem;
+        font-weight: 650;
+        letter-spacing: 0;
+        line-height: 1;
+        margin: 0;
+      }
+
+      p {
+        color: #9b9b9b;
+        font-size: 0.76rem;
+        line-height: 1.4;
+        margin: 0;
+      }
+
+      .bar {
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 999px;
+        height: 0.18rem;
+        margin-top: 0.18rem;
+        overflow: hidden;
+        width: 8.5rem;
+      }
+
+      .bar::before {
+        animation: load 1.25s ease-in-out infinite;
+        background: linear-gradient(90deg, transparent, #b7a287, transparent);
+        content: "";
+        display: block;
+        height: 100%;
+        transform: translateX(-100%);
+        width: 70%;
+      }
+
+      @keyframes load {
+        to {
+          transform: translateX(170%);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell" aria-label="SupraChat is starting">
+      <div class="mark" aria-hidden="true"></div>
+      <h1>SupraChat</h1>
+      <p>Starting local runtime</p>
+      <div class="bar" aria-hidden="true"></div>
+    </main>
+  </body>
+</html>`)
+
+  splashWindow.loadURL(`data:text/html;charset=utf-8,${splashHtml}`).catch((error) => {
+    console.error("Unable to load SupraChat startup screen.", error)
+  })
+
+  splashWindow.on("ready-to-show", () => {
+    if (!splashWindow?.isDestroyed()) {
+      splashWindow.show()
+    }
+  })
+
+  splashWindow.on("closed", () => {
+    splashWindow = null
+  })
+
+  return splashWindow
+}
+
+function closeSplashWindow() {
+  if (!splashWindow || splashWindow.isDestroyed()) {
+    return
+  }
+
+  splashWindow.destroy()
+  splashWindow = null
+}
+
 function createWindow() {
   const isMac = process.platform === "darwin"
   let allowWindowClose = false
+  let didShowWindow = false
   const window = new BrowserWindow({
     width: 1500,
     height: 940,
@@ -73,7 +218,8 @@ function createWindow() {
     title: "SupraChat",
     backgroundColor: "#F7F3EE",
     autoHideMenuBar: true,
-    frame: isMac,
+    frame: false,
+    show: false,
     fullSizeContentView: isMac,
     titleBarStyle: "hidden",
     trafficLightPosition: isMac ? { x: 13, y: 10 } : undefined,
@@ -88,14 +234,33 @@ function createWindow() {
 
   const rendererUrl = process.env.VITE_DEV_SERVER_URL || `file://${path.join(__dirname, "..", "dist", "index.html")}`
 
+  function showWindowWhenReady() {
+    if (didShowWindow || window.isDestroyed()) {
+      return
+    }
+
+    didShowWindow = true
+    window.show()
+    closeSplashWindow()
+    updateService.handleWindowShown(window)
+  }
+
   window.loadURL(rendererUrl).catch((error) => {
     console.error("Unable to load SupraChat renderer.", error)
   })
 
   window.on("ready-to-show", () => {
-    window.show()
-    updateService.handleWindowShown(window)
+    setTimeout(showWindowWhenReady, 1800)
   })
+
+  function handleRendererReady(event) {
+    if (event.sender === window.webContents) {
+      showWindowWhenReady()
+      ipcMain.removeListener("renderer:ready", handleRendererReady)
+    }
+  }
+
+  ipcMain.on("renderer:ready", handleRendererReady)
 
   window.on("close", (event) => {
     if (isAppQuitting || allowWindowClose) {
@@ -117,6 +282,14 @@ function createWindow() {
     })
   })
 
+  window.on("closed", () => {
+    ipcMain.removeListener("renderer:ready", handleRendererReady)
+    if (mainWindow === window) {
+      mainWindow = null
+    }
+  })
+
+  mainWindow = window
   return window
 }
 
@@ -155,10 +328,13 @@ function stopBackend() {
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null)
+  createSplashWindow()
+
   try {
     await startBackend()
   } catch (error) {
     console.error("Unable to start SupraChat backend.", error)
+    closeSplashWindow()
     dialog.showErrorBox(
       "Unable to start SupraChat",
       "The local SupraChat backend could not start. Run npm run rebuild:electron, then restart the app.",
@@ -170,16 +346,14 @@ app.whenReady().then(async () => {
   createWindow()
 
   app.on("activate", () => {
-    const existingWindow = BrowserWindow.getAllWindows()[0]
-
-    if (existingWindow) {
-      existingWindow.show()
-      existingWindow.focus()
-      updateService.handleWindowShown(existingWindow)
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show()
+      mainWindow.focus()
+      updateService.handleWindowShown(mainWindow)
       return
     }
 
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (BrowserWindow.getAllWindows().filter((window) => window !== splashWindow).length === 0) {
       createWindow()
     }
   })

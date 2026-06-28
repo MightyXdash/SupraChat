@@ -23,8 +23,9 @@ declare global {
     suprachat?: {
       backendPort?: number
       clientToken?: string
-      platform?: SupraChatPlatform
-      updater?: UpdaterBridge
+    platform?: SupraChatPlatform
+    rendererReady?: () => void
+    updater?: UpdaterBridge
       windowControls?: WindowControls
     }
   }

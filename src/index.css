@@ -191,6 +191,10 @@ body {
     color var(--motion-base) ease-out;
 }
 
+.app-shell {
+  position: relative;
+}
+
 .app-shell-grid {
   grid-template-columns: var(--sidebar-expanded-width) minmax(0, 1fr);
   height: 100vh;
@@ -198,7 +202,7 @@ body {
 }
 
 .app-shell:not([data-platform="darwin"]) .app-shell-grid {
-  height: calc(100vh - var(--window-titlebar-height));
+  height: 100vh;
 }
 
 .app-shell-grid[data-sidebar-state="collapsed"] {
@@ -248,42 +252,30 @@ body {
 .window-titlebar {
   -webkit-app-region: drag;
   align-items: center;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 72%, transparent), color-mix(in srgb, var(--background) 96%, transparent));
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  background: transparent;
+  border: 0;
   color: var(--text-secondary);
   display: flex;
   height: var(--window-titlebar-height);
-  justify-content: space-between;
-  padding: 0 0.75rem 0 1rem;
+  justify-content: flex-end;
+  left: var(--sidebar-expanded-width);
+  padding: 0.35rem 0.55rem 0 0;
+  position: absolute;
+  right: 0;
+  top: 0;
   user-select: none;
+  z-index: 40;
 }
 
-.window-titlebar-brand {
-  align-items: center;
-  display: inline-flex;
-  gap: 0.5rem;
-  font-size: 0.79rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  min-width: 0;
-}
-
-.window-titlebar-mark {
-  background: linear-gradient(135deg, var(--accent-light), var(--accent-primary));
-  border: 1px solid color-mix(in srgb, var(--accent-hover) 28%, transparent);
-  border-radius: 50%;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-light) 26%, transparent);
-  display: inline-block;
-  height: 0.48rem;
-  width: 0.48rem;
+.app-shell[data-sidebar-state="collapsed"] .window-titlebar {
+  left: var(--sidebar-collapsed-width);
 }
 
 .window-titlebar-controls {
   -webkit-app-region: no-drag;
   align-items: center;
   display: inline-flex;
-  gap: 0.125rem;
+  gap: 0.5rem;
   height: 100%;
 }
 
@@ -291,7 +283,8 @@ body {
   align-items: center;
   background: transparent;
   border: 0;
-  border-radius: var(--radius-control);
+  border-radius: 7px;
+  box-shadow: none;
   color: var(--text-muted);
   display: inline-flex;
   height: 1.7rem;
@@ -299,17 +292,34 @@ body {
   transition:
     background var(--motion-fast) ease-out,
     color var(--motion-fast) ease-out;
-  width: 2rem;
+  width: 1.7rem;
 }
 
 .window-titlebar-control:hover {
-  background: color-mix(in srgb, var(--highlight) 44%, transparent);
+  background: color-mix(in srgb, var(--highlight) 68%, transparent);
+  color: var(--text-primary);
+}
+
+.window-titlebar-control-minimize:hover {
+  background: color-mix(in srgb, var(--highlight) 68%, transparent);
+  color: var(--text-primary);
+}
+
+.window-titlebar-control-maximize:hover {
+  background: color-mix(in srgb, var(--highlight) 68%, transparent);
   color: var(--text-primary);
 }
 
 .window-titlebar-control-close:hover {
-  background: color-mix(in srgb, var(--error) 18%, transparent);
-  color: var(--error);
+  background: color-mix(in srgb, var(--highlight) 68%, transparent);
+  color: var(--text-primary);
+}
+
+@media (max-width: 780px) {
+  .window-titlebar,
+  .app-shell[data-sidebar-state="collapsed"] .window-titlebar {
+    left: 0;
+  }
 }
 
 .chat-workspace-header {
@@ -958,6 +968,7 @@ button:disabled {
 }
 
 .sidebar-header {
+  -webkit-app-region: drag;
   align-items: center;
   display: flex;
   justify-content: space-between;
@@ -979,6 +990,7 @@ button:disabled {
 }
 
 .sidebar-header-actions {
+  -webkit-app-region: no-drag;
   align-items: center;
   display: inline-flex;
   flex: 0 0 auto;
@@ -2114,6 +2126,24 @@ button:disabled {
   width: min(47rem, calc(100vw - 2.5rem));
 }
 
+.app-shell[data-platform="win32"] .conversation-search-layer {
+  isolation: isolate;
+}
+
+.app-shell[data-platform="win32"] .conversation-search-dialog {
+  backdrop-filter: blur(14px) saturate(1.08);
+  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  backface-visibility: hidden;
+  contain: layout paint;
+  transform: translateZ(0);
+  will-change: opacity, transform;
+}
+
+.app-shell[data-platform="win32"] .conversation-search-backdrop {
+  transform: translateZ(0);
+  will-change: opacity;
+}
+
 .conversation-search-field {
   align-items: center;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
@@ -2308,6 +2338,24 @@ button:disabled {
   overflow: hidden;
   position: relative;
   width: min(57.5rem, calc(100vw - 4rem));
+}
+
+.app-shell[data-platform="win32"] .settings-layer {
+  isolation: isolate;
+}
+
+.app-shell[data-platform="win32"] .settings-dialog {
+  backdrop-filter: blur(14px) saturate(1.04);
+  -webkit-backdrop-filter: blur(14px) saturate(1.04);
+  backface-visibility: hidden;
+  contain: layout paint;
+  transform: translateZ(0);
+  will-change: opacity, transform;
+}
+
+.app-shell[data-platform="win32"] .settings-backdrop {
+  transform: translateZ(0);
+  will-change: opacity;
 }
 
 .settings-sidebar {
