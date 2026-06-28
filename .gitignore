@@ -13,6 +13,7 @@ dist-electron/
 __pycache__/
 *.pyc
 build/
+release-resources/
 release/
 .DS_Store
 *.log

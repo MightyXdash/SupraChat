@@ -26,8 +26,10 @@
     "dev:node": "node backend/node/server.cjs",
     "build": "vite build",
     "rebuild:electron": "electron-rebuild --force --only better-sqlite3",
-    "build:electron": "npm run models:download && npm run runtime:check:all && npm run rebuild:electron && vite build && electron-builder",
-    "build:electron:current": "npm run models:download && npm run runtime:check && npm run rebuild:electron && vite build && electron-builder",
+    "resources:stage": "node scripts/stage-release-resources.cjs",
+    "build:electron": "npm run models:download && npm run resources:stage && npm run runtime:check && npm run rebuild:electron && vite build && electron-builder",
+    "build:electron:current": "npm run models:download && npm run resources:stage && npm run runtime:check && npm run rebuild:electron && vite build && electron-builder",
+    "build:windows:x64": "npm run models:download && npm run resources:stage -- --platform win32 --arch x64 && node scripts/check-runtime.cjs --target --platform win32 --arch x64 --resource-root release-resources && npm run rebuild:electron && vite build && electron-builder --win --x64",
     "runtime:download": "node scripts/download-llama-runtime.cjs",
     "models:download": "node scripts/download-llama-models.cjs",
     "publish:release": "cross-env EP_DRAFT=false EP_PRE_RELEASE=false npm run build:electron -- --publish always",
@@ -88,7 +90,7 @@
     ],
     "extraResources": [
     {
-      "from": "resources",
+      "from": "release-resources",
       "to": "resources",
       "filter": [
         "**/*"
@@ -110,12 +112,17 @@
       }
     ],
     "win": {
+      "artifactName": "SupraChat-Setup-${version}.${ext}",
       "icon": "build/icon.ico",
       "target": [
         "nsis"
       ]
     },
     "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "SupraChat",
       "installerHeader": "build/installer-header.bmp",
       "installerSidebar": "build/installer-sidebar.bmp",
       "uninstallerSidebar": "build/installer-sidebar.bmp"
