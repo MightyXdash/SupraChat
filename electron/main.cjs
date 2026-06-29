@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, nativeTheme, shell } = require("electron")
+const { app, BrowserWindow, Menu, ipcMain, dialog, nativeImage, nativeTheme, shell } = require("electron")
 const { randomBytes } = require("node:crypto")
 const fs = require("node:fs")
 const net = require("node:net")
@@ -184,14 +184,28 @@ function resolveStartupTheme() {
 }
 
 function resolveAppIconPath() {
-  const candidates = app.isPackaged
+  const packagedCandidates = process.platform === "win32"
     ? [
+      path.join(process.resourcesPath, "icon.ico"),
+      path.join(process.resourcesPath, "icon.png"),
+      path.join(process.resourcesPath, "build", "icon.ico"),
+      path.join(process.resourcesPath, "build", "icon.png"),
+    ]
+    : [
       path.join(process.resourcesPath, "icon.png"),
       path.join(process.resourcesPath, "build", "icon.png"),
+    ]
+
+  const developmentCandidates = process.platform === "win32"
+    ? [
+      path.join(__dirname, "..", "build", "icon.ico"),
+      path.join(__dirname, "..", "build", "icon.png"),
     ]
     : [
       path.join(__dirname, "..", "build", "icon.png"),
     ]
+
+  const candidates = app.isPackaged ? packagedCandidates : developmentCandidates
 
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null
 }
@@ -204,7 +218,13 @@ function readAppIconDataUrl() {
   }
 
   try {
-    return `data:image/png;base64,${fs.readFileSync(iconPath).toString("base64")}`
+    const icon = nativeImage.createFromPath(iconPath)
+
+    if (icon.isEmpty()) {
+      return ""
+    }
+
+    return icon.toDataURL()
   } catch {
     return ""
   }
