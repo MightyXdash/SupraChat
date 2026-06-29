@@ -48,6 +48,6 @@ The Electron app runs the Node backend inside Electron's bundled Node runtime,
 so packaged builds do not require a separate system Node installation.
 
 
-<img width="1470" height="848" alt="image" src="https://github.com/user-attachments/assets/22ed8848-f6bd-4963-9e1f-02b662811352" />
+<img width="3440" height="1440" alt="App_demo" src="https://github.com/user-attachments/assets/984c2b80-92a7-4c54-a2f8-134b52ecb2fb" />
 
 
