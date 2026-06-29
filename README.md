@@ -3,7 +3,7 @@
 
 
 
-<img width="3440" height="1080" alt="SupraLabs_theme_Artwork_redesign" src="https://github.com/user-attachments/assets/b04de0a0-714b-4c8f-956a-9559a66a1e75" /><div align="center">
+<img width="3440" height="1080" alt="SupraLabs_theme_Artwork_redesign" src="https://github.com/user-attachments/assets/b04de0a0-714b-4c8f-956a-9559a66a1e75" />
 
 
 
