@@ -5,6 +5,7 @@ const axios = require("axios")
 const {
   CHAT_MODEL,
   TITLE_MODEL,
+  getAccelerationMode,
   getHardwareAccelerationArgs,
   getThreadCount,
   resolveLlamaServerPath,
@@ -77,6 +78,7 @@ class LlamaCppWorker {
     this.process = null
     this.port = null
     this.readyPromise = null
+    this.accelerationMode = null
   }
 
   async ensureReady() {
@@ -103,6 +105,31 @@ class LlamaCppWorker {
     assertReadableFile(llamaServerPath, "llama.cpp server binary")
     assertReadableFile(modelPath, `${this.model.label} GGUF model`)
 
+    const preferredMode = getAccelerationMode()
+    const modes = preferredMode === "vulkan" ? ["vulkan", "cpu"] : [preferredMode]
+    let lastError = null
+
+    for (const mode of modes) {
+      try {
+        await this.startWithAccelerationMode(mode, llamaServerPath, modelPath)
+        this.accelerationMode = mode
+        return
+      } catch (error) {
+        lastError = error
+        this.stop()
+
+        if (mode === "vulkan") {
+          console.warn(
+            `[llama.cpp:${this.model.role}] Vulkan startup failed; retrying with CPU inference.`,
+          )
+        }
+      }
+    }
+
+    throw lastError ?? new Error(`Unable to start llama.cpp ${this.model.role} worker.`)
+  }
+
+  async startWithAccelerationMode(mode, llamaServerPath, modelPath) {
     this.port = await findAvailablePort(this.portStart)
 
     const args = [
@@ -118,7 +145,7 @@ class LlamaCppWorker {
       String(getThreadCount()),
       "--parallel",
       "1",
-      ...getHardwareAccelerationArgs(),
+      ...getHardwareAccelerationArgs({ mode }),
     ]
 
     this.process = spawn(llamaServerPath, args, {
@@ -126,6 +153,8 @@ class LlamaCppWorker {
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     })
+
+    console.log(`[llama.cpp:${this.model.role}] starting with ${mode} acceleration`)
 
     this.process.stdout.on("data", (chunk) => {
       process.stdout.write(`[llama.cpp:${this.model.role}] ${chunk}`)
@@ -141,12 +170,12 @@ class LlamaCppWorker {
       this.readyPromise = null
     })
 
-    await this.waitForHealth()
+    await this.waitForHealth(mode)
   }
 
-  async waitForHealth() {
+  async waitForHealth(mode) {
     const startedAt = Date.now()
-    const timeoutMs = 90_000
+    const timeoutMs = mode === "vulkan" ? 35_000 : 90_000
 
     while (Date.now() - startedAt < timeoutMs) {
       if (!this.process) {
@@ -205,6 +234,7 @@ class LlamaCppWorker {
 
     this.port = null
     this.readyPromise = null
+    this.accelerationMode = null
   }
 }
 

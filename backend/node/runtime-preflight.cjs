@@ -4,8 +4,10 @@ const {
   CHAT_MODEL,
   REQUIRED_SPEECH_ASSETS,
   TITLE_MODEL,
+  getAccelerationMode,
   getLlamaServerName,
   getPlatformKey,
+  hasBundledVulkanRuntime,
   resolveLlamaServerPath,
   resolveModelPath,
   resolveResourceRoot,
@@ -97,6 +99,10 @@ function checkCurrentRuntime() {
     arch: process.arch,
     platformKey: getPlatformKey(),
     resourceRoot,
+    acceleration: {
+      preferredMode: getAccelerationMode({ resourceRoot }),
+      bundledVulkan: hasBundledVulkanRuntime(resourceRoot),
+    },
     checks,
   }
 }

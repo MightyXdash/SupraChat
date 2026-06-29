@@ -1,3 +1,4 @@
+const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 
@@ -195,15 +196,74 @@ function resolveSpeechSttModel(resourceRoot = resolveResourceRoot()) {
   }
 }
 
-function getHardwareAccelerationArgs() {
+function hasBundledVulkanRuntime(resourceRoot = resolveResourceRoot(), platform = process.platform, arch = process.arch) {
+  if (platform !== "win32" || arch !== "x64") {
+    return false
+  }
+
+  return fsExists(path.join(resourceRoot, "llama.cpp", getPlatformKey(platform, arch), "ggml-vulkan.dll"))
+}
+
+function fsExists(filePath) {
+  try {
+    return fs.existsSync(filePath)
+  } catch {
+    return false
+  }
+}
+
+function getAccelerationMode(options = {}) {
+  const platform = options.platform ?? process.platform
+  const arch = options.arch ?? process.arch
+  const resourceRoot = options.resourceRoot ?? resolveResourceRoot()
+
+  if (process.env.SUPRACHAT_DISABLE_GPU === "1") {
+    return "cpu"
+  }
+
+  if (process.env.SUPRACHAT_LLAMA_ACCELERATION) {
+    return process.env.SUPRACHAT_LLAMA_ACCELERATION
+  }
+
+  if (hasBundledVulkanRuntime(resourceRoot, platform, arch)) {
+    return "vulkan"
+  }
+
+  if (platform === "darwin") {
+    return "metal"
+  }
+
+  return "auto"
+}
+
+function getHardwareAccelerationArgs(options = {}) {
   const configured = process.env.SUPRACHAT_LLAMA_GPU_LAYERS
 
   if (configured) {
     return ["--n-gpu-layers", configured]
   }
 
-  if (process.env.SUPRACHAT_DISABLE_GPU === "1") {
+  const mode = options.mode ?? getAccelerationMode(options)
+
+  if (mode === "cpu") {
     return []
+  }
+
+  if (mode === "vulkan") {
+    const device = process.env.SUPRACHAT_LLAMA_VULKAN_DEVICE ?? "Vulkan0"
+
+    return [
+      "--device",
+      device,
+      "--split-mode",
+      "none",
+      "--main-gpu",
+      "0",
+      "--flash-attn",
+      "on",
+      "--n-gpu-layers",
+      "all",
+    ]
   }
 
   // llama.cpp uses this for Metal/CUDA/Vulkan-enabled builds and ignores it
@@ -228,9 +288,11 @@ module.exports = {
   SPEECH_STT_MODEL,
   SPEECH_TTS_MODEL,
   TITLE_MODEL,
+  getAccelerationMode,
   getHardwareAccelerationArgs,
   getPlatformKey,
   getThreadCount,
+  hasBundledVulkanRuntime,
   getLlamaServerName,
   resolveLlamaServerPath,
   resolveModelPath,

@@ -12,7 +12,11 @@ dist-electron/
 *.db-shm
 __pycache__/
 *.pyc
-build/
+build/*
+!build/icon.ico
+!build/icon.png
+!build/installer-header.bmp
+!build/installer-sidebar.bmp
 release-resources/
 release/
 .DS_Store

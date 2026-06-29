@@ -7,6 +7,22 @@ const { pipeline } = require("node:stream/promises")
 const RELEASE_TAG = process.env.SUPRACHAT_LLAMA_RELEASE_TAG || "b9827"
 const REPO = "ggml-org/llama.cpp"
 
+function readOption(name, fallback) {
+  const prefix = `--${name}=`
+  const inline = process.argv.find((arg) => arg.startsWith(prefix))
+
+  if (inline) {
+    return inline.slice(prefix.length)
+  }
+
+  const index = process.argv.indexOf(`--${name}`)
+  if (index >= 0 && process.argv[index + 1]) {
+    return process.argv[index + 1]
+  }
+
+  return fallback
+}
+
 const targets = [
   {
     asset: `llama-${RELEASE_TAG}-bin-macos-arm64.tar.gz`,
@@ -29,7 +45,7 @@ const targets = [
     platformKey: "linux-arm64",
   },
   {
-    asset: `llama-${RELEASE_TAG}-bin-win-cpu-x64.zip`,
+    asset: `llama-${RELEASE_TAG}-bin-win-vulkan-x64.zip`,
     executable: "llama-server.exe",
     platformKey: "win32-x64",
   },
@@ -53,6 +69,31 @@ function run(command, args) {
   if (result.status !== 0) {
     throw new Error(`${command} ${args.join(" ")} failed: ${result.stderr || result.stdout}`)
   }
+}
+
+function extractArchive(archivePath, extractDir) {
+  if (archivePath.endsWith(".zip")) {
+    if (process.platform === "win32") {
+      run("powershell", [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "Expand-Archive",
+        "-LiteralPath",
+        archivePath,
+        "-DestinationPath",
+        extractDir,
+        "-Force",
+      ])
+      return
+    }
+
+    run("unzip", ["-q", archivePath, "-d", extractDir])
+    return
+  }
+
+  run("tar", ["-xzf", archivePath, "-C", extractDir])
 }
 
 function walkFiles(directory) {
@@ -132,18 +173,29 @@ async function installTarget(target) {
   console.log(`Downloading ${target.asset}`)
   await downloadFile(url, archivePath)
 
-  if (target.asset.endsWith(".zip")) {
-    run("unzip", ["-q", archivePath, "-d", extractDir])
-  } else {
-    run("tar", ["-xzf", archivePath, "-C", extractDir])
-  }
+  extractArchive(archivePath, extractDir)
 
+  fs.rmSync(targetDir, { force: true, recursive: true })
   installExtractedFiles(extractDir, targetDir, target.executable)
   console.log(`Installed ${target.platformKey} runtime to ${targetDir}`)
 }
 
 async function main() {
-  for (const target of targets) {
+  const requestedPlatform = readOption("platform")
+  const requestedArch = readOption("arch")
+  const requestedPlatformKey = readOption(
+    "platform-key",
+    requestedPlatform && requestedArch ? `${requestedPlatform}-${requestedArch}` : undefined,
+  )
+  const selectedTargets = requestedPlatformKey
+    ? targets.filter((target) => target.platformKey === requestedPlatformKey)
+    : targets
+
+  if (selectedTargets.length === 0) {
+    throw new Error(`No llama.cpp runtime target matched ${requestedPlatformKey}.`)
+  }
+
+  for (const target of selectedTargets) {
     await installTarget(target)
   }
 }

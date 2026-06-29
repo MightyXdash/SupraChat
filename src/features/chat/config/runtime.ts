@@ -16,6 +16,6 @@ export const chatRuntimeConfig = {
   titleModel: "supra-title-350m-exp-q4-k-m",
   contextWindowTokens: 16384,
   stream: {
-    characterFrameMs: 3,
+    maxDisplayBatchCharacters: 4096,
   },
 } as const

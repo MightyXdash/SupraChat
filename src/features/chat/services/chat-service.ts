@@ -185,14 +185,41 @@ export async function streamChatCompletion({
   const decoder = new TextDecoder()
   const pendingOutput: string[] = []
   let streamFinished = false
-  let displayTimer: number | undefined
+  let displayFrame: number | undefined
   let abortDisplay: (() => void) | undefined
+  const maxDisplayBatchCharacters = chatRuntimeConfig.stream.maxDisplayBatchCharacters
 
   const displayComplete = new Promise<void>((resolve, reject) => {
+    const flushDisplay = () => {
+      displayFrame = undefined
+
+      if (signal?.aborted) {
+        abortDisplay?.()
+        return
+      }
+
+      let batch = ""
+
+      while (pendingOutput.length > 0 && batch.length < maxDisplayBatchCharacters) {
+        batch += pendingOutput.shift()
+      }
+
+      if (batch) {
+        onChunk(batch)
+      }
+
+      if (pendingOutput.length > 0 || !streamFinished) {
+        displayFrame = window.requestAnimationFrame(flushDisplay)
+        return
+      }
+
+      resolve()
+    }
+
     abortDisplay = () => {
       pendingOutput.length = 0
-      if (displayTimer !== undefined) {
-        window.clearInterval(displayTimer)
+      if (displayFrame !== undefined) {
+        window.cancelAnimationFrame(displayFrame)
       }
       reject(new DOMException("Generation stopped.", "AbortError"))
     }
@@ -203,27 +230,7 @@ export async function streamChatCompletion({
     }
 
     signal?.addEventListener("abort", abortDisplay, { once: true })
-
-    displayTimer = window.setInterval(() => {
-      if (signal?.aborted) {
-        abortDisplay?.()
-        return
-      }
-
-      const nextToken = pendingOutput.shift()
-
-      if (nextToken !== undefined) {
-        onChunk(nextToken)
-        return
-      }
-
-      if (streamFinished) {
-        if (displayTimer !== undefined) {
-          window.clearInterval(displayTimer)
-        }
-        resolve()
-      }
-    }, chatRuntimeConfig.stream.characterFrameMs)
+    displayFrame = window.requestAnimationFrame(flushDisplay)
   })
 
   const thinkingMarkers = ["<suprachat-think>", "</suprachat-think>", "<think>", "</think>"]
@@ -235,7 +242,9 @@ export async function streamChatCompletion({
   const isMarkerPrefix = (text: string) => thinkingMarkers.some((marker) => marker.startsWith(text))
 
   const queueText = (text: string) => {
-    pendingOutput.push(...Array.from(text))
+    if (text) {
+      pendingOutput.push(text)
+    }
   }
 
   const queueChunk = (chunk: string) => {
@@ -302,8 +311,8 @@ export async function streamChatCompletion({
     signal?.removeEventListener("abort", abortDisplay ?? (() => undefined))
     reader.releaseLock()
 
-    if (displayTimer !== undefined) {
-      window.clearInterval(displayTimer)
+    if (displayFrame !== undefined) {
+      window.cancelAnimationFrame(displayFrame)
     }
   }
 }
