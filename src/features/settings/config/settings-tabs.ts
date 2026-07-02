@@ -4,10 +4,11 @@ import {
   Download,
   Palette,
   Settings2,
+  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react"
 
-export type SettingsTabId = "general" | "appearance" | "updates" | "models" | "data"
+export type SettingsTabId = "general" | "appearance" | "updates" | "models" | "hyperparameters" | "data"
 
 export type SettingsTab = {
   group: "Desktop" | "Local"
@@ -45,6 +46,13 @@ export const settingsTabs: SettingsTab[] = [
     label: "Models",
     description: "Bundled SupraLabs models and local assets.",
     icon: Bot,
+  },
+  {
+    group: "Local",
+    id: "hyperparameters",
+    label: "Hyperparameters",
+    description: "Model inference parameters and generation settings.",
+    icon: SlidersHorizontal,
   },
   {
     group: "Local",

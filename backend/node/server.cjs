@@ -474,7 +474,19 @@ function createServer(database, config, provider) {
         })),
       ]
 
-      const response = await provider.streamChat(formattedMessages, thinking)
+      const overrides = {
+        temperature: body.temperature,
+        topK: body.top_k,
+        topP: body.top_p,
+        repeatPenalty: body.repeat_penalty,
+        maxTokens: body.max_tokens,
+      }
+
+      const hasOverrides = Object.values(overrides).some((v) => typeof v === "number")
+
+      const response = hasOverrides
+        ? await provider.streamChatWithParams(formattedMessages, overrides, thinking)
+        : await provider.streamChat(formattedMessages, thinking)
 
       writeStreamHeaders(req, res, config)
       provider.pipeStream(response.data, res, thinking)

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { RefreshCcw, X } from "lucide-react"
+import { Download, RefreshCcw, Trash2, Upload, X } from "lucide-react"
 import { useConfirmationDialog } from "@/app/components/ConfirmationDialog"
 import { settingsTabs, type SettingsTabId } from "@/features/settings/config/settings-tabs"
-import { SettingsBadge, SettingsPath, SettingsSegmentedControl, SettingsToggle } from "@/features/settings/components/SettingsControl"
+import { SettingsBadge, SettingsPath, SettingsRangeControl, SettingsSegmentedControl, SettingsToggle } from "@/features/settings/components/SettingsControl"
 import { SettingsNav } from "@/features/settings/components/SettingsNav"
 import { SettingsRow } from "@/features/settings/components/SettingsRow"
 import { SettingsSection } from "@/features/settings/components/SettingsSection"
+import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import {
   exportConversationData,
   fetchSettingsModels,
@@ -94,17 +95,21 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const confirmConversationDeletion = useSettingsStore((state) => state.confirmConversationDeletion)
   const deleteAllConversations = useChatStore((state) => state.deleteAllConversations)
   const reloadConversations = useChatStore((state) => state.reloadConversations)
+  const hyperparameters = useSettingsStore((state) => state.hyperparameters)
   const showAverageTps = useSettingsStore((state) => state.showAverageTps)
   const showContextMeter = useSettingsStore((state) => state.showContextMeter)
   const startWithLastConversation = useSettingsStore((state) => state.startWithLastConversation)
+  const streamingTpsCap = useSettingsStore((state) => state.streamingTpsCap)
   const themePreference = useSettingsStore((state) => state.themePreference)
   const updateTrack = useSettingsStore((state) => state.updateTrack)
   const setAutoTitleConversations = useSettingsStore((state) => state.setAutoTitleConversations)
   const setConfirmExperimentalInstall = useSettingsStore((state) => state.setConfirmExperimentalInstall)
   const setConfirmConversationDeletion = useSettingsStore((state) => state.setConfirmConversationDeletion)
+  const setHyperparameters = useSettingsStore((state) => state.setHyperparameters)
   const setShowAverageTps = useSettingsStore((state) => state.setShowAverageTps)
   const setShowContextMeter = useSettingsStore((state) => state.setShowContextMeter)
   const setStartWithLastConversation = useSettingsStore((state) => state.setStartWithLastConversation)
+  const setStreamingTpsCap = useSettingsStore((state) => state.setStreamingTpsCap)
   const setThemePreference = useSettingsStore((state) => state.setThemePreference)
   const setUpdateTrack = useSettingsStore((state) => state.setUpdateTrack)
   const setUpdaterStatus = useUpdaterStore((state) => state.setStatus)
@@ -506,6 +511,17 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                           onChange={setShowAverageTps}
                         />
                       </SettingsRow>
+                      <SettingsRow label="Streaming TPS cap" description="Limits the visible response reveal. The composer still reports actual runtime TPS.">
+                        <SettingsRangeControl
+                          aria-label="Streaming TPS cap"
+                          max={chatRuntimeConfig.stream.maximumVisibleTokensPerSecondCap}
+                          min={chatRuntimeConfig.stream.minimumVisibleTokensPerSecondCap}
+                          step={10}
+                          unit="t/s"
+                          value={streamingTpsCap}
+                          onChange={setStreamingTpsCap}
+                        />
+                      </SettingsRow>
                     </SettingsSection>
                   </>
                 ) : null}
@@ -619,6 +635,79 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                   </SettingsSection>
                 ) : null}
 
+                {activeTab === "hyperparameters" ? (
+                  <SettingsSection
+                    title="Hyperparameters"
+                    description="Control how the active model generates responses. These values are sent with every chat request."
+                  >
+                    <SettingsRow
+                      label="Temperature"
+                      description="Controls randomness. Lower values produce more deterministic responses."
+                    >
+                      <SettingsRangeControl
+                        aria-label="Temperature"
+                        max={2}
+                        min={0}
+                        step={0.05}
+                        value={hyperparameters.temperature}
+                        onChange={(value) => setHyperparameters({ ...hyperparameters, temperature: value })}
+                      />
+                    </SettingsRow>
+                    <SettingsRow
+                      label="Top K"
+                      description="Limits the vocabulary to the K most likely next tokens."
+                    >
+                      <SettingsRangeControl
+                        aria-label="Top K"
+                        max={200}
+                        min={1}
+                        step={1}
+                        value={hyperparameters.topK}
+                        onChange={(value) => setHyperparameters({ ...hyperparameters, topK: value })}
+                      />
+                    </SettingsRow>
+                    <SettingsRow
+                      label="Top P"
+                      description="Nucleus sampling threshold. Tokens with cumulative probability above P are considered."
+                    >
+                      <SettingsRangeControl
+                        aria-label="Top P"
+                        max={1}
+                        min={0}
+                        step={0.05}
+                        value={hyperparameters.topP}
+                        onChange={(value) => setHyperparameters({ ...hyperparameters, topP: value })}
+                      />
+                    </SettingsRow>
+                    <SettingsRow
+                      label="Repeat Penalty"
+                      description="Penalizes repeating token sequences. Higher values reduce repetition."
+                    >
+                      <SettingsRangeControl
+                        aria-label="Repeat Penalty"
+                        max={2}
+                        min={0}
+                        step={0.05}
+                        value={hyperparameters.repeatPenalty}
+                        onChange={(value) => setHyperparameters({ ...hyperparameters, repeatPenalty: value })}
+                      />
+                    </SettingsRow>
+                    <SettingsRow
+                      label="Max Tokens"
+                      description="Maximum number of tokens the model can generate in a single response."
+                    >
+                      <SettingsRangeControl
+                        aria-label="Max Tokens"
+                        max={16384}
+                        min={16}
+                        step={64}
+                        value={hyperparameters.maxTokens}
+                        onChange={(value) => setHyperparameters({ ...hyperparameters, maxTokens: value })}
+                      />
+                    </SettingsRow>
+                  </SettingsSection>
+                ) : null}
+
                 {activeTab === "data" ? (
                   <>
                     <SettingsSection title="Local Storage" description="Conversation data is stored on this device.">
@@ -640,21 +729,25 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                       <SettingsRow label="Messages">
                         <SettingsBadge>{String(dataState.storage?.stats.messageCount ?? 0)}</SettingsBadge>
                       </SettingsRow>
-                      <div className="settings-section-actions">
+                      <SettingsRow label="Export conversations" description="Save a copy of all conversations as a JSON file.">
                         <button
                           className="settings-secondary-button"
                           type="button"
                           onClick={() => void handleExportChats()}
                           disabled={isExportingChats}
                         >
+                          <Download className="h-3.5 w-3.5" aria-hidden="true" />
                           {isExportingChats ? "Exporting" : "Export"}
                         </button>
+                      </SettingsRow>
+                      <SettingsRow label="Import conversations" description="Merge conversations from a SupraChat JSON export.">
                         <button
                           className="settings-primary-button"
                           type="button"
                           onClick={() => importInputRef.current?.click()}
                           disabled={isImportingChats}
                         >
+                          <Upload className="h-3.5 w-3.5" aria-hidden="true" />
                           {isImportingChats ? "Importing" : "Import"}
                         </button>
                         <input
@@ -664,29 +757,21 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                           type="file"
                           onChange={(event) => void handleImportChats(event.currentTarget.files?.[0] ?? null)}
                         />
-                      </div>
+                      </SettingsRow>
                     </SettingsSection>
 
-                    <SettingsSection title="Delete">
-                      <div className="settings-danger-section-heading">Delete</div>
-                      <div className="settings-section-rows settings-danger-rows">
-                        <div className="settings-row settings-danger-row">
-                          <div className="settings-row-copy">
-                            <span>Delete all chats</span>
-                            <p>Remove all saved conversations and messages from this device.</p>
-                          </div>
-                          <div className="settings-row-control">
-                            <button
-                              className="settings-danger-button"
-                              type="button"
-                              onClick={() => void handleDeleteAllChats()}
-                              disabled={isDeletingAllChats}
-                            >
-                              {isDeletingAllChats ? "Deleting" : "Delete all chats"}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                    <SettingsSection title="Danger">
+                      <SettingsRow label="Delete all chats" description="Remove all saved conversations and messages from this device.">
+                        <button
+                          className="settings-danger-button"
+                          type="button"
+                          onClick={() => void handleDeleteAllChats()}
+                          disabled={isDeletingAllChats}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          {isDeletingAllChats ? "Deleting" : "Delete all chats"}
+                        </button>
+                      </SettingsRow>
                     </SettingsSection>
                   </>
                 ) : null}

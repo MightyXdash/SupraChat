@@ -66,6 +66,7 @@
   --motion-slow: 420ms;
   --ease-sidebar: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-sidebar-content: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-stream-character: cubic-bezier(0.55, 0, 0.9, 0.58);
   --sidebar-collapsed-width: 5.25rem;
   --sidebar-expanded-width: 17.5rem;
   --window-titlebar-height: 2.5rem;
@@ -2124,16 +2125,15 @@ button:disabled {
 }
 
 .conversation-search-dialog {
-  background: var(--search-surface);
-  backdrop-filter: blur(14px) saturate(1.08);
-  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  background: var(--surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   backface-visibility: hidden;
   border: 1px solid var(--search-border);
-  border-radius: 16px;
+  border-radius: 10px;
   box-shadow:
     0 24px 52px var(--search-shadow-strong, var(--shadow-strong)),
-    0 8px 20px var(--search-shadow-soft, var(--shadow-soft)),
-    inset 0 1px 0 var(--glass-inset);
+    0 8px 20px var(--search-shadow-soft, var(--shadow-soft));
   display: flex;
   flex-direction: column;
   max-height: min(36.5rem, 74vh);
@@ -2149,8 +2149,8 @@ button:disabled {
 }
 
 .app-shell[data-platform="win32"] .conversation-search-dialog {
-  backdrop-filter: blur(14px) saturate(1.08);
-  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   backface-visibility: hidden;
   contain: layout paint;
   transform: translateZ(0);
@@ -2192,7 +2192,7 @@ button:disabled {
   align-items: center;
   background: transparent;
   border: 0;
-  border-radius: 0.54rem;
+  border-radius: 6px;
   color: var(--text-muted);
   display: inline-flex;
   height: 1.95rem;
@@ -2348,12 +2348,11 @@ button:disabled {
   backdrop-filter: blur(14px) saturate(1.04);
   -webkit-backdrop-filter: blur(14px) saturate(1.04);
   backface-visibility: hidden;
-  border: 1px solid var(--glass-border);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: 16px;
   box-shadow:
     0 26px 58px var(--shadow-strong),
-    0 10px 24px var(--shadow-soft),
-    inset 0 1px 0 var(--glass-inset);
+    0 10px 24px var(--shadow-soft);
   display: grid;
   grid-template-columns: 13.75rem minmax(0, 1fr);
   height: min(42.5rem, calc(100vh - 4rem));
@@ -2362,6 +2361,10 @@ button:disabled {
   transform: translateZ(0);
   will-change: opacity, transform;
   width: min(57.5rem, calc(100vw - 4rem));
+}
+
+.settings-dialog:has(.settings-inline-warning-shell) {
+  border-color: transparent;
 }
 
 .app-shell[data-platform="win32"] .settings-layer {
@@ -2413,8 +2416,7 @@ button:disabled {
   transition:
     background var(--motion-fast) ease-out,
     border-color var(--motion-fast) ease-out,
-    color var(--motion-fast) ease-out,
-    transform var(--motion-fast) ease-out;
+    color var(--motion-fast) ease-out;
 }
 
 .settings-icon-button {
@@ -3102,6 +3104,64 @@ html[data-theme-switching] *::after {
   padding: 0 0.25rem;
 }
 
+.settings-range-control {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.62rem;
+  min-width: min(16rem, 100%);
+}
+
+.settings-range-control input {
+  accent-color: var(--accent-primary);
+  appearance: none;
+  background: transparent;
+  height: 1.45rem;
+  min-width: 7.5rem;
+  width: clamp(8rem, 17vw, 12rem);
+}
+
+.settings-range-control input::-webkit-slider-runnable-track {
+  background: color-mix(in srgb, var(--border) 76%, transparent);
+  border-radius: 999px;
+  height: 0.18rem;
+}
+
+.settings-range-control input::-webkit-slider-thumb {
+  appearance: none;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 64%, var(--border));
+  border-radius: 999px;
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--shadow-soft) 80%, transparent);
+  height: 0.76rem;
+  margin-top: -0.29rem;
+  width: 0.76rem;
+}
+
+.settings-range-control input::-moz-range-track {
+  background: color-mix(in srgb, var(--border) 76%, transparent);
+  border-radius: 999px;
+  height: 0.18rem;
+}
+
+.settings-range-control input::-moz-range-thumb {
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 64%, var(--border));
+  border-radius: 999px;
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--shadow-soft) 80%, transparent);
+  height: 0.76rem;
+  width: 0.76rem;
+}
+
+.settings-range-control span {
+  color: var(--settings-text);
+  font-size: 0.84rem;
+  font-weight: 640;
+  line-height: 1;
+  min-width: 4rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .settings-badge-success,
 .settings-badge-warning,
 .settings-badge-error {
@@ -3140,13 +3200,6 @@ html[data-theme-switching] *::after {
   margin: 0.55rem 0 0;
 }
 
-.settings-section-actions {
-  display: flex;
-  gap: 0.55rem;
-  justify-content: flex-end;
-  margin-top: 0.75rem;
-}
-
 .settings-primary-button,
 .settings-secondary-button {
   align-items: center;
@@ -3154,6 +3207,7 @@ html[data-theme-switching] *::after {
   display: inline-flex;
   font-size: 0.84rem;
   font-weight: 580;
+  gap: 0.38rem;
   justify-content: center;
   min-height: 2rem;
   padding: 0 0.82rem;
@@ -3324,39 +3378,20 @@ html[data-theme-switching] *::after {
   margin-top: 1rem;
 }
 
-.settings-danger-section-heading {
-  color: var(--error);
-  font-size: 0.86rem;
-  font-weight: 650;
-  margin: 0 0 0.52rem;
-}
-
-.settings-danger-rows {
-  background: color-mix(in srgb, var(--surface-elevated) 32%, var(--surface));
-  border-color: color-mix(in srgb, var(--error) 18%, var(--border));
-}
-
-.settings-danger-row {
-  min-height: 4rem;
-}
-
-.settings-danger-row .settings-row-copy > span {
-  color: var(--settings-text-strong);
-}
-
 .settings-danger-button {
   align-items: center;
   background: color-mix(in srgb, var(--error) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--error) 34%, var(--border));
-  border-radius: 5px;
+  border-radius: 7px;
   color: var(--error);
   display: inline-flex;
   flex: 0 0 auto;
   font-size: 0.84rem;
   font-weight: 620;
+  gap: 0.38rem;
   justify-content: center;
-  min-height: 1.95rem;
-  padding: 0 0.72rem;
+  min-height: 2rem;
+  padding: 0 0.82rem;
   transition:
     background var(--motion-fast) ease-out,
     border-color var(--motion-fast) ease-out,
@@ -3504,16 +3539,6 @@ html[data-theme-switching] *::after {
   height: 1.75rem;
   justify-content: center;
   width: 1.75rem;
-  transition:
-    background var(--motion-fast) ease-out,
-    color var(--motion-fast) ease-out,
-    transform var(--motion-base) ease-out;
-}
-
-.sidebar-icon-button:hover {
-  background: var(--sidebar-item-hover);
-  color: var(--text-primary);
-  transform: translateY(-1px);
 }
 
 .sidebar-section {
@@ -3657,7 +3682,8 @@ html[data-theme-switching] *::after {
 }
 
 .markdown-stream-character {
-  animation: markdown-stream-character-fade var(--motion-stream-character) ease-out both;
+  animation: markdown-stream-character-fade var(--motion-stream-character) var(--ease-stream-character) both;
+  will-change: opacity;
 }
 
 @keyframes markdown-stream-character-fade {
@@ -3667,6 +3693,12 @@ html[data-theme-switching] *::after {
 
   to {
     opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markdown-stream-character {
+    animation-duration: 1ms;
   }
 }
 
@@ -3952,21 +3984,64 @@ html[data-theme-switching] *::after {
 .markdown-thinking-toggle {
   align-items: center;
   background: transparent;
-  border: 0;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-control) - 3px);
   cursor: pointer;
+  color: var(--text-muted);
   display: inline-flex;
+  gap: 0.25rem;
   font-family: var(--font-sans);
   margin: 0 0 0.5rem;
-  padding: 0.1rem 0.35rem;
+  padding: 0.1rem 0.4rem;
+  transition:
+    background var(--motion-fast) ease-out,
+    border-color var(--motion-fast) ease-out,
+    color var(--motion-fast) ease-out,
+    transform var(--motion-fast) ease-out;
   user-select: none;
+}
+
+.markdown-thinking-toggle:hover:not(:disabled),
+.markdown-thinking-toggle:focus-visible {
+  background: color-mix(in srgb, var(--info) 18%, transparent);
+  border-color: color-mix(in srgb, var(--info) 34%, transparent);
+  color: var(--text-secondary);
+}
+
+.markdown-thinking-toggle:disabled {
+  cursor: default;
 }
 
 .markdown-thinking-label {
   background: transparent;
-  color: var(--text-muted);
+  color: currentColor;
   font-size: 0.85rem;
   font-weight: 500;
   transition: color var(--motion-fast) ease-out;
+}
+
+.markdown-thinking-icon {
+  color: currentColor;
+  height: 0.9rem;
+  opacity: 0;
+  transform: translateX(-0.1rem);
+  transition:
+    opacity var(--motion-fast) ease-out,
+    transform var(--motion-fast) ease-out;
+  width: 0.9rem;
+}
+
+.markdown-thinking-toggle:hover .markdown-thinking-icon,
+.markdown-thinking-toggle:focus-visible .markdown-thinking-icon {
+  opacity: 0.8;
+  transform: translateX(0);
+}
+
+.markdown-thinking-lamp-icon {
+  color: var(--accent-primary);
+  flex-shrink: 0;
+  height: 0.9rem;
+  width: 0.9rem;
 }
 
 .markdown-thinking-label-streaming {
@@ -4027,6 +4102,94 @@ html[data-theme-switching] *::after {
 
 .markdown-thought-paragraph.thought-reveal {
   animation: thought-reveal var(--motion-thought-reveal) var(--ease-sidebar-content) both;
+}
+
+.thought-trace-panel {
+  background: linear-gradient(180deg, var(--glass-top), var(--glass-bottom));
+  border-left: 1px solid var(--glass-border);
+  bottom: 0;
+  box-shadow: -18px 0 42px var(--shadow-soft);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-sans);
+  max-width: min(25rem, calc(100vw - 2rem));
+  position: fixed;
+  right: 0;
+  top: var(--window-titlebar-height);
+  width: min(25rem, 34vw);
+  z-index: 80;
+}
+
+@supports (backdrop-filter: blur(18px)) {
+  .thought-trace-panel {
+    backdrop-filter: blur(22px) saturate(1.05);
+  }
+}
+
+.thought-trace-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.05rem 1.15rem 1.4rem;
+}
+
+.thought-trace-item {
+  position: relative;
+}
+
+.thought-trace-item + .thought-trace-item {
+  margin-top: 1.15rem;
+}
+
+.thought-trace-content {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.65;
+}
+
+.thought-trace-content .markdown-paragraph,
+.thought-trace-content .markdown-list,
+.thought-trace-content .markdown-quote {
+  color: var(--text-muted);
+}
+
+.thought-trace-content .markdown-spacer {
+  height: 0.45rem;
+}
+
+.thought-trace-content .markdown-paragraph {
+  margin: 0;
+}
+
+.thought-trace-content .markdown-paragraph + .markdown-paragraph,
+.thought-trace-content .markdown-list + .markdown-paragraph,
+.thought-trace-content .markdown-paragraph + .markdown-list {
+  margin-top: 0.55rem;
+}
+
+@media (max-width: 860px) {
+  .thought-trace-panel {
+    max-width: none;
+    width: min(23rem, 92vw);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .thought-trace-panel {
+    animation: thought-panel-enter var(--motion-base) var(--ease-sidebar-content) both;
+  }
+}
+
+@keyframes thought-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateX(0.85rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .voice-button-wrapper {

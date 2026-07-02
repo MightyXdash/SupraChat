@@ -325,13 +325,15 @@ function sortConversationsByUpdatedAt(conversations: Conversation[]) {
 }
 
 function createGenerationThroughputTracker(setTokensPerSecond: (value: number) => void) {
-  const startedAt = performance.now()
+  let startedAt: number | null = null
   let estimatedTokens = 0
   let latestTokensPerSecond: number | null = null
 
   const recordChunk = (chunk: string) => {
+    const now = performance.now()
+    startedAt ??= now
     estimatedTokens += chunk.length / 4
-    const elapsedSeconds = Math.max((performance.now() - startedAt) / 1000, 0.1)
+    const elapsedSeconds = Math.max((now - startedAt) / 1000, 0.1)
     latestTokensPerSecond = estimatedTokens / elapsedSeconds
     setTokensPerSecond(latestTokensPerSecond)
   }
@@ -352,6 +354,7 @@ async function generateTitleExpansion(conversation: Conversation) {
   let expansion = ""
 
   await streamChatCompletion({
+    displayTokensPerSecondCap: null,
     messages: [
       {
         role: "user",
@@ -429,7 +432,6 @@ export const useChatStore = create<ChatState>((set) => ({
     const streamingCheckpoint = createStreamingCheckpoint(conversationId)
 
     const appendAssistantChunk = (chunk: string) => {
-      throughputTracker.recordChunk(chunk)
       set((state) => ({
         conversations: sortConversationsByUpdatedAt(
           updateAssistantMessage(
@@ -458,11 +460,14 @@ export const useChatStore = create<ChatState>((set) => ({
 
     try {
       await streamChatCompletion({
+        displayTokensPerSecondCap: useSettingsStore.getState().streamingTpsCap,
+        hyperparameters: useSettingsStore.getState().hyperparameters,
         messages: priorMessages.map((message) => ({
           role: message.role,
           content: message.content,
         })),
         onChunk: appendAssistantChunk,
+        onRawChunk: throughputTracker.recordChunk,
         signal: generationController.signal,
       })
 
@@ -570,7 +575,6 @@ export const useChatStore = create<ChatState>((set) => ({
     const streamingCheckpoint = createStreamingCheckpoint(conversationId)
 
     const appendAssistantChunk = (chunk: string) => {
-      throughputTracker.recordChunk(chunk)
       set((state) => ({
         conversations: sortConversationsByUpdatedAt(
           updateAssistantMessage(
@@ -599,11 +603,14 @@ export const useChatStore = create<ChatState>((set) => ({
 
     try {
       await streamChatCompletion({
+        displayTokensPerSecondCap: useSettingsStore.getState().streamingTpsCap,
+        hyperparameters: useSettingsStore.getState().hyperparameters,
         messages: promptMessages.map((message) => ({
           role: message.role,
           content: message.content,
         })),
         onChunk: appendAssistantChunk,
+        onRawChunk: throughputTracker.recordChunk,
         signal: generationController.signal,
       })
 
@@ -1097,7 +1104,6 @@ export const useChatStore = create<ChatState>((set) => ({
     const streamingCheckpoint = createStreamingCheckpoint(conversationId)
 
     const appendAssistantChunk = (chunk: string) => {
-      throughputTracker.recordChunk(chunk)
       set((state) => ({
         conversations: sortConversationsByUpdatedAt(
           updateAssistantMessage(
@@ -1183,6 +1189,8 @@ export const useChatStore = create<ChatState>((set) => ({
         .conversations.find((conversation) => conversation.id === conversationId)
 
       const responseStream = streamChatCompletion({
+        displayTokensPerSecondCap: useSettingsStore.getState().streamingTpsCap,
+        hyperparameters: useSettingsStore.getState().hyperparameters,
         messages:
           activeConversation?.messages
             .filter((message) => message.id !== assistantMessage.id)
@@ -1191,6 +1199,7 @@ export const useChatStore = create<ChatState>((set) => ({
               content: message.content,
             })) ?? [],
         onChunk: appendAssistantChunk,
+        onRawChunk: throughputTracker.recordChunk,
         signal: generationController.signal,
       })
       const titleStream = shouldGenerateTitle

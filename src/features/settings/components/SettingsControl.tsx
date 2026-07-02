@@ -21,6 +21,16 @@ type SettingsToggleProps = {
   onChange: (checked: boolean) => void
 }
 
+type SettingsRangeControlProps = {
+  "aria-label": string
+  max: number
+  min: number
+  step: number
+  unit?: string
+  value: number
+  onChange: (value: number) => void
+}
+
 type SettingsBadgeProps = {
   children: string
   tone?: "neutral" | "success" | "warning" | "error"
@@ -75,6 +85,31 @@ export function SettingsToggle({
         <Check className="h-3 w-3" aria-hidden="true" />
       </span>
     </button>
+  )
+}
+
+export function SettingsRangeControl({
+  "aria-label": ariaLabel,
+  max,
+  min,
+  onChange,
+  step,
+  unit,
+  value,
+}: SettingsRangeControlProps) {
+  return (
+    <div className="settings-range-control">
+      <input
+        aria-label={ariaLabel}
+        max={max}
+        min={min}
+        step={step}
+        type="range"
+        value={value}
+        onChange={(event) => onChange(Number(event.currentTarget.value))}
+      />
+      <span>{unit ? `${value} ${unit}` : String(value)}</span>
+    </div>
   )
 }
 

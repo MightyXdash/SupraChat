@@ -202,17 +202,21 @@ class LlamaCppWorker {
   }
 
   async streamChat(messages, temperatureOverride, thinking) {
+    return this.streamChatWithParams(messages, { temperature: temperatureOverride }, thinking)
+  }
+
+  async streamChatWithParams(messages, params = {}, thinking) {
     await this.ensureReady()
 
     const body = {
       model: this.model.filename,
       messages,
       stream: true,
-      temperature: typeof temperatureOverride === "number" ? temperatureOverride : this.model.temperature,
-      top_k: this.model.topK,
-      top_p: this.model.topP,
-      repeat_penalty: this.model.repeatPenalty,
-      max_tokens: this.model.maxTokens,
+      temperature: typeof params.temperature === "number" ? params.temperature : this.model.temperature,
+      top_k: typeof params.topK === "number" ? params.topK : this.model.topK,
+      top_p: typeof params.topP === "number" ? params.topP : this.model.topP,
+      repeat_penalty: typeof params.repeatPenalty === "number" ? params.repeatPenalty : this.model.repeatPenalty,
+      max_tokens: typeof params.maxTokens === "number" ? params.maxTokens : this.model.maxTokens,
     }
 
     if (thinking !== undefined) {
@@ -355,6 +359,13 @@ function createLlamaCppProvider() {
     async streamChat(messages, thinking) {
       try {
         return await chatWorker.streamChat(messages, undefined, thinking)
+      } catch (error) {
+        throw normalizeLlamaError(error)
+      }
+    },
+    async streamChatWithParams(messages, params, thinking) {
+      try {
+        return await chatWorker.streamChatWithParams(messages, params, thinking)
       } catch (error) {
         throw normalizeLlamaError(error)
       }

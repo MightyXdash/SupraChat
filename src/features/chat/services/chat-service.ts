@@ -1,9 +1,13 @@
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import { ChatCompletionMessage, Conversation } from "@/features/chat/types"
+import type { Hyperparameters } from "@/features/settings/store/use-settings-store"
 
 type StreamChatCompletionOptions = {
+  displayTokensPerSecondCap?: number | null
+  hyperparameters?: Hyperparameters
   messages: ChatCompletionMessage[]
   onChunk: (chunk: string) => void
+  onRawChunk?: (chunk: string) => void
   signal?: AbortSignal
 }
 
@@ -161,8 +165,11 @@ export async function synthesizeSpeech(text: string) {
 }
 
 export async function streamChatCompletion({
+  displayTokensPerSecondCap,
+  hyperparameters,
   messages,
   onChunk,
+  onRawChunk,
   signal,
 }: StreamChatCompletionOptions) {
   const response = await fetchWithRetry(
@@ -172,7 +179,19 @@ export async function streamChatCompletion({
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ messages, thinking: true }),
+      body: JSON.stringify({
+        messages,
+        thinking: true,
+        ...(hyperparameters
+          ? {
+            temperature: hyperparameters.temperature,
+            top_k: hyperparameters.topK,
+            top_p: hyperparameters.topP,
+            repeat_penalty: hyperparameters.repeatPenalty,
+            max_tokens: hyperparameters.maxTokens,
+          }
+          : {}),
+      }),
       signal,
     }),
   )
@@ -187,7 +206,26 @@ export async function streamChatCompletion({
   let streamFinished = false
   let displayFrame: number | undefined
   let abortDisplay: (() => void) | undefined
-  const maxDisplayBatchCharacters = chatRuntimeConfig.stream.maxDisplayBatchCharacters
+  const maxDisplayBatchCharacters =
+    displayTokensPerSecondCap === null
+      ? chatRuntimeConfig.stream.maxDisplayBatchCharacters
+      : Math.max(
+        1,
+        Math.min(
+          chatRuntimeConfig.stream.maxDisplayBatchCharacters,
+          Math.ceil(
+            (Math.min(
+              Math.max(
+                displayTokensPerSecondCap ?? chatRuntimeConfig.stream.defaultVisibleTokensPerSecondCap,
+                chatRuntimeConfig.stream.minimumVisibleTokensPerSecondCap,
+              ),
+              chatRuntimeConfig.stream.maximumVisibleTokensPerSecondCap,
+            ) *
+              chatRuntimeConfig.stream.averageCharactersPerToken) /
+              chatRuntimeConfig.stream.assumedDisplayFramesPerSecond,
+          ),
+        ),
+      )
 
   const displayComplete = new Promise<void>((resolve, reject) => {
     const flushDisplay = () => {
@@ -294,10 +332,16 @@ export async function streamChatCompletion({
       }
 
       const chunk = decoder.decode(value, { stream: true })
+      if (chunk) {
+        onRawChunk?.(chunk)
+      }
       queueChunk(chunk)
     }
 
     const remaining = decoder.decode()
+    if (remaining) {
+      onRawChunk?.(remaining)
+    }
     queueChunk(remaining)
 
     if (markerBuffer) {

@@ -1,5 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from "react"
-import { Copy, Download, Ellipsis } from "lucide-react"
+import { createPortal } from "react-dom"
+import { ChevronRight, Copy, Download, Ellipsis, Lightbulb } from "lucide-react"
+import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import { cn } from "@/lib/utils"
 
 const greekSymbols: Record<string, string> = {
@@ -43,6 +45,12 @@ const latexSymbols: Record<string, string> = {
   to: "→",
   leftarrow: "←",
   leftrightarrow: "↔",
+}
+
+type StreamAnimationRange = {
+  end: number
+  expiresAt: number
+  start: number
 }
 
 function renderText(source: string, offset = 0, animatedFrom = Number.POSITIVE_INFINITY): ReactNode[] {
@@ -301,15 +309,17 @@ function renderInlineMarkdown(
     } else if (token.startsWith("\\(")) {
       nodes.push(<MathExpression key={`math-${tokenOffset}`} source={token.slice(2, -2)} />)
     } else if (token.startsWith("**")) {
+      const innerAnimatedFrom = animatedFrom === Number.POSITIVE_INFINITY ? animatedFrom : Math.min(animatedFrom, tokenOffset + 2)
       nodes.push(
         <strong key={`strong-${tokenOffset}`}>
-          {renderInlineMarkdown(token.slice(2, -2), tokenOffset + 2, animatedFrom)}
+          {renderInlineMarkdown(token.slice(2, -2), tokenOffset + 2, innerAnimatedFrom)}
         </strong>,
       )
     } else {
+      const innerAnimatedFrom = animatedFrom === Number.POSITIVE_INFINITY ? animatedFrom : Math.min(animatedFrom, tokenOffset + 1)
       nodes.push(
         <em key={`em-${tokenOffset}`}>
-          {renderInlineMarkdown(token.slice(1, -1), tokenOffset + 1, animatedFrom)}
+          {renderInlineMarkdown(token.slice(1, -1), tokenOffset + 1, innerAnimatedFrom)}
         </em>,
       )
     }
@@ -734,30 +744,67 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
 export function MarkdownMessage({ content, isGenerating }: { content: string; isGenerating?: boolean }) {
   const [openTableMenu, setOpenTableMenu] = useState<string | null>(null)
   const [closingTableMenu, setClosingTableMenu] = useState<string | null>(null)
-  const [isReasoningOpen, setIsReasoningOpen] = useState(false)
+  const [isReasoningPanelOpen, setIsReasoningPanelOpen] = useState(false)
+  const [, setStreamAnimationRevision] = useState(0)
   const closeTimeoutRef = useRef<number | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const previousContentLengthRef = useRef(content.length)
-  const prevThinkingActiveRef = useRef(false)
   const { reasoning, answer } = splitOnThinking(content)
+  const previousAnswerLengthRef = useRef(answer.length)
+  const streamAnimationRangesRef = useRef<StreamAnimationRange[]>([])
+  const streamAnimationTimeoutRef = useRef<number | null>(null)
   const isStreaming = isGenerating || content.length > previousContentLengthRef.current
   const isThinkingActive = isStreaming && !answer
-  const animatedFrom =
-    content.length > previousContentLengthRef.current
-      ? previousContentLengthRef.current
+  const [thinkingDurationMs, setThinkingDurationMs] = useState<number | null>(null)
+  const thinkingStartedAtRef = useRef<number | null>(null)
+  const wasThinkingRef = useRef(false)
+  const streamAnimationDuration = chatRuntimeConfig.stream.characterFadeMs
+  const renderTime = performance.now()
+  const activeAnimationStart = streamAnimationRangesRef.current.reduce(
+    (start, range) => range.expiresAt > renderTime ? Math.min(start, range.start) : start,
+    Number.POSITIVE_INFINITY,
+  )
+  const newAnswerStart =
+    isGenerating && answer.length > previousAnswerLengthRef.current
+      ? Math.max(0, previousAnswerLengthRef.current)
       : Number.POSITIVE_INFINITY
+  const animatedFrom = Math.min(activeAnimationStart, newAnswerStart)
   const answerBlocks = buildMarkdownBlocks(answer, animatedFrom)
 
   const allParagraphs = reasoning ? reasoning.split(/\n\n+/).filter(Boolean) : []
-  const completedParagraphs = /\n\s*\n\s*$/.test(reasoning)
-    ? allParagraphs
-    : allParagraphs.slice(0, -1)
-  const visibleParagraphs = isThinkingActive
-    ? completedParagraphs.slice(-1)
-    : allParagraphs
-
   const showThinkingToggle = !!reasoning || (isGenerating && !answer)
-  const showParagraphs = isThinkingActive || isReasoningOpen
+  const hasReasoningTraces = allParagraphs.length > 0
+
+  function scheduleStreamAnimationCleanup() {
+    if (streamAnimationTimeoutRef.current) {
+      window.clearTimeout(streamAnimationTimeoutRef.current)
+      streamAnimationTimeoutRef.current = null
+    }
+
+    const now = performance.now()
+    streamAnimationRangesRef.current = streamAnimationRangesRef.current.filter(
+      (range) => range.expiresAt > now,
+    )
+
+    const nextRange = streamAnimationRangesRef.current.reduce<StreamAnimationRange | null>(
+      (next, range) => !next || range.expiresAt < next.expiresAt ? range : next,
+      null,
+    )
+
+    if (!nextRange) {
+      setStreamAnimationRevision((revision) => revision + 1)
+      return
+    }
+
+    streamAnimationTimeoutRef.current = window.setTimeout(() => {
+      streamAnimationRangesRef.current = streamAnimationRangesRef.current.filter(
+        (range) => range.expiresAt > performance.now(),
+      )
+      streamAnimationTimeoutRef.current = null
+      setStreamAnimationRevision((revision) => revision + 1)
+      scheduleStreamAnimationCleanup()
+    }, Math.max(0, nextRange.expiresAt - now))
+  }
 
   useEffect(() => {
     setOpenTableMenu(null)
@@ -765,20 +812,78 @@ export function MarkdownMessage({ content, isGenerating }: { content: string; is
   }, [content])
 
   useEffect(() => {
+    const previousAnswerLength = previousAnswerLengthRef.current
+
+    if (answer.length < previousAnswerLength) {
+      streamAnimationRangesRef.current = []
+      if (streamAnimationTimeoutRef.current) {
+        window.clearTimeout(streamAnimationTimeoutRef.current)
+        streamAnimationTimeoutRef.current = null
+      }
+    }
+
+    if (isGenerating && answer.length > previousAnswerLength) {
+      const now = performance.now()
+      streamAnimationRangesRef.current = [
+        ...streamAnimationRangesRef.current.filter((range) => range.expiresAt > now),
+        {
+          end: answer.length,
+          expiresAt: now + streamAnimationDuration,
+          start: previousAnswerLength,
+        },
+      ]
+      scheduleStreamAnimationCleanup()
+    }
+
     previousContentLengthRef.current = content.length
-  }, [content])
+    previousAnswerLengthRef.current = answer.length
+  }, [answer.length, content, isGenerating, streamAnimationDuration])
 
   useEffect(() => {
-    if (prevThinkingActiveRef.current && !isThinkingActive) {
-      setIsReasoningOpen(false)
+    if (!hasReasoningTraces) {
+      setIsReasoningPanelOpen(false)
     }
-    prevThinkingActiveRef.current = isThinkingActive
-  }, [isThinkingActive])
+  }, [hasReasoningTraces])
+
+  useEffect(() => {
+    const isThinking = !!reasoning && !answer
+
+    if (isThinking && !wasThinkingRef.current) {
+      thinkingStartedAtRef.current = performance.now()
+    }
+
+    if (!isThinking && wasThinkingRef.current && thinkingStartedAtRef.current !== null) {
+      setThinkingDurationMs(performance.now() - thinkingStartedAtRef.current)
+      thinkingStartedAtRef.current = null
+    }
+
+    wasThinkingRef.current = isThinking
+  }, [reasoning, answer])
+
+  useEffect(() => {
+    if (!isReasoningPanelOpen) {
+      return
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsReasoningPanelOpen(false)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isReasoningPanelOpen])
 
   useEffect(() => {
     return () => {
       if (closeTimeoutRef.current) {
         window.clearTimeout(closeTimeoutRef.current)
+      }
+
+      if (streamAnimationTimeoutRef.current) {
+        window.clearTimeout(streamAnimationTimeoutRef.current)
       }
     }
   }, [])
@@ -815,25 +920,53 @@ export function MarkdownMessage({ content, isGenerating }: { content: string; is
           <button
             className="markdown-thinking-toggle"
             type="button"
-            onClick={() => setIsReasoningOpen(!isReasoningOpen)}
-            aria-expanded={isReasoningOpen}
+            onClick={() => setIsReasoningPanelOpen(prev => !prev)}
+            aria-expanded={isReasoningPanelOpen}
+            aria-haspopup="dialog"
+            disabled={!hasReasoningTraces}
           >
-            <span className={cn("markdown-thinking-label", isThinkingActive && "markdown-thinking-label-streaming")}>
-              {isThinkingActive ? "Thinking" : "Thoughts"}
-            </span>
+            {thinkingDurationMs !== null ? (
+              <>
+                <Lightbulb className="markdown-thinking-lamp-icon" aria-hidden="true" />
+                <span className="markdown-thinking-label">
+                  {isReasoningPanelOpen
+                    ? "Press to close"
+                    : thinkingDurationMs < 3000
+                      ? "Thought for a moment"
+                      : `Thought for ${Math.round(thinkingDurationMs / 1000)} seconds`}
+                </span>
+              </>
+            ) : (
+              <span className={cn("markdown-thinking-label", isThinkingActive && "markdown-thinking-label-streaming")}>
+                {isReasoningPanelOpen ? "Press to close" : "Thinking"}
+              </span>
+            )}
+            {hasReasoningTraces ? <ChevronRight className="markdown-thinking-icon" aria-hidden="true" /> : null}
           </button>
-          {showParagraphs && visibleParagraphs.length > 0 ? (
-            <div className="markdown-reasoning-body">
-              {visibleParagraphs.map((para, index) => (
-                <div
-                  key={`t-${index}-${para.slice(0, 20)}`}
-                  className={cn("markdown-thought-paragraph", isThinkingActive && "thought-reveal")}
-                >
-                  {buildMarkdownBlocks(para, Number.POSITIVE_INFINITY)}
+          {isReasoningPanelOpen && hasReasoningTraces
+            ? createPortal(
+              <aside
+                aria-label="Thought traces"
+                aria-modal="false"
+                className="thought-trace-panel"
+                role="dialog"
+              >
+                <div className="thought-trace-panel-body">
+                  {allParagraphs.map((para, index) => (
+                    <section
+                      className="thought-trace-item"
+                      key={`trace-${index}-${para.slice(0, 20)}`}
+                    >
+                      <div className="thought-trace-content">
+                        {buildMarkdownBlocks(para, Number.POSITIVE_INFINITY)}
+                      </div>
+                    </section>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : null}
+              </aside>,
+              document.body,
+            )
+            : null}
         </>
       ) : null}
       {answerBlocks}
