@@ -5,6 +5,7 @@ export type ChatMessage = {
   role: ChatRole
   content: string
   createdAt: string
+  reasoningDurationMs?: number | null
   tokensPerSecond?: number | null
 }
 

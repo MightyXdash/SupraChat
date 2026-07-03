@@ -11,10 +11,10 @@ const CHAT_MODEL = {
   filename: "LFM2.5-1.2B-Thinking-Q5_K_M.gguf",
   contextWindowTokens: 16384,
   maxTokens: 4096,
-  temperature: 0.75,
-  topK: 50,
-  topP: 0.8,
-  repeatPenalty: 1.1,
+  temperature: 0.55,
+  topK: 35,
+  topP: 0.7,
+  repeatPenalty: 1.15,
 }
 
 const TITLE_MODEL = {

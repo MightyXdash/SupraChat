@@ -1,5 +1,6 @@
 import { RefObject } from "react"
 import { AnimatePresence, motion } from "framer-motion"
+import { ArrowDown } from "lucide-react"
 import { ChatBubble } from "@/features/chat/components/ChatBubble"
 import { ChatComposer } from "@/features/chat/components/ChatComposer"
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
@@ -15,6 +16,7 @@ type ChatWorkspaceProps = {
   error: string | null
   generationTokensPerSecond: number | null
   isGenerating: boolean
+  isJumpToLatestVisible: boolean
   scrollRef: RefObject<HTMLDivElement | null>
   speechPlayback: SpeechPlaybackState
   showAverageTps: boolean
@@ -31,6 +33,7 @@ type ChatWorkspaceProps = {
   onStopSpeech: () => void
   onStopGeneration: () => void
   onSubmit: () => Promise<void> | void
+  onJumpToLatest: () => void
   onToggleSpeech: () => void
   onVoiceVadStart: () => void
   onVoiceFinish: () => void
@@ -45,6 +48,7 @@ export function ChatWorkspace({
   error,
   generationTokensPerSecond,
   isGenerating,
+  isJumpToLatestVisible,
   scrollRef,
   speechPlayback,
   showAverageTps,
@@ -61,6 +65,7 @@ export function ChatWorkspace({
   onStopSpeech,
   onStopGeneration,
   onSubmit,
+  onJumpToLatest,
   onToggleSpeech,
   onVoiceVadStart,
   onVoiceFinish,
@@ -137,6 +142,24 @@ export function ChatWorkspace({
       <div className="chat-workspace-bottom-glass" data-hidden={!hasMessages} aria-hidden="true">
         <span className="chat-workspace-bottom-glass-layer" />
       </div>
+
+      <AnimatePresence>
+        {hasMessages && isJumpToLatestVisible ? (
+          <motion.button
+            aria-label="Jump to latest"
+            className="chat-jump-to-latest"
+            title="Jump to latest"
+            type="button"
+            initial={{ opacity: 0, scale: 0.88, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.92, y: 6 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            onClick={onJumpToLatest}
+          >
+            <ArrowDown className="h-4 w-4" aria-hidden="true" />
+          </motion.button>
+        ) : null}
+      </AnimatePresence>
 
       <div
         className="chat-composer-dock pointer-events-none absolute inset-x-0 px-5"

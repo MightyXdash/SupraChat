@@ -20,6 +20,7 @@ export const chatRuntimeConfig = {
     averageCharactersPerToken: 4,
     characterFadeMs: 550,
     defaultVisibleTokensPerSecondCap: 145,
+    markdownLookaheadCharacters: 50,
     maxDisplayBatchCharacters: 4096,
     maximumVisibleTokensPerSecondCap: 999,
     minimumVisibleTokensPerSecondCap: 60,

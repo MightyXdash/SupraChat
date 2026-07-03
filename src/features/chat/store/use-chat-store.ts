@@ -30,7 +30,71 @@ const TITLE_MIN_ENGLISH_LETTER_RATIO = 0.6
 const TITLE_RECOVERY_EXPANSION_WORDS = 200
 const STREAM_CHECKPOINT_MIN_CHARACTERS = 512
 const STREAM_CHECKPOINT_MIN_MS = 1500
+const THINK_OPEN_MARKERS = ["<suprachat-think>", "<think>"]
+const THINK_CLOSE_MARKERS = ["</suprachat-think>", "</think>"]
 let activeGenerationController: AbortController | null = null
+
+function getAnswerAfterReasoning(content: string) {
+  const firstOpenIndex = THINK_OPEN_MARKERS.reduce<number | null>((matchIndex, marker) => {
+    const index = content.indexOf(marker)
+
+    if (index < 0) {
+      return matchIndex
+    }
+
+    return matchIndex === null ? index : Math.min(matchIndex, index)
+  }, null)
+
+  if (firstOpenIndex === null) {
+    return ""
+  }
+
+  let closeMarkerEnd = -1
+
+  for (const marker of THINK_CLOSE_MARKERS) {
+    const index = content.indexOf(marker, firstOpenIndex)
+
+    if (index >= 0) {
+      closeMarkerEnd = closeMarkerEnd < 0 ? index + marker.length : Math.min(closeMarkerEnd, index + marker.length)
+    }
+  }
+
+  if (closeMarkerEnd < 0) {
+    return ""
+  }
+
+  return content.slice(closeMarkerEnd).trim()
+}
+
+function createReasoningDurationRecorder(
+  conversationId: string,
+  assistantMessageId: string,
+) {
+  const startedAt = performance.now()
+  let hasRecorded = false
+
+  return (content: string) => {
+    if (hasRecorded || !getAnswerAfterReasoning(content)) {
+      return
+    }
+
+    hasRecorded = true
+    const reasoningDurationMs = Math.max(0, performance.now() - startedAt)
+
+    setTimeout(() => {
+      useChatStore.setState((state) => ({
+        conversations: sortConversationsByUpdatedAt(
+          updateAssistantMessageMetadata(
+            state.conversations,
+            conversationId,
+            assistantMessageId,
+            (message) => ({ ...message, reasoningDurationMs }),
+          ),
+        ),
+      }))
+    }, 0)
+  }
+}
 
 function letterUnigrams(content: string) {
   return Array.from(content.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]/gu, ""))
@@ -419,7 +483,9 @@ export const useChatStore = create<ChatState>((set) => ({
         updateConversationById(state.conversations, conversationId, (conversation) => ({
           ...conversation,
           messages: conversation.messages.slice(0, messageIndex + 1).map((message) =>
-            message.id === messageId ? { ...message, content: "" } : message,
+            message.id === messageId
+              ? { ...message, content: "", reasoningDurationMs: null, tokensPerSecond: null }
+              : message,
           ),
           updatedAt: new Date().toISOString(),
         })),
@@ -430,8 +496,11 @@ export const useChatStore = create<ChatState>((set) => ({
       set({ generationTokensPerSecond: value })
     })
     const streamingCheckpoint = createStreamingCheckpoint(conversationId)
+    const recordReasoningDuration = createReasoningDurationRecorder(conversationId, messageId)
+    let streamedAssistantContent = ""
 
     const appendAssistantChunk = (chunk: string) => {
+      streamedAssistantContent = `${streamedAssistantContent}${chunk}`
       set((state) => ({
         conversations: sortConversationsByUpdatedAt(
           updateAssistantMessage(
@@ -442,6 +511,7 @@ export const useChatStore = create<ChatState>((set) => ({
           ),
         ),
       }))
+      recordReasoningDuration(streamedAssistantContent)
       streamingCheckpoint.recordChunk(chunk)
     }
 
@@ -573,8 +643,11 @@ export const useChatStore = create<ChatState>((set) => ({
       set({ generationTokensPerSecond: value })
     })
     const streamingCheckpoint = createStreamingCheckpoint(conversationId)
+    const recordReasoningDuration = createReasoningDurationRecorder(conversationId, assistantMessage.id)
+    let streamedAssistantContent = ""
 
     const appendAssistantChunk = (chunk: string) => {
+      streamedAssistantContent = `${streamedAssistantContent}${chunk}`
       set((state) => ({
         conversations: sortConversationsByUpdatedAt(
           updateAssistantMessage(
@@ -585,6 +658,7 @@ export const useChatStore = create<ChatState>((set) => ({
           ),
         ),
       }))
+      recordReasoningDuration(streamedAssistantContent)
       streamingCheckpoint.recordChunk(chunk)
     }
 
@@ -1102,8 +1176,11 @@ export const useChatStore = create<ChatState>((set) => ({
       set({ generationTokensPerSecond: value })
     })
     const streamingCheckpoint = createStreamingCheckpoint(conversationId)
+    const recordReasoningDuration = createReasoningDurationRecorder(conversationId, assistantMessage.id)
+    let streamedAssistantContent = ""
 
     const appendAssistantChunk = (chunk: string) => {
+      streamedAssistantContent = `${streamedAssistantContent}${chunk}`
       set((state) => ({
         conversations: sortConversationsByUpdatedAt(
           updateAssistantMessage(
@@ -1114,6 +1191,7 @@ export const useChatStore = create<ChatState>((set) => ({
           ),
         ),
       }))
+      recordReasoningDuration(streamedAssistantContent)
       streamingCheckpoint.recordChunk(chunk)
     }
 

@@ -84,6 +84,13 @@
     "copyright": "Copyright © 2026 SupraLabs. Licensed under the GNU General Public License v3.0 (GPL-3.0).",
     "files": [
       "dist/**/*",
+      "!dist/**/*.dmg",
+      "!dist/**/*.exe",
+      "!dist/**/*.blockmap",
+      "!dist/builder-debug.yml",
+      "!dist/latest.yml",
+      "!dist/mac*/**",
+      "!dist/win*/**",
       "electron/**/*",
       "backend/node/**/*",
       "package.json"
@@ -106,7 +113,8 @@
     }
   ],
     "directories": {
-      "buildResources": "build"
+      "buildResources": "build",
+      "output": "release"
     },
     "publish": [
       {
@@ -139,24 +147,25 @@
       ]
     },
     "dmg": {
-      "background": "build/dmg-background.png",
+      "background": "build/dmg-background-compact.png",
       "writeUpdateInfo": false,
+      "iconSize": 96,
       "contents": [
         {
-          "x": 350,
-          "y": 420,
+          "x": 250,
+          "y": 270,
           "type": "file"
         },
         {
-          "x": 850,
-          "y": 420,
+          "x": 510,
+          "y": 270,
           "type": "link",
           "path": "/Applications"
         }
       ],
       "window": {
-        "width": 1200,
-        "height": 800
+        "width": 760,
+        "height": 500
       }
     },
     "linux": {

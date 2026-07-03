@@ -9,7 +9,7 @@ type SegmentedOption<T extends string> = {
 type SettingsSegmentedControlProps<T extends string> = {
   "aria-label": string
   options: SegmentedOption<T>[]
-  value: T
+  value: T | null
   onChange: (value: T) => void
 }
 

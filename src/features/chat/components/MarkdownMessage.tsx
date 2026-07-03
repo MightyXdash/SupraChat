@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { ChevronRight, Copy, Download, Ellipsis, Lightbulb } from "lucide-react"
+import { ChevronRight, Copy, Download, Ellipsis, Lightbulb, Zap } from "lucide-react"
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import { cn } from "@/lib/utils"
 
@@ -53,23 +53,37 @@ type StreamAnimationRange = {
   start: number
 }
 
-function renderText(source: string, offset = 0, animatedFrom = Number.POSITIVE_INFINITY): ReactNode[] {
+const FAST_REASONING_THRESHOLD_MS = 3850
+const MOMENT_REASONING_THRESHOLD_MS = 10000
+
+function renderText(
+  source: string,
+  offset = 0,
+  animatedFrom = Number.POSITIVE_INFINITY,
+  visibleUntil = Number.POSITIVE_INFINITY,
+): ReactNode[] {
   if (!source) {
     return []
   }
 
-  return Array.from(source).map((character, index) =>
-    offset + index >= animatedFrom ? (
+  return Array.from(source).flatMap((character, index) => {
+    const characterOffset = offset + index
+
+    if (characterOffset >= visibleUntil) {
+      return []
+    }
+
+    return characterOffset >= animatedFrom ? (
       <span
         className="markdown-stream-character"
-        key={`stream-char-${offset + index}`}
+        key={`stream-char-${characterOffset}`}
       >
         {character}
       </span>
     ) : (
       character
-    ),
-  )
+    )
+  })
 }
 
 function normalizeMarkdownSource(source: string) {
@@ -228,7 +242,12 @@ function MathExpression({ display = false, source }: { display?: boolean; source
   )
 }
 
-function renderPlainChemistry(source: string, offset: number, animatedFrom: number): ReactNode[] {
+function renderPlainChemistry(
+  source: string,
+  offset: number,
+  animatedFrom: number,
+  visibleUntil: number,
+): ReactNode[] {
   const nodes: ReactNode[] = []
   const pattern = /\b(?:[A-Z][a-z]?\d*){2,}\b/g
   let cursor = 0
@@ -236,99 +255,256 @@ function renderPlainChemistry(source: string, offset: number, animatedFrom: numb
 
   while ((match = pattern.exec(source))) {
     if (match.index > cursor) {
-      nodes.push(...renderText(source.slice(cursor, match.index), offset + cursor, animatedFrom))
+      nodes.push(...renderText(source.slice(cursor, match.index), offset + cursor, animatedFrom, visibleUntil))
     }
 
     const formula = match[0]
+    const formulaOffset = offset + match.index
+    const visibleFormula = formula.slice(0, Math.max(0, visibleUntil - formulaOffset))
     const formulaNodes: ReactNode[] = []
 
-    for (let index = 0; index < formula.length; index += 1) {
-      const character = formula[index]
+    for (let index = 0; index < visibleFormula.length; index += 1) {
+      const character = visibleFormula[index]
 
       if (/\d/.test(character)) {
         let digits = character
 
-        while (index + 1 < formula.length && /\d/.test(formula[index + 1])) {
-          digits += formula[index + 1]
+        while (index + 1 < visibleFormula.length && /\d/.test(visibleFormula[index + 1])) {
+          digits += visibleFormula[index + 1]
           index += 1
         }
 
-        formulaNodes.push(<sub key={`chem-sub-${offset + match.index}-${index}`}>{digits}</sub>)
+        formulaNodes.push(<sub key={`chem-sub-${formulaOffset}-${index}`}>{digits}</sub>)
       } else {
         formulaNodes.push(character)
       }
     }
 
-    nodes.push(
-      <span className="latex-expression" key={`chem-${offset + match.index}`}>
-        {formulaNodes}
-      </span>,
-    )
+    if (formulaNodes.length > 0) {
+      nodes.push(
+        <span className="latex-expression" key={`chem-${formulaOffset}`}>
+          {formulaNodes}
+        </span>,
+      )
+    }
     cursor = match.index + formula.length
   }
 
   if (cursor < source.length) {
-    nodes.push(...renderText(source.slice(cursor), offset + cursor, animatedFrom))
+    nodes.push(...renderText(source.slice(cursor), offset + cursor, animatedFrom, visibleUntil))
   }
 
   return nodes
+}
+
+type InlineMarkdownToken =
+  | {
+      body: string
+      end: number
+      start: number
+      type:
+        | "code"
+        | "displayMath"
+        | "inlineMath"
+        | "strong"
+        | "emphasis"
+        | "plainStrongCandidate"
+        | "plainEmphasisCandidate"
+    }
+  | { end: number; start: number; type: "break" }
+
+function findClosingMarker(source: string, marker: string, startIndex: number) {
+  let cursor = startIndex
+
+  while (cursor < source.length) {
+    const nextIndex = source.indexOf(marker, cursor)
+
+    if (nextIndex === -1) {
+      return -1
+    }
+
+    if (nextIndex === 0 || source[nextIndex - 1] !== "\\") {
+      return nextIndex
+    }
+
+    cursor = nextIndex + marker.length
+  }
+
+  return -1
+}
+
+function canOpenEmphasis(source: string, start: number, markerLength: number) {
+  const nextCharacter = source[start + markerLength]
+
+  return !!nextCharacter && !/\s/.test(nextCharacter)
+}
+
+function readInlineMarkdownToken(source: string, start: number): InlineMarkdownToken | null {
+  const remaining = source.slice(start)
+  const breakMatch = /^<br\s*\/?>/i.exec(remaining)
+
+  if (breakMatch) {
+    return { end: start + breakMatch[0].length, start, type: "break" }
+  }
+
+  if (source[start] === "`") {
+    const end = findClosingMarker(source, "`", start + 1)
+
+    return end === -1
+      ? null
+      : { body: source.slice(start + 1, end), end: end + 1, start, type: "code" }
+  }
+
+  if (source.startsWith("$$", start)) {
+    const end = findClosingMarker(source, "$$", start + 2)
+
+    return end === -1
+      ? null
+      : { body: source.slice(start + 2, end), end: end + 2, start, type: "displayMath" }
+  }
+
+  if (source.startsWith("\\[", start)) {
+    const end = findClosingMarker(source, "\\]", start + 2)
+
+    return end === -1
+      ? null
+      : { body: source.slice(start + 2, end), end: end + 2, start, type: "displayMath" }
+  }
+
+  if (source[start] === "$") {
+    const end = findClosingMarker(source, "$", start + 1)
+
+    return end === -1 || source.slice(start + 1, end).includes("\n")
+      ? null
+      : { body: source.slice(start + 1, end), end: end + 1, start, type: "inlineMath" }
+  }
+
+  if (source.startsWith("\\(", start)) {
+    const end = findClosingMarker(source, "\\)", start + 2)
+
+    return end === -1
+      ? null
+      : { body: source.slice(start + 2, end), end: end + 2, start, type: "inlineMath" }
+  }
+
+  if (source.startsWith("**", start) && canOpenEmphasis(source, start, 2)) {
+    const end = findClosingMarker(source, "**", start + 2)
+
+    return end === -1
+      ? {
+          body: source.slice(start + 2),
+          end: source.length,
+          start,
+          type: "plainStrongCandidate",
+        }
+      : { body: source.slice(start + 2, end), end: end + 2, start, type: "strong" }
+  }
+
+  if (source[start] === "*" && !source.startsWith("**", start) && canOpenEmphasis(source, start, 1)) {
+    const end = findClosingMarker(source, "*", start + 1)
+
+    return end === -1
+      ? {
+          body: source.slice(start + 1),
+          end: source.length,
+          start,
+          type: "plainEmphasisCandidate",
+        }
+      : { body: source.slice(start + 1, end), end: end + 1, start, type: "emphasis" }
+  }
+
+  return null
+}
+
+function findNextInlineMarkdownToken(source: string, startIndex: number): InlineMarkdownToken | null {
+  for (let index = startIndex; index < source.length; index += 1) {
+    const token = readInlineMarkdownToken(source, index)
+
+    if (token) {
+      return token
+    }
+  }
+
+  return null
 }
 
 function renderInlineMarkdown(
   source: string,
   offset: number,
   animatedFrom = Number.POSITIVE_INFINITY,
+  visibleUntil = Number.POSITIVE_INFINITY,
 ): ReactNode[] {
   const nodes: ReactNode[] = []
-  const pattern = /(<br\s*\/?>|`[^`]+`|\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\$[^$\n]+\$|\\\([^)]+\\\)|\*\*[^*]+\*\*|\*[^*]+\*)/gi
   let cursor = 0
-  let match: RegExpExecArray | null
 
-  while ((match = pattern.exec(source))) {
-    if (match.index > cursor) {
-      nodes.push(...renderPlainChemistry(source.slice(cursor, match.index), offset + cursor, animatedFrom))
+  while (cursor < source.length) {
+    const token = findNextInlineMarkdownToken(source, cursor)
+
+    if (!token) {
+      break
     }
 
-    const token = match[0]
-    const tokenOffset = offset + match.index
+    if (token.start > cursor) {
+      nodes.push(...renderPlainChemistry(source.slice(cursor, token.start), offset + cursor, animatedFrom, visibleUntil))
+    }
 
-    if (/^<br\s*\/?>$/i.test(token)) {
+    if (offset + token.start >= visibleUntil) {
+      break
+    }
+
+    const tokenOffset = offset + token.start
+
+    if (token.type === "break") {
       nodes.push(<br key={`br-${tokenOffset}`} />)
-    } else if (token.startsWith("`")) {
+    } else if (token.type === "code") {
       nodes.push(
         <code className="markdown-code" key={`code-${tokenOffset}`}>
-          {renderText(token.slice(1, -1), tokenOffset + 1, animatedFrom)}
+          {renderText(token.body, tokenOffset + 1, animatedFrom, visibleUntil)}
         </code>,
       )
-    } else if (token.startsWith("$$")) {
-      nodes.push(<MathExpression display key={`math-${tokenOffset}`} source={token.slice(2, -2)} />)
-    } else if (token.startsWith("\\[")) {
-      nodes.push(<MathExpression display key={`math-${tokenOffset}`} source={token.slice(2, -2)} />)
-    } else if (token.startsWith("$")) {
-      nodes.push(<MathExpression key={`math-${tokenOffset}`} source={token.slice(1, -1)} />)
-    } else if (token.startsWith("\\(")) {
-      nodes.push(<MathExpression key={`math-${tokenOffset}`} source={token.slice(2, -2)} />)
-    } else if (token.startsWith("**")) {
+    } else if (token.type === "displayMath") {
+      if (token.end + offset <= visibleUntil) {
+        nodes.push(<MathExpression display key={`math-${tokenOffset}`} source={token.body} />)
+      }
+    } else if (token.type === "inlineMath") {
+      if (token.end + offset <= visibleUntil) {
+        nodes.push(<MathExpression key={`math-${tokenOffset}`} source={token.body} />)
+      }
+    } else if (token.type === "strong") {
       const innerAnimatedFrom = animatedFrom === Number.POSITIVE_INFINITY ? animatedFrom : Math.min(animatedFrom, tokenOffset + 2)
       nodes.push(
         <strong key={`strong-${tokenOffset}`}>
-          {renderInlineMarkdown(token.slice(2, -2), tokenOffset + 2, innerAnimatedFrom)}
+          {renderInlineMarkdown(token.body, tokenOffset + 2, innerAnimatedFrom, visibleUntil)}
         </strong>,
       )
-    } else {
+    } else if (token.type === "emphasis") {
       const innerAnimatedFrom = animatedFrom === Number.POSITIVE_INFINITY ? animatedFrom : Math.min(animatedFrom, tokenOffset + 1)
       nodes.push(
         <em key={`em-${tokenOffset}`}>
-          {renderInlineMarkdown(token.slice(1, -1), tokenOffset + 1, innerAnimatedFrom)}
+          {renderInlineMarkdown(token.body, tokenOffset + 1, innerAnimatedFrom, visibleUntil)}
         </em>,
+      )
+    } else {
+      const markerLength = token.type === "plainStrongCandidate" ? 2 : 1
+      const innerAnimatedFrom = animatedFrom === Number.POSITIVE_INFINITY
+        ? animatedFrom
+        : Math.min(animatedFrom, tokenOffset + markerLength)
+
+      nodes.push(
+        ...renderInlineMarkdown(
+          token.body,
+          tokenOffset + markerLength,
+          innerAnimatedFrom,
+          visibleUntil,
+        ),
       )
     }
 
-    cursor = match.index + token.length
+    cursor = token.end
   }
 
   if (cursor < source.length) {
-    nodes.push(...renderPlainChemistry(source.slice(cursor), offset + cursor, animatedFrom))
+    nodes.push(...renderPlainChemistry(source.slice(cursor), offset + cursor, animatedFrom, visibleUntil))
   }
 
   return nodes
@@ -437,7 +613,11 @@ function splitOnThinking(content: string): { reasoning: string; answer: string }
   return { reasoning: reasoning.trim(), answer: answer.trim() }
 }
 
-function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[] {
+function buildMarkdownBlocks(
+  content: string,
+  animatedFrom: number,
+  visibleUntil = content.length,
+): ReactNode[] {
   const normalized = normalizeMarkdownSource(content)
   const lines = normalized.split("\n")
   const blocks: ReactNode[] = []
@@ -447,6 +627,10 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
   while (lineIndex < lines.length) {
     const line = lines[lineIndex]
     const currentOffset = offset
+
+    if (currentOffset >= visibleUntil) {
+      break
+    }
 
     if (!line.trim()) {
       blocks.push(<div aria-hidden="true" className="markdown-spacer" key={`s-${currentOffset}`} />)
@@ -472,6 +656,7 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
     if (codeFence) {
       const language = codeFence[1]?.trim()
       const codeOffset = currentOffset
+      const codeBodyOffset = offset + line.length + 1
       const codeLines: string[] = []
 
       lineIndex += 1
@@ -492,7 +677,7 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
         <div className="markdown-code-block" key={`cb-${codeOffset}`}>
           {language ? <div className="markdown-code-block-label">{language}</div> : null}
           <pre className="markdown-code-block-pre">
-            <code>{codeLines.join("\n")}</code>
+            <code>{renderText(codeLines.join("\n"), codeBodyOffset, animatedFrom, visibleUntil)}</code>
           </pre>
         </div>,
       )
@@ -504,7 +689,7 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
       const HeadingTag = `h${Math.min(heading[1].length, 3)}` as "h1" | "h2" | "h3"
       blocks.push(
         <HeadingTag className="markdown-heading" key={`h-${currentOffset}`}>
-          {renderInlineMarkdown(heading[2], currentOffset + heading[1].length + 1, animatedFrom)}
+          {renderInlineMarkdown(heading[2], currentOffset + heading[1].length + 1, animatedFrom, visibleUntil)}
         </HeadingTag>,
       )
       lineIndex += 1
@@ -542,17 +727,17 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
                 <tr>
                   {header.map((cell, cellIndex) => (
                     <th key={`th-${tableOffset}-${cellIndex}`}>
-                      {renderInlineMarkdown(cell, tableOffset + cellIndex, animatedFrom)}
+                      {renderInlineMarkdown(cell, tableOffset + cellIndex, animatedFrom, visibleUntil)}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {rows.filter((row) => row.offset < visibleUntil).map((row) => (
                   <tr key={`tr-${row.offset}`}>
                     {header.map((_, cellIndex) => (
                       <td key={`td-${row.offset}-${cellIndex}`}>
-                        {renderInlineMarkdown(row.cells[cellIndex] ?? "", row.offset + cellIndex, animatedFrom)}
+                        {renderInlineMarkdown(row.cells[cellIndex] ?? "", row.offset + cellIndex, animatedFrom, visibleUntil)}
                       </td>
                     ))}
                   </tr>
@@ -567,11 +752,13 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
 
     const displayMath = /^\s*(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])\s*$/.exec(line)
     if (displayMath) {
-      blocks.push(
-        <div className="latex-display-line" key={`m-${currentOffset}`}>
-          <MathExpression display source={displayMath[2]} />
-        </div>,
-      )
+      if (currentOffset + line.length <= visibleUntil) {
+        blocks.push(
+          <div className="latex-display-line" key={`m-${currentOffset}`}>
+            <MathExpression display source={displayMath[2]} />
+          </div>,
+        )
+      }
       lineIndex += 1
       offset += line.length + 1
       continue
@@ -591,7 +778,7 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
 
       blocks.push(
         <blockquote className="markdown-quote" key={`q-${quoteOffset}`}>
-          {renderInlineMarkdown(quoteLines.join("\n"), quoteOffset, animatedFrom)}
+          {renderInlineMarkdown(quoteLines.join("\n"), quoteOffset, animatedFrom, visibleUntil)}
         </blockquote>,
       )
       continue
@@ -606,7 +793,7 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
 
         items.push(
           <li key={`li-${offset}`}>
-            {renderInlineMarkdown(item.slice(marker.length), offset + marker.length, animatedFrom)}
+            {renderInlineMarkdown(item.slice(marker.length), offset + marker.length, animatedFrom, visibleUntil)}
           </li>,
         )
         offset += item.length + 1
@@ -630,7 +817,9 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
         const marker = item.match(/^\s*\d+\.\s+/)?.[0] ?? ""
         const itemOffset = offset
         const itemBlocks: ReactNode[] = [
-          <div key={`oli-title-${itemOffset}`}>{renderInlineMarkdown(item.slice(marker.length), offset + marker.length, animatedFrom)}</div>,
+          <div key={`oli-title-${itemOffset}`}>
+            {renderInlineMarkdown(item.slice(marker.length), offset + marker.length, animatedFrom, visibleUntil)}
+          </div>,
         ]
 
         offset += item.length + 1
@@ -697,7 +886,7 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
 
           itemBlocks.push(
             <p className="markdown-paragraph" key={`oli-paragraph-${paragraphOffset}`}>
-              {renderInlineMarkdown(paragraphLines.join("\n"), paragraphOffset, animatedFrom)}
+              {renderInlineMarkdown(paragraphLines.join("\n"), paragraphOffset, animatedFrom, visibleUntil)}
             </p>,
           )
         }
@@ -733,7 +922,7 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
 
     blocks.push(
       <p className="markdown-paragraph" key={`p-${paragraphOffset}`}>
-        {renderInlineMarkdown(paragraphLines.join("\n"), paragraphOffset, animatedFrom)}
+        {renderInlineMarkdown(paragraphLines.join("\n"), paragraphOffset, animatedFrom, visibleUntil)}
       </p>,
     )
   }
@@ -741,7 +930,15 @@ function buildMarkdownBlocks(content: string, animatedFrom: number): ReactNode[]
   return blocks
 }
 
-export function MarkdownMessage({ content, isGenerating }: { content: string; isGenerating?: boolean }) {
+export function MarkdownMessage({
+  content,
+  isGenerating,
+  reasoningDurationMs,
+}: {
+  content: string
+  isGenerating?: boolean
+  reasoningDurationMs?: number | null
+}) {
   const [openTableMenu, setOpenTableMenu] = useState<string | null>(null)
   const [closingTableMenu, setClosingTableMenu] = useState<string | null>(null)
   const [isReasoningPanelOpen, setIsReasoningPanelOpen] = useState(false)
@@ -750,12 +947,18 @@ export function MarkdownMessage({ content, isGenerating }: { content: string; is
   const rootRef = useRef<HTMLDivElement | null>(null)
   const previousContentLengthRef = useRef(content.length)
   const { reasoning, answer } = splitOnThinking(content)
-  const previousAnswerLengthRef = useRef(answer.length)
+  const markdownLookaheadCharacters = chatRuntimeConfig.stream.markdownLookaheadCharacters
+  const visibleAnswer =
+    isGenerating && answer.length > 0
+      ? answer.slice(0, Math.max(0, answer.length - markdownLookaheadCharacters))
+      : answer
+  const hasAnswerStarted = answer.length > 0
+  const previousAnswerLengthRef = useRef(visibleAnswer.length)
   const streamAnimationRangesRef = useRef<StreamAnimationRange[]>([])
   const streamAnimationTimeoutRef = useRef<number | null>(null)
   const isStreaming = isGenerating || content.length > previousContentLengthRef.current
-  const isThinkingActive = isStreaming && !answer
-  const [thinkingDurationMs, setThinkingDurationMs] = useState<number | null>(null)
+  const isThinkingActive = isStreaming && !hasAnswerStarted
+  const [thinkingDurationMs, setThinkingDurationMs] = useState<number | null>(reasoningDurationMs ?? null)
   const thinkingStartedAtRef = useRef<number | null>(null)
   const wasThinkingRef = useRef(false)
   const streamAnimationDuration = chatRuntimeConfig.stream.characterFadeMs
@@ -765,14 +968,14 @@ export function MarkdownMessage({ content, isGenerating }: { content: string; is
     Number.POSITIVE_INFINITY,
   )
   const newAnswerStart =
-    isGenerating && answer.length > previousAnswerLengthRef.current
+    visibleAnswer.length > previousAnswerLengthRef.current
       ? Math.max(0, previousAnswerLengthRef.current)
       : Number.POSITIVE_INFINITY
   const animatedFrom = Math.min(activeAnimationStart, newAnswerStart)
-  const answerBlocks = buildMarkdownBlocks(answer, animatedFrom)
+  const answerBlocks = buildMarkdownBlocks(answer, animatedFrom, visibleAnswer.length)
 
   const allParagraphs = reasoning ? reasoning.split(/\n\n+/).filter(Boolean) : []
-  const showThinkingToggle = !!reasoning || (isGenerating && !answer)
+  const showThinkingToggle = !!reasoning || isThinkingActive
   const hasReasoningTraces = allParagraphs.length > 0
 
   function scheduleStreamAnimationCleanup() {
@@ -814,7 +1017,7 @@ export function MarkdownMessage({ content, isGenerating }: { content: string; is
   useEffect(() => {
     const previousAnswerLength = previousAnswerLengthRef.current
 
-    if (answer.length < previousAnswerLength) {
+    if (visibleAnswer.length < previousAnswerLength) {
       streamAnimationRangesRef.current = []
       if (streamAnimationTimeoutRef.current) {
         window.clearTimeout(streamAnimationTimeoutRef.current)
@@ -822,12 +1025,12 @@ export function MarkdownMessage({ content, isGenerating }: { content: string; is
       }
     }
 
-    if (isGenerating && answer.length > previousAnswerLength) {
+    if (visibleAnswer.length > previousAnswerLength) {
       const now = performance.now()
       streamAnimationRangesRef.current = [
         ...streamAnimationRangesRef.current.filter((range) => range.expiresAt > now),
         {
-          end: answer.length,
+          end: visibleAnswer.length,
           expiresAt: now + streamAnimationDuration,
           start: previousAnswerLength,
         },
@@ -836,8 +1039,8 @@ export function MarkdownMessage({ content, isGenerating }: { content: string; is
     }
 
     previousContentLengthRef.current = content.length
-    previousAnswerLengthRef.current = answer.length
-  }, [answer.length, content, isGenerating, streamAnimationDuration])
+    previousAnswerLengthRef.current = visibleAnswer.length
+  }, [content, streamAnimationDuration, visibleAnswer.length])
 
   useEffect(() => {
     if (!hasReasoningTraces) {
@@ -846,7 +1049,18 @@ export function MarkdownMessage({ content, isGenerating }: { content: string; is
   }, [hasReasoningTraces])
 
   useEffect(() => {
-    const isThinking = !!reasoning && !answer
+    if (typeof reasoningDurationMs === "number") {
+      setThinkingDurationMs(reasoningDurationMs)
+      return
+    }
+
+    if (isThinkingActive) {
+      setThinkingDurationMs(null)
+    }
+  }, [isThinkingActive, reasoningDurationMs])
+
+  useEffect(() => {
+    const isThinking = (!!reasoning || isGenerating) && !hasAnswerStarted
 
     if (isThinking && !wasThinkingRef.current) {
       thinkingStartedAtRef.current = performance.now()
@@ -858,7 +1072,7 @@ export function MarkdownMessage({ content, isGenerating }: { content: string; is
     }
 
     wasThinkingRef.current = isThinking
-  }, [reasoning, answer])
+  }, [reasoning, isGenerating, hasAnswerStarted])
 
   useEffect(() => {
     if (!isReasoningPanelOpen) {
@@ -925,13 +1139,21 @@ export function MarkdownMessage({ content, isGenerating }: { content: string; is
             aria-haspopup="dialog"
             disabled={!hasReasoningTraces}
           >
-            {thinkingDurationMs !== null ? (
+            {thinkingDurationMs !== null || hasReasoningTraces && !isThinkingActive ? (
               <>
-                <Lightbulb className="markdown-thinking-lamp-icon" aria-hidden="true" />
+                {thinkingDurationMs !== null && thinkingDurationMs < FAST_REASONING_THRESHOLD_MS ? (
+                  <Zap className="markdown-thinking-lamp-icon markdown-thinking-energy-icon" aria-hidden="true" />
+                ) : (
+                  <Lightbulb className="markdown-thinking-lamp-icon" aria-hidden="true" />
+                )}
                 <span className="markdown-thinking-label">
                   {isReasoningPanelOpen
                     ? "Press to close"
-                    : thinkingDurationMs < 3000
+                    : thinkingDurationMs === null
+                      ? "Thought"
+                      : thinkingDurationMs < FAST_REASONING_THRESHOLD_MS
+                      ? "Fast Reasoning"
+                      : thinkingDurationMs < MOMENT_REASONING_THRESHOLD_MS
                       ? "Thought for a moment"
                       : `Thought for ${Math.round(thinkingDurationMs / 1000)} seconds`}
                 </span>

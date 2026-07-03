@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { defaultHyperparameters, type Hyperparameters } from "@/features/chat/config/hyperparameters"
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import type { UpdatePreferences, UpdateTrack } from "@/features/updates/types"
 
@@ -8,17 +9,9 @@ export type FrostedSurfacePreference = "standard" | "reduced"
 export type MessageFontPreference = "sans" | "serif"
 export type DefaultWorkspacePreference = "chat" | "playground"
 
-export type Hyperparameters = {
-  temperature: number
-  topK: number
-  topP: number
-  repeatPenalty: number
-  maxTokens: number
-}
-
 const SETTINGS_STORAGE_KEY = "suprachat.settings"
 
-const defaultHyperparameters: Hyperparameters = {
+const legacyDefaultHyperparameters: Hyperparameters = {
   temperature: 0.75,
   topK: 50,
   topP: 0.8,
@@ -126,8 +119,7 @@ function normalizeHyperparameters(value: unknown): Hyperparameters {
   }
 
   const raw = value as Record<string, unknown>
-
-  return {
+  const normalized = {
     temperature:
       typeof raw.temperature === "number" && Number.isFinite(raw.temperature)
         ? Math.min(2, Math.max(0, raw.temperature))
@@ -149,6 +141,18 @@ function normalizeHyperparameters(value: unknown): Hyperparameters {
         ? Math.round(Math.min(16384, Math.max(16, raw.maxTokens)))
         : defaultHyperparameters.maxTokens,
   }
+
+  if (
+    normalized.temperature === legacyDefaultHyperparameters.temperature &&
+    normalized.topK === legacyDefaultHyperparameters.topK &&
+    normalized.topP === legacyDefaultHyperparameters.topP &&
+    normalized.repeatPenalty === legacyDefaultHyperparameters.repeatPenalty &&
+    normalized.maxTokens === legacyDefaultHyperparameters.maxTokens
+  ) {
+    return { ...defaultHyperparameters }
+  }
+
+  return normalized
 }
 
 function readStoredSettings(): PersistedSettings {
@@ -295,7 +299,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setUpdateTrack: (value) => updateSetting(set, "updateTrack", value),
   setHyperparameters: (hyperparameters) =>
     set((state) => {
-      const nextSettings = { ...state, hyperparameters }
+      const normalizedHyperparameters = normalizeHyperparameters(hyperparameters)
+      const nextSettings = { ...state, hyperparameters: normalizedHyperparameters }
       persistSettings({
         autoTitleConversations: nextSettings.autoTitleConversations,
         confirmExperimentalInstall: nextSettings.confirmExperimentalInstall,
@@ -314,6 +319,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         updateTrack: nextSettings.updateTrack,
         hyperparameters: nextSettings.hyperparameters,
       })
-      return { hyperparameters }
+      return { hyperparameters: normalizedHyperparameters }
     }),
 }))

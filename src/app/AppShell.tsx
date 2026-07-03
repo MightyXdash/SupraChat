@@ -102,7 +102,6 @@ export function AppShell() {
   const { confirm, confirmationDialog } = useConfirmationDialog()
   const hasAppliedInitialThemeRef = useRef(false)
   const themeRef = useRef<AppTheme>(theme)
-  const { clearSubmitScrollSpace, scrollLatestUserTurnIntoView, scrollRef } = useAutoScroll()
   const conversations = useChatStore((state) => state.conversations)
   const activeConversationId = useChatStore((state) => state.activeConversationId)
   const initialize = useChatStore((state) => state.initialize)
@@ -144,6 +143,24 @@ export function AppShell() {
   const finishVoiceRecording = useVoiceStore((state) => state.finishRecording)
   const startVadRecording = useVoiceStore((state) => state.startVadRecording)
   const setHotkeyActive = useVoiceStore((state) => state.setHotkeyActive)
+  const activeConversation = conversations.find(
+    (conversation) => conversation.id === activeConversationId,
+  )
+  const latestStreamMessage = activeConversation?.messages[activeConversation.messages.length - 1]
+  const streamScrollKey = latestStreamMessage
+    ? `${activeConversationId}:${latestStreamMessage.id}:${latestStreamMessage.content.length}`
+    : activeConversationId
+  const {
+    clearSubmitScrollSpace,
+    isJumpToLatestVisible,
+    scrollLatestUserTurnIntoView,
+    scrollRef,
+    scrollToLatestTurn,
+  } = useAutoScroll({
+    isGenerating,
+    reduceMotion,
+    streamScrollKey,
+  })
 
   useEffect(() => {
     void initialize()
@@ -361,10 +378,6 @@ export function AppShell() {
   function toggleTheme() {
     setThemePreference(theme === "light" ? "dark" : "light")
   }
-
-  const activeConversation = conversations.find(
-    (conversation) => conversation.id === activeConversationId,
-  )
 
   async function handleSubmit() {
     const message = draft.trim()
@@ -652,6 +665,7 @@ export function AppShell() {
             editingMessageId={editingMessageId}
             error={voiceError ?? error}
             isGenerating={isGenerating}
+            isJumpToLatestVisible={isJumpToLatestVisible}
             generationTokensPerSecond={generationTokensPerSecond}
             scrollRef={scrollRef}
             speechPlayback={speechPlayback}
@@ -669,6 +683,7 @@ export function AppShell() {
             onStopSpeech={stopSpeechPlayback}
             onStopGeneration={stopGeneration}
             onSubmit={handleSubmit}
+            onJumpToLatest={scrollToLatestTurn}
             onToggleSpeech={toggleSpeechPlayback}
             onVoiceVadStart={handleVoiceVadStart}
             onVoiceFinish={handleVoiceFinish}

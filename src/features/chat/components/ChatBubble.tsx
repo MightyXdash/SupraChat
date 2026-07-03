@@ -51,7 +51,11 @@ export const ChatBubble = memo(function ChatBubble({ message, canEdit, isGenerat
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
-            <MarkdownMessage content={message.content} isGenerating={isGenerating} />
+            <MarkdownMessage
+              content={message.content}
+              isGenerating={isGenerating}
+              reasoningDurationMs={message.reasoningDurationMs}
+            />
           )}
         </div>
         {showAssistantActions || showUserActions ? (

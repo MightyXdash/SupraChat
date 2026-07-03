@@ -7,6 +7,12 @@ import { SettingsBadge, SettingsPath, SettingsRangeControl, SettingsSegmentedCon
 import { SettingsNav } from "@/features/settings/components/SettingsNav"
 import { SettingsRow } from "@/features/settings/components/SettingsRow"
 import { SettingsSection } from "@/features/settings/components/SettingsSection"
+import {
+  customHyperparameters,
+  getHyperparameterPresetId,
+  hyperparameterPresets,
+  type HyperparameterPresetId,
+} from "@/features/chat/config/hyperparameters"
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import {
   exportConversationData,
@@ -39,6 +45,8 @@ type SettingsDataState = {
   models: SettingsModelsPayload | null
   storage: SettingsStoragePayload | null
 }
+
+type HyperparameterPresetControlId = HyperparameterPresetId | "custom"
 
 function formatBytes(value: number | null | undefined) {
   if (!value) {
@@ -115,6 +123,22 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const setUpdaterStatus = useUpdaterStore((state) => state.setStatus)
   const updaterStatus = useUpdaterStore((state) => state.status)
   const experimentalConfirmationLocked = updateTrack === "final"
+  const activeHyperparameterPresetId = getHyperparameterPresetId(hyperparameters)
+  const hyperparameterPresetControlValue: HyperparameterPresetControlId =
+    activeHyperparameterPresetId ?? "custom"
+
+  function handleHyperparameterPresetChange(presetId: HyperparameterPresetControlId) {
+    if (presetId === "custom") {
+      setHyperparameters({ ...customHyperparameters })
+      return
+    }
+
+    const preset = hyperparameterPresets.find((candidate) => candidate.id === presetId)
+
+    if (preset) {
+      setHyperparameters({ ...preset.values })
+    }
+  }
 
   async function applyUpdateTrack(nextTrack: UpdateTrack) {
     setUpdateTrack(nextTrack)
@@ -640,6 +664,24 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                     title="Hyperparameters"
                     description="Control how the active model generates responses. These values are sent with every chat request."
                   >
+                    <SettingsRow
+                      label="Preset"
+                    >
+                      <div className="settings-inline-control-group">
+                        <SettingsSegmentedControl<HyperparameterPresetControlId>
+                          aria-label="Hyperparameter preset"
+                          value={hyperparameterPresetControlValue}
+                          options={[
+                            ...hyperparameterPresets.map((preset) => ({
+                              label: preset.label,
+                              value: preset.id,
+                            })),
+                            { label: "Custom", value: "custom" },
+                          ]}
+                          onChange={handleHyperparameterPresetChange}
+                        />
+                      </div>
+                    </SettingsRow>
                     <SettingsRow
                       label="Temperature"
                       description="Controls randomness. Lower values produce more deterministic responses."

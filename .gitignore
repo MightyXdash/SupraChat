@@ -15,6 +15,7 @@ __pycache__/
 build/*
 !build/icon.ico
 !build/icon.png
+!build/dmg-background-compact.png
 !build/installer-header.bmp
 !build/installer-sidebar.bmp
 release-resources/

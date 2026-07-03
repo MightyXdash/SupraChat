@@ -1,6 +1,6 @@
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import { ChatCompletionMessage, Conversation } from "@/features/chat/types"
-import type { Hyperparameters } from "@/features/settings/store/use-settings-store"
+import type { Hyperparameters } from "@/features/chat/config/hyperparameters"
 
 type StreamChatCompletionOptions = {
   displayTokensPerSecondCap?: number | null
