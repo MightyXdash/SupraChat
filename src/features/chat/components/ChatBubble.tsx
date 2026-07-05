@@ -3,7 +3,7 @@ import { motion } from "framer-motion"
 import { Check, Copy, Loader2, Pencil, RotateCcw, Volume2 } from "lucide-react"
 import { attachmentSummaryLabel, buildMessageTextPayload } from "@/features/chat/lib/message-attachments"
 import { MarkdownMessage } from "@/features/chat/components/MarkdownMessage"
-import { ChatMessage } from "@/features/chat/types"
+import { ChatMessage, ReasoningBlock } from "@/features/chat/types"
 import { cn } from "@/lib/utils"
 
 type ChatBubbleProps = {
@@ -16,11 +16,29 @@ type ChatBubbleProps = {
   speechLoading?: boolean
 }
 
+function formatReasoningBlocksForThinkingPanel(blocks: ReasoningBlock[]) {
+  return blocks
+    .map((block) => [
+      `**${block.title}**`,
+      block.summary,
+    ]
+      .filter(Boolean)
+      .join("\n\n"))
+    .join("\n\n")
+}
+
 export const ChatBubble = memo(function ChatBubble({ message, canEdit, isGenerating, onEdit, onRegenerate, onSpeak, speechLoading }: ChatBubbleProps) {
   const [hasCopied, setHasCopied] = useState(false)
   const isUser = message.role === "user"
   const showAssistantActions = !isUser && !isGenerating && message.content.trim().length > 0
   const showUserActions = isUser && !isGenerating && (message.content.trim().length > 0 || (message.attachments?.length ?? 0) > 0)
+  const showReasoningSummary = !isUser && message.reasoningMode === "summary"
+  const cloudReasoningText = showReasoningSummary
+    ? formatReasoningBlocksForThinkingPanel(message.reasoningBlocks ?? [])
+    : ""
+  const assistantContent = showReasoningSummary && (cloudReasoningText || isGenerating)
+    ? `<suprachat-think>${cloudReasoningText}</suprachat-think>${message.content}`
+    : message.content
 
   async function handleCopy() {
     try {
@@ -77,7 +95,7 @@ export const ChatBubble = memo(function ChatBubble({ message, canEdit, isGenerat
             </div>
           ) : (
             <MarkdownMessage
-              content={message.content}
+              content={assistantContent}
               isGenerating={isGenerating}
               reasoningDurationMs={message.reasoningDurationMs}
             />

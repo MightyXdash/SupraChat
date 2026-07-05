@@ -39,6 +39,7 @@ export type ChatMessage = {
   content: string
   createdAt: string
   attachments?: ChatAttachment[]
+  reasoningMode?: "summary"
   reasoningDurationMs?: number | null
   tokensPerSecond?: number | null
   reasoningBlocks?: ReasoningBlock[]

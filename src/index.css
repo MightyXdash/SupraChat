@@ -4707,6 +4707,37 @@ html[data-theme-switching] *::after {
   margin-top: 0.55rem;
 }
 
+.thought-trace-item-skeleton {
+  border-left: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-left: 0.8rem;
+}
+
+.thought-trace-skeleton-line {
+  animation: thinking-shimmer var(--motion-thinking-shimmer) ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--text-muted) 16%, transparent) 0%,
+    color-mix(in srgb, var(--text-muted) 24%, transparent) 48%,
+    color-mix(in srgb, var(--text-muted) 16%, transparent) 100%
+  );
+  background-size: 260% 100%;
+  border-radius: 999px;
+  height: 0.62rem;
+  width: 100%;
+}
+
+.thought-trace-skeleton-line-title {
+  height: 0.72rem;
+  width: 62%;
+}
+
+.thought-trace-skeleton-line-short {
+  width: 78%;
+}
+
 @media (max-width: 860px) {
   .thought-trace-panel {
     max-width: none;

@@ -548,7 +548,7 @@ function parseTaskListItem(line: string): { checked: boolean; text: string; mark
   }
 }
 
-function splitOnThinking(content: string): { reasoning: string; answer: string } {
+function splitOnThinking(content: string): { answer: string; hasReasoningMarker: boolean; reasoning: string } {
   let reasoning = ""
   let answer = ""
   let isInsideReasoning = false
@@ -573,7 +573,7 @@ function splitOnThinking(content: string): { reasoning: string; answer: string }
   }
 
   if (!hasReasoningMarker) {
-    return { reasoning: "", answer: content }
+    return { answer: content, hasReasoningMarker: false, reasoning: "" }
   }
 
   const remainingText = content.slice(lastIndex)
@@ -583,7 +583,7 @@ function splitOnThinking(content: string): { reasoning: string; answer: string }
     answer += remainingText
   }
 
-  return { reasoning: reasoning.trim(), answer: answer.trim() }
+  return { answer: answer.trim(), hasReasoningMarker, reasoning: reasoning.trim() }
 }
 
 function buildMarkdownBlocks(
@@ -938,7 +938,7 @@ export function MarkdownMessage({
   const closeTimeoutRef = useRef<number | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const previousContentLengthRef = useRef(content.length)
-  const { reasoning, answer } = splitOnThinking(content)
+  const { reasoning, answer, hasReasoningMarker } = splitOnThinking(content)
   const markdownLookaheadCharacters = chatRuntimeConfig.stream.markdownLookaheadCharacters
   const visibleAnswer =
     isGenerating && answer.length > 0
@@ -967,8 +967,9 @@ export function MarkdownMessage({
   const answerBlocks = buildMarkdownBlocks(answer, animatedFrom, visibleAnswer.length)
 
   const allParagraphs = reasoning ? reasoning.split(/\n\n+/).filter(Boolean) : []
-  const showThinkingToggle = !!reasoning || isThinkingActive
+  const showThinkingToggle = hasReasoningMarker || isThinkingActive
   const hasReasoningTraces = allParagraphs.length > 0
+  const canOpenReasoningPanel = hasReasoningTraces || hasReasoningMarker
 
   function scheduleStreamAnimationCleanup() {
     if (streamAnimationTimeoutRef.current) {
@@ -1035,10 +1036,10 @@ export function MarkdownMessage({
   }, [content, streamAnimationDuration, visibleAnswer.length])
 
   useEffect(() => {
-    if (!hasReasoningTraces) {
+    if (!canOpenReasoningPanel) {
       setIsReasoningPanelOpen(false)
     }
-  }, [hasReasoningTraces])
+  }, [canOpenReasoningPanel])
 
   useEffect(() => {
     if (typeof reasoningDurationMs === "number") {
@@ -1129,7 +1130,7 @@ export function MarkdownMessage({
             onClick={() => setIsReasoningPanelOpen(prev => !prev)}
             aria-expanded={isReasoningPanelOpen}
             aria-haspopup="dialog"
-            disabled={!hasReasoningTraces}
+            disabled={!canOpenReasoningPanel}
           >
             {thinkingDurationMs !== null || hasReasoningTraces && !isThinkingActive ? (
               <>
@@ -1155,9 +1156,9 @@ export function MarkdownMessage({
                 {isReasoningPanelOpen ? "Press to close" : "Thinking"}
               </span>
             )}
-            {hasReasoningTraces ? <ChevronRight className="markdown-thinking-icon" aria-hidden="true" /> : null}
+            {canOpenReasoningPanel ? <ChevronRight className="markdown-thinking-icon" aria-hidden="true" /> : null}
           </button>
-          {isReasoningPanelOpen && hasReasoningTraces
+          {isReasoningPanelOpen && canOpenReasoningPanel
             ? createPortal(
               <aside
                 aria-label="Thought traces"
@@ -1166,17 +1167,25 @@ export function MarkdownMessage({
                 role="dialog"
               >
                 <div className="thought-trace-panel-body">
-                  {allParagraphs.map((para, index) => (
-                    <section
-                      className="thought-trace-item"
-                      key={`trace-${index}-${para.slice(0, 20)}`}
-                    >
-                      <div className="thought-trace-content">
-                        {buildMarkdownBlocks(para, Number.POSITIVE_INFINITY)}
-                      </div>
+                  {hasReasoningTraces ? (
+                    allParagraphs.map((para, index) => (
+                      <section
+                        className="thought-trace-item"
+                        key={`trace-${index}-${para.slice(0, 20)}`}
+                      >
+                        <div className="thought-trace-content">
+                          {buildMarkdownBlocks(para, Number.POSITIVE_INFINITY)}
+                        </div>
+                      </section>
+                    ))
+                  ) : (
+                    <section className="thought-trace-item thought-trace-item-skeleton" aria-label="Preparing reasoning summary">
+                      <div className="thought-trace-skeleton-line thought-trace-skeleton-line-title" />
+                      <div className="thought-trace-skeleton-line" />
+                      <div className="thought-trace-skeleton-line thought-trace-skeleton-line-short" />
                     </section>
-                  ))}
-                </div>
+                  )}
+                      </div>
               </aside>,
               document.body,
             )

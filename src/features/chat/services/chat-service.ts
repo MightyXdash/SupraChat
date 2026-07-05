@@ -49,6 +49,9 @@ type StreamCloudChatCompletionOptions = {
   hyperparameters?: Hyperparameters
   onChunk: (chunk: string) => void
   onRawChunk?: (chunk: string) => void
+  onReasoningChunk?: (chunk: string) => void
+  onReasoningEnd?: () => void
+  onReasoningStart?: () => void
   signal?: AbortSignal
 }
 
@@ -434,6 +437,9 @@ export async function streamCloudChatCompletion({
   hyperparameters,
   onChunk,
   onRawChunk,
+  onReasoningChunk,
+  onReasoningEnd,
+  onReasoningStart,
   signal,
 }: StreamCloudChatCompletionOptions) {
   const reasoningEnabled = reasoningEffort !== "instant"
@@ -470,6 +476,70 @@ export async function streamCloudChatCompletion({
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
+  const thinkingMarkers = ["<suprachat-think>", "</suprachat-think>", "<think>", "</think>"]
+  const openThinkingMarkers = new Set(["<suprachat-think>", "<think>"])
+  const maxMarkerLength = Math.max(...thinkingMarkers.map((marker) => marker.length))
+  let markerBuffer = ""
+  let isInsideReasoning = false
+
+  const findMarkerAtStart = (text: string) => thinkingMarkers.find((marker) => text.startsWith(marker))
+
+  const isMarkerPrefix = (text: string) => thinkingMarkers.some((marker) => marker.startsWith(text))
+
+  const emitVisibleText = (text: string) => {
+    if (!text) {
+      return
+    }
+
+    if (isInsideReasoning) {
+      onReasoningChunk?.(text)
+      return
+    }
+
+    onChunk(text)
+  }
+
+  const routeCloudChunk = (chunk: string) => {
+    if (!chunk && !markerBuffer) {
+      return
+    }
+
+    const text = markerBuffer + (chunk ?? "")
+    markerBuffer = ""
+    let cursor = 0
+
+    while (cursor < text.length) {
+      const remaining = text.slice(cursor)
+      const marker = findMarkerAtStart(remaining)
+
+      if (marker) {
+        if (openThinkingMarkers.has(marker)) {
+          if (!isInsideReasoning) {
+            isInsideReasoning = true
+            onReasoningStart?.()
+          }
+        } else if (isInsideReasoning) {
+          isInsideReasoning = false
+          onReasoningEnd?.()
+        }
+
+        cursor += marker.length
+        continue
+      }
+
+      if (remaining.startsWith("<")) {
+        const possibleMarker = remaining.slice(0, Math.min(maxMarkerLength, remaining.length))
+
+        if (isMarkerPrefix(possibleMarker)) {
+          markerBuffer = remaining
+          break
+        }
+      }
+
+      emitVisibleText(text[cursor])
+      cursor += 1
+    }
+  }
 
   while (true) {
     if (signal?.aborted) {
@@ -486,7 +556,7 @@ export async function streamCloudChatCompletion({
 
     if (chunk) {
       onRawChunk?.(chunk)
-      onChunk(chunk)
+      routeCloudChunk(chunk)
     }
   }
 
@@ -494,7 +564,17 @@ export async function streamCloudChatCompletion({
 
   if (remaining) {
     onRawChunk?.(remaining)
-    onChunk(remaining)
+    routeCloudChunk(remaining)
+  }
+
+  if (markerBuffer) {
+    emitVisibleText(markerBuffer)
+    markerBuffer = ""
+  }
+
+  if (isInsideReasoning) {
+    isInsideReasoning = false
+    onReasoningEnd?.()
   }
 }
 
@@ -563,7 +643,7 @@ export async function summarizeReasoningText(
       body: JSON.stringify({
         apiKey,
         reasoningText,
-        modelId: "inclusionai/ling-2.6-flash",
+        modelId: "openai/gpt-5.4-nano",
       }),
       signal,
     }),

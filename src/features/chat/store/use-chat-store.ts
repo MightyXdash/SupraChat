@@ -45,6 +45,9 @@ type UnifiedStreamOptions = {
   messages: import("@/features/chat/types").ChatCompletionMessage[]
   onChunk: (chunk: string) => void
   onRawChunk?: (chunk: string) => void
+  onReasoningChunk?: (chunk: string) => void
+  onReasoningEnd?: () => void
+  onReasoningStart?: () => void
   signal?: AbortSignal
 }
 
@@ -52,6 +55,9 @@ async function streamActiveModelChat({
   messages,
   onChunk,
   onRawChunk,
+  onReasoningChunk,
+  onReasoningEnd,
+  onReasoningStart,
   signal,
 }: UnifiedStreamOptions) {
   const cloudState = useCloudModelsStore.getState()
@@ -72,6 +78,9 @@ async function streamActiveModelChat({
       hyperparameters: useSettingsStore.getState().hyperparameters,
       onChunk,
       onRawChunk,
+      onReasoningChunk,
+      onReasoningEnd,
+      onReasoningStart,
       signal,
     })
     return
@@ -119,152 +128,232 @@ function getAnswerAfterReasoning(content: string) {
   return content.slice(closeMarkerEnd).trim()
 }
 
-function extractReasoningText(content: string): string {
-  const openMatch = THINK_OPEN_MARKERS.reduce<{ offset: number; marker: string } | null>((match, marker) => {
-    const index = content.indexOf(marker)
+const REASONING_BATCH_MIN_WORDS = 18
+const REASONING_LIVE_FLUSH_MS = 450
 
-    if (index < 0) {
-      return match
-    }
-
-    if (!match || index < match.offset) {
-      return { offset: index, marker }
-    }
-
-    return match
-  }, null)
-
-  if (!openMatch) {
-    return ""
-  }
-
-  const startOffset = openMatch.offset + openMatch.marker.length
-
-  let endOffset = content.length
-
-  for (const marker of THINK_CLOSE_MARKERS) {
-    const index = content.indexOf(marker, startOffset)
-
-    if (index >= 0 && index < endOffset) {
-      endOffset = index
-    }
-  }
-
-  if (endOffset < startOffset) {
-    return ""
-  }
-
-  return content.slice(startOffset, endOffset).trim()
+function countWords(content: string) {
+  return content.trim().split(/\s+/).filter(Boolean).length
 }
 
-const REASONING_BATCH_MIN_WORDS = 100
+function createAssistantReasoningSummaryMessage(): Pick<ChatMessage, "reasoningBlocks" | "reasoningMode"> {
+  return {
+    reasoningBlocks: [],
+    reasoningMode: "summary",
+  }
+}
 
-function batchReasoningText(reasoningText: string): string[] {
-  const paragraphs = reasoningText.split(/\n\s*\n/).filter((p) => p.trim().length > 0)
+function getActiveCloudReasoningApiKey() {
+  const cloudState = useCloudModelsStore.getState()
+  const activeCloudModel = cloudState.activeCloudModel
+
+  if (!activeCloudModel || cloudState.reasoningEffort === "instant") {
+    return null
+  }
+
+  const instance = cloudState.instances.find((candidate) => candidate.id === activeCloudModel.instanceId)
+
+  return instance?.apiKey ?? null
+}
+
+function extractReadyReasoningBatches(
+  pendingText: string,
+  force = false,
+): { batches: string[]; remainingText: string } {
+  const normalizedText = pendingText.replace(/\r\n/g, "\n")
+  const hasTrailingParagraphBoundary = /\n\s*\n\s*$/.test(normalizedText)
+  const paragraphs = normalizedText
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
 
   if (paragraphs.length === 0) {
-    return []
+    return { batches: [], remainingText: "" }
+  }
+
+  let incompleteParagraph = ""
+
+  if (!force && !hasTrailingParagraphBoundary) {
+    incompleteParagraph = paragraphs.pop() ?? ""
   }
 
   const batches: string[] = []
-  let currentBatch: string[] = []
-  let currentWordCount = 0
+  let batchParagraphs: string[] = []
+  let batchWordCount = 0
 
   for (const paragraph of paragraphs) {
-    const wordCount = paragraph.split(/\s+/).filter(Boolean).length
+    batchParagraphs.push(paragraph)
+    batchWordCount += countWords(paragraph)
 
-    currentBatch.push(paragraph)
-    currentWordCount += wordCount
-
-    if (currentWordCount >= REASONING_BATCH_MIN_WORDS) {
-      batches.push(currentBatch.join("\n\n"))
-      currentBatch = []
-      currentWordCount = 0
+    if (batchWordCount >= REASONING_BATCH_MIN_WORDS) {
+      batches.push(batchParagraphs.join("\n\n"))
+      batchParagraphs = []
+      batchWordCount = 0
     }
   }
 
-  if (currentBatch.length > 0) {
-    batches.push(currentBatch.join("\n\n"))
+  const remainingParagraphs = [...batchParagraphs, incompleteParagraph].filter(Boolean)
+  let remainingText = remainingParagraphs.join("\n\n")
+
+  if (!force && batches.length === 0 && countWords(remainingText) >= REASONING_BATCH_MIN_WORDS) {
+    batches.push(remainingText)
+    remainingText = ""
   }
 
-  return batches
+  if (force && remainingText.trim()) {
+    batches.push(remainingText.trim())
+    remainingText = ""
+  }
+
+  return { batches, remainingText }
 }
 
-function createReasoningAccumulator(
-  conversationId: string,
-  messageId: string,
-) {
-  let hasSummarized = false
-  let pendingSummarization: Promise<void> | null = null
+function createCloudReasoningSummaryStream({
+  apiKey,
+  conversationId,
+  messageId,
+  signal,
+}: {
+  apiKey: string
+  conversationId: string
+  messageId: string
+  signal?: AbortSignal
+}) {
+  const blocks: ReasoningBlock[] = []
+  let pendingReasoningText = ""
+  let summarizationQueue = Promise.resolve()
+  let reasoningStartedAt: number | null = null
+  let reasoningEnded = false
+  let liveFlushTimeout: number | null = null
 
-  return (content: string) => {
-    if (hasSummarized) {
-      return
+  const updateMessage = (updater: (message: ChatMessage) => ChatMessage) => {
+    useChatStore.setState((state) => ({
+      conversations: sortConversationsByUpdatedAt(
+        updateAssistantMessageMetadata(
+          state.conversations,
+          conversationId,
+          messageId,
+          updater,
+        ),
+      ),
+    }))
+  }
+
+  const enqueueSummarization = (reasoningText: string) => {
+    const trimmedReasoningText = reasoningText.trim()
+
+    if (!trimmedReasoningText) {
+      return summarizationQueue
     }
 
-    const answerText = getAnswerAfterReasoning(content)
-
-    if (!answerText) {
-      return
-    }
-
-    hasSummarized = true
-
-    pendingSummarization = (async () => {
-      const reasoningText = extractReasoningText(content)
-
-      if (!reasoningText) {
-        return
-      }
-
-      const cloudState = useCloudModelsStore.getState()
-      const activeCloudModel = cloudState.activeCloudModel
-
-      if (!activeCloudModel) {
-        return
-      }
-
-      const instance = cloudState.instances.find((i) => i.id === activeCloudModel.instanceId)
-
-      if (!instance) {
-        return
-      }
-
-      const batches = batchReasoningText(reasoningText)
-
-      const blocks: ReasoningBlock[] = []
-
-      for (const batch of batches) {
-        try {
-          const block = await summarizeReasoningText(instance.apiKey, batch)
-
-          if (block) {
-            blocks.push(block)
-
-            useChatStore.setState((state) => ({
-              conversations: state.conversations.map((conversation) => {
-                if (conversation.id !== conversationId) {
-                  return conversation
-                }
-
-                return {
-                  ...conversation,
-                  messages: conversation.messages.map((message) =>
-                    message.id === messageId
-                      ? { ...message, reasoningBlocks: [...blocks] }
-                      : message,
-                  ),
-                }
-              }),
-            }))
-          }
-        } catch {
-          // Continue to next batch even if one fails.
+    summarizationQueue = summarizationQueue
+      .then(async () => {
+        if (signal?.aborted) {
+          return
         }
-      }
-    })()
 
-    return pendingSummarization
+        const block = await summarizeReasoningText(apiKey, trimmedReasoningText, signal)
+
+        if (!block || signal?.aborted) {
+          return
+        }
+
+        blocks.push({
+          ...block,
+          completedAt: performance.now(),
+        })
+
+        updateMessage((message) => ({
+          ...message,
+          reasoningBlocks: [...blocks],
+          reasoningMode: "summary",
+        }))
+      })
+      .catch(() => undefined)
+
+    return summarizationQueue
+  }
+
+  const clearLiveFlushTimeout = () => {
+    if (liveFlushTimeout === null) {
+      return
+    }
+
+    window.clearTimeout(liveFlushTimeout)
+    liveFlushTimeout = null
+  }
+
+  const drainReadyBatches = (force = false) => {
+    if (force) {
+      clearLiveFlushTimeout()
+    }
+
+    const { batches, remainingText } = extractReadyReasoningBatches(pendingReasoningText, force)
+    pendingReasoningText = remainingText
+
+    batches.forEach((batch) => {
+      void enqueueSummarization(batch)
+    })
+  }
+
+  const scheduleLiveFlush = () => {
+    if (liveFlushTimeout !== null || reasoningEnded || countWords(pendingReasoningText) < REASONING_BATCH_MIN_WORDS) {
+      return
+    }
+
+    liveFlushTimeout = window.setTimeout(() => {
+      liveFlushTimeout = null
+      drainReadyBatches(false)
+      scheduleLiveFlush()
+    }, REASONING_LIVE_FLUSH_MS)
+  }
+
+  const recordDuration = () => {
+    if (reasoningStartedAt === null || reasoningEnded) {
+      return
+    }
+
+    reasoningEnded = true
+    const reasoningDurationMs = Math.max(0, performance.now() - reasoningStartedAt)
+
+    updateMessage((message) => ({
+      ...message,
+      reasoningDurationMs,
+      reasoningMode: "summary",
+    }))
+  }
+
+  return {
+    flush: async () => {
+      clearLiveFlushTimeout()
+      drainReadyBatches(true)
+      recordDuration()
+      await summarizationQueue
+    },
+    handleReasoningChunk: (chunk: string) => {
+      if (!chunk || signal?.aborted) {
+        return
+      }
+
+      if (reasoningStartedAt === null) {
+        reasoningStartedAt = performance.now()
+      }
+
+      pendingReasoningText = `${pendingReasoningText}${chunk}`
+      drainReadyBatches(false)
+      scheduleLiveFlush()
+    },
+    handleReasoningEnd: () => {
+      clearLiveFlushTimeout()
+      drainReadyBatches(true)
+      recordDuration()
+    },
+    handleReasoningStart: () => {
+      reasoningStartedAt ??= performance.now()
+      updateMessage((message) => ({
+        ...message,
+        reasoningMode: "summary",
+      }))
+    },
   }
 }
 
@@ -681,6 +770,7 @@ export const useChatStore = create<ChatState>((set) => ({
     const generationController = new AbortController()
     activeGenerationController?.abort()
     activeGenerationController = generationController
+    const cloudReasoningApiKey = getActiveCloudReasoningApiKey()
 
     set((state) => ({
       error: null,
@@ -691,7 +781,14 @@ export const useChatStore = create<ChatState>((set) => ({
           ...conversation,
           messages: conversation.messages.slice(0, messageIndex + 1).map((message) =>
             message.id === messageId
-              ? { ...message, content: "", reasoningDurationMs: null, tokensPerSecond: null }
+              ? {
+                ...message,
+                content: "",
+                reasoningBlocks: cloudReasoningApiKey ? [] : undefined,
+                reasoningDurationMs: null,
+                reasoningMode: cloudReasoningApiKey ? "summary" : undefined,
+                tokensPerSecond: null,
+              }
               : message,
           ),
           updatedAt: new Date().toISOString(),
@@ -704,9 +801,15 @@ export const useChatStore = create<ChatState>((set) => ({
     })
     const streamingCheckpoint = createStreamingCheckpoint(conversationId)
     const recordReasoningDuration = createReasoningDurationRecorder(conversationId, messageId)
-    const recordReasoningBlock = createReasoningAccumulator(conversationId, messageId)
+    const reasoningSummaryStream = cloudReasoningApiKey
+      ? createCloudReasoningSummaryStream({
+        apiKey: cloudReasoningApiKey,
+        conversationId,
+        messageId,
+        signal: generationController.signal,
+      })
+      : null
     let streamedAssistantContent = ""
-    let reasoningBlockPromise: Promise<void> | undefined
 
     const appendAssistantChunk = (chunk: string) => {
       streamedAssistantContent = `${streamedAssistantContent}${chunk}`
@@ -721,7 +824,6 @@ export const useChatStore = create<ChatState>((set) => ({
         ),
       }))
       recordReasoningDuration(streamedAssistantContent)
-      reasoningBlockPromise = recordReasoningBlock(streamedAssistantContent) ?? reasoningBlockPromise
       streamingCheckpoint.recordChunk(chunk)
     }
 
@@ -743,10 +845,13 @@ export const useChatStore = create<ChatState>((set) => ({
         messages: priorMessages.map((message) => buildCompletionMessage(message)),
         onChunk: appendAssistantChunk,
         onRawChunk: throughputTracker.recordChunk,
+        onReasoningChunk: reasoningSummaryStream?.handleReasoningChunk,
+        onReasoningEnd: reasoningSummaryStream?.handleReasoningEnd,
+        onReasoningStart: reasoningSummaryStream?.handleReasoningStart,
         signal: generationController.signal,
       })
 
-      await reasoningBlockPromise
+      await reasoningSummaryStream?.flush()
 
       const finalTokensPerSecond = throughputTracker.getTokensPerSecond()
       if (finalTokensPerSecond !== null) {
@@ -824,7 +929,11 @@ export const useChatStore = create<ChatState>((set) => ({
       return
     }
 
-    const assistantMessage = createMessage("assistant", "")
+    const cloudReasoningApiKey = getActiveCloudReasoningApiKey()
+    const assistantMessage = {
+      ...createMessage("assistant", ""),
+      ...(cloudReasoningApiKey ? createAssistantReasoningSummaryMessage() : {}),
+    }
     const generationController = new AbortController()
     activeGenerationController?.abort()
     activeGenerationController = generationController
@@ -851,6 +960,14 @@ export const useChatStore = create<ChatState>((set) => ({
     })
     const streamingCheckpoint = createStreamingCheckpoint(conversationId)
     const recordReasoningDuration = createReasoningDurationRecorder(conversationId, assistantMessage.id)
+    const reasoningSummaryStream = cloudReasoningApiKey
+      ? createCloudReasoningSummaryStream({
+        apiKey: cloudReasoningApiKey,
+        conversationId,
+        messageId: assistantMessage.id,
+        signal: generationController.signal,
+      })
+      : null
     let streamedAssistantContent = ""
 
     const appendAssistantChunk = (chunk: string) => {
@@ -889,10 +1006,13 @@ export const useChatStore = create<ChatState>((set) => ({
         })),
         onChunk: appendAssistantChunk,
         onRawChunk: throughputTracker.recordChunk,
+        onReasoningChunk: reasoningSummaryStream?.handleReasoningChunk,
+        onReasoningEnd: reasoningSummaryStream?.handleReasoningEnd,
+        onReasoningStart: reasoningSummaryStream?.handleReasoningStart,
         signal: generationController.signal,
       })
 
-      await reasoningBlockPromise
+      await reasoningSummaryStream?.flush()
 
       const finalTokensPerSecond = throughputTracker.getTokensPerSecond()
       if (finalTokensPerSecond !== null) {
@@ -1301,7 +1421,11 @@ export const useChatStore = create<ChatState>((set) => ({
     }
 
     const userMessage = createMessage("user", trimmedContent, attachments)
-    const assistantMessage = createMessage("assistant", "")
+    const cloudReasoningApiKey = getActiveCloudReasoningApiKey()
+    const assistantMessage = {
+      ...createMessage("assistant", ""),
+      ...(cloudReasoningApiKey ? createAssistantReasoningSummaryMessage() : {}),
+    }
     const conversationId = useChatStore.getState().activeConversationId
     const generationController = new AbortController()
     activeGenerationController?.abort()
@@ -1384,9 +1508,15 @@ export const useChatStore = create<ChatState>((set) => ({
     })
     const streamingCheckpoint = createStreamingCheckpoint(conversationId)
     const recordReasoningDuration = createReasoningDurationRecorder(conversationId, assistantMessage.id)
-    const recordReasoningBlock = createReasoningAccumulator(conversationId, assistantMessage.id)
+    const reasoningSummaryStream = cloudReasoningApiKey
+      ? createCloudReasoningSummaryStream({
+        apiKey: cloudReasoningApiKey,
+        conversationId,
+        messageId: assistantMessage.id,
+        signal: generationController.signal,
+      })
+      : null
     let streamedAssistantContent = ""
-    let reasoningBlockPromise: Promise<void> | undefined
 
     const appendAssistantChunk = (chunk: string) => {
       streamedAssistantContent = `${streamedAssistantContent}${chunk}`
@@ -1401,7 +1531,6 @@ export const useChatStore = create<ChatState>((set) => ({
         ),
       }))
       recordReasoningDuration(streamedAssistantContent)
-      reasoningBlockPromise = recordReasoningBlock(streamedAssistantContent) ?? reasoningBlockPromise
       streamingCheckpoint.recordChunk(chunk)
     }
 
@@ -1483,6 +1612,9 @@ export const useChatStore = create<ChatState>((set) => ({
             .map((message: ChatMessage) => buildCompletionMessage(message)) ?? [],
         onChunk: appendAssistantChunk,
         onRawChunk: throughputTracker.recordChunk,
+        onReasoningChunk: reasoningSummaryStream?.handleReasoningChunk,
+        onReasoningEnd: reasoningSummaryStream?.handleReasoningEnd,
+        onReasoningStart: reasoningSummaryStream?.handleReasoningStart,
         signal: generationController.signal,
       })
       const titleStream = shouldGenerateTitle
@@ -1505,7 +1637,7 @@ export const useChatStore = create<ChatState>((set) => ({
 
       await Promise.all([responseStream, titleStream])
 
-      await reasoningBlockPromise
+      await reasoningSummaryStream?.flush()
 
       if (generationController.signal.aborted) {
         throw new DOMException("Generation stopped.", "AbortError")
