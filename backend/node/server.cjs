@@ -8,6 +8,7 @@ const {
 } = require("./llama-cpp-provider.cjs")
 const {
   CHAT_MODEL,
+  discoverCachedChatModels,
   SPEECH_STT_MODEL,
   SPEECH_TTS_MODEL,
   TITLE_MODEL,
@@ -79,6 +80,13 @@ function isValidConversation(payload) {
         typeof message.id === "string" &&
         (message.role === "user" || message.role === "assistant") &&
         typeof message.content === "string" &&
+        (
+          message.attachments === undefined ||
+          (
+            Array.isArray(message.attachments) &&
+            message.attachments.every(isValidAttachment)
+          )
+        ) &&
         typeof message.createdAt === "string" &&
         (
           message.tokensPerSecond === undefined ||
@@ -86,6 +94,49 @@ function isValidConversation(payload) {
           typeof message.tokensPerSecond === "number"
         ),
     )
+  )
+}
+
+function isValidAttachment(payload) {
+  if (!payload || typeof payload !== "object" || typeof payload.id !== "string" || typeof payload.name !== "string" || typeof payload.filePath !== "string" || typeof payload.mimeType !== "string" || typeof payload.createdAt !== "string") {
+    return false
+  }
+
+  if (payload.kind === "document") {
+    return (
+      typeof payload.textContent === "string" &&
+      typeof payload.truncated === "boolean" &&
+      typeof payload.wordCount === "number"
+    )
+  }
+
+  if (payload.kind === "image") {
+    return typeof payload.dataUrl === "string"
+  }
+
+  return false
+}
+
+function isValidChatContentPart(part) {
+  if (!part || typeof part !== "object" || typeof part.type !== "string") {
+    return false
+  }
+
+  if (part.type === "text") {
+    return typeof part.text === "string"
+  }
+
+  if (part.type === "image_url") {
+    return Boolean(part.image_url && typeof part.image_url.url === "string")
+  }
+
+  return false
+}
+
+function hasVisionPromptContent(messages) {
+  return messages.some((message) =>
+    Array.isArray(message.content) &&
+    message.content.some((part) => part?.type === "image_url"),
   )
 }
 
@@ -178,17 +229,44 @@ function getSettingsModelsPayload() {
   const resourceRoot = resolveResourceRoot()
   const ttsModel = resolveSpeechTtsModel(resourceRoot)
   const sttModel = resolveSpeechSttModel(resourceRoot)
+  const cachedChatModels = discoverCachedChatModels()
+  const chatModels = cachedChatModels.length > 0
+    ? cachedChatModels
+    : [CHAT_MODEL]
 
   return {
     ok: true,
     resourceRoot,
     models: [
-      serializeModel(CHAT_MODEL, resolveModelPath(CHAT_MODEL, resourceRoot)),
+      ...chatModels.map((model) => serializeModel(model, resolveModelPath(model, resourceRoot))),
       serializeModel(TITLE_MODEL, resolveModelPath(TITLE_MODEL, resourceRoot)),
       serializeModel(SPEECH_TTS_MODEL, ttsModel.modelPath),
       serializeModel(SPEECH_STT_MODEL, sttModel.encoderPath),
     ],
   }
+}
+
+function getChatModelsPayload(provider) {
+  const cachedChatModels = discoverCachedChatModels()
+  const models = cachedChatModels.map((model) => serializeModel(model, resolveModelPath(model)))
+
+  return {
+    ok: true,
+    activeModelId: provider.chatModel.id,
+    cacheOnly: true,
+    models,
+  }
+}
+
+function selectChatModel(provider, modelId) {
+  const cachedChatModels = discoverCachedChatModels()
+  const selectedModel = cachedChatModels.find((model) => model.id === modelId)
+
+  if (!selectedModel) {
+    return null
+  }
+
+  return provider.setChatModel(selectedModel)
 }
 
 function getSettingsRuntimePayload(config, provider) {
@@ -280,6 +358,41 @@ function createServer(database, config, provider) {
 
   if (req.method === "GET" && url.pathname === "/settings/models") {
     sendJson(req, res, 200, getSettingsModelsPayload())
+    return
+  }
+
+  if (req.method === "GET" && url.pathname === "/runtime/chat-models") {
+    sendJson(req, res, 200, getChatModelsPayload(provider))
+    return
+  }
+
+  if (req.method === "POST" && url.pathname === "/runtime/chat-model") {
+    try {
+      const body = await readJsonBody(req, { maxBytes: 32_000 })
+      const modelId = typeof body.modelId === "string" ? body.modelId : ""
+      const selectedModel = selectChatModel(provider, modelId)
+
+      if (!selectedModel) {
+        sendJson(req, res, 404, {
+          ok: false,
+          error: "model_not_found",
+          detail: "The selected Hugging Face cache model could not be found.",
+        })
+        return
+      }
+
+      sendJson(req, res, 200, {
+        ok: true,
+        activeModelId: selectedModel.id,
+        model: serializeModel(selectedModel, resolveModelPath(selectedModel)),
+      })
+    } catch {
+      sendJson(req, res, 500, {
+        ok: false,
+        error: "model_selection_failed",
+        detail: "Unable to select the local model.",
+      })
+    }
     return
   }
 
@@ -449,7 +562,7 @@ function createServer(database, config, provider) {
 
   if (req.method === "POST" && url.pathname === "/chat") {
     try {
-      const body = await readJsonBody(req)
+      const body = await readJsonBody(req, { maxBytes: 30 * 1024 * 1024 })
       const messages = Array.isArray(body.messages) ? body.messages : []
       const thinking = body.thinking !== false
 
@@ -462,6 +575,36 @@ function createServer(database, config, provider) {
         return
       }
 
+      const hasInvalidMessages = messages.some((message) => {
+        if (!message || (message.role !== "user" && message.role !== "assistant")) {
+          return true
+        }
+
+        if (typeof message.content === "string") {
+          return false
+        }
+
+        return !Array.isArray(message.content) || !message.content.every(isValidChatContentPart)
+      })
+
+      if (hasInvalidMessages) {
+        sendJson(req, res, 400, {
+          ok: false,
+          error: "invalid_messages",
+          detail: "One or more chat messages are not valid.",
+        })
+        return
+      }
+
+      if (hasVisionPromptContent(messages) && !provider.chatModel?.capabilities?.vision) {
+        sendJson(req, res, 400, {
+          ok: false,
+          error: "vision_not_supported",
+          detail: "The selected local model does not support image inputs.",
+        })
+        return
+      }
+
       const systemPrompt = getSystemPrompt()
       const promptContent = thinking
         ? systemPrompt
@@ -470,7 +613,7 @@ function createServer(database, config, provider) {
         { role: "system", content: promptContent },
         ...messages.map((message) => ({
           role: message.role,
-          content: String(message.content ?? ""),
+          content: typeof message.content === "string" ? message.content : message.content,
         })),
       ]
 

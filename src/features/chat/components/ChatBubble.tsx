@@ -1,6 +1,7 @@
 import { memo, useState } from "react"
 import { motion } from "framer-motion"
 import { Check, Copy, Loader2, Pencil, RotateCcw, Volume2 } from "lucide-react"
+import { attachmentSummaryLabel } from "@/features/chat/lib/message-attachments"
 import { MarkdownMessage } from "@/features/chat/components/MarkdownMessage"
 import { ChatMessage } from "@/features/chat/types"
 import { cn } from "@/lib/utils"
@@ -19,7 +20,7 @@ export const ChatBubble = memo(function ChatBubble({ message, canEdit, isGenerat
   const [hasCopied, setHasCopied] = useState(false)
   const isUser = message.role === "user"
   const showAssistantActions = !isUser && !isGenerating && message.content.trim().length > 0
-  const showUserActions = isUser && !isGenerating && message.content.trim().length > 0
+  const showUserActions = isUser && !isGenerating && (message.content.trim().length > 0 || (message.attachments?.length ?? 0) > 0)
 
   async function handleCopy() {
     try {
@@ -49,7 +50,31 @@ export const ChatBubble = memo(function ChatBubble({ message, canEdit, isGenerat
           )}
         >
           {isUser ? (
-            <p className="whitespace-pre-wrap">{message.content}</p>
+            <div className="space-y-3">
+              {message.attachments?.length ? (
+                <div className="chat-message-attachments">
+                  {message.attachments.map((attachment) => (
+                    attachment.kind === "image" ? (
+                      <figure className="chat-message-image-card" key={attachment.id}>
+                        <img alt={attachment.name} className="chat-message-image-preview" src={attachment.dataUrl} />
+                        <figcaption>
+                          <strong title={attachment.name}>{attachment.name}</strong>
+                          <span>{attachmentSummaryLabel(attachment)}</span>
+                        </figcaption>
+                      </figure>
+                    ) : (
+                      <div className="chat-message-document-chip" key={attachment.id}>
+                        <div className="chat-message-document-copy">
+                          <strong title={attachment.name}>{attachment.name}</strong>
+                          <span>{attachmentSummaryLabel(attachment)}</span>
+                        </div>
+                      </div>
+                    )
+                  ))}
+                </div>
+              ) : null}
+              {message.content.trim() ? <p className="whitespace-pre-wrap">{message.content}</p> : null}
+            </div>
           ) : (
             <MarkdownMessage
               content={message.content}

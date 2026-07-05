@@ -1,7 +1,7 @@
 const backendPort = window.suprachat?.backendPort ?? 3001
 const clientToken = window.suprachat?.clientToken ?? ""
 const apiBaseUrl = `http://127.0.0.1:${backendPort}`
-const localApiHeaders = clientToken
+const localApiHeaders: Record<string, string> = clientToken
   ? {
       "X-SupraChat-Client-Token": clientToken,
     }

@@ -7,6 +7,33 @@ type WindowControls = {
   toggleMaximize: () => Promise<void>
 }
 
+type AttachmentPickerDocument = {
+  id: string
+  kind: "document"
+  name: string
+  filePath: string
+  mimeType: string
+  textContent: string
+  truncated: boolean
+  wordCount: number
+  createdAt: string
+}
+
+type AttachmentPickerImage = {
+  id: string
+  kind: "image"
+  name: string
+  filePath: string
+  mimeType: string
+  dataUrl: string
+  createdAt: string
+}
+
+type AttachmentPickerBridge = {
+  pickDocuments: () => Promise<AttachmentPickerDocument[]>
+  pickImages: () => Promise<AttachmentPickerImage[]>
+}
+
 type UpdaterBridge = {
   checkNow: () => Promise<UpdateStatus>
   dismissReadyState: () => Promise<UpdateStatus>
@@ -37,6 +64,7 @@ declare global {
   interface Window {
     suprachat?: {
       appEvents?: AppEventsBridge
+      attachments?: AttachmentPickerBridge
       backendPort?: number
       clientToken?: string
       platform?: SupraChatPlatform

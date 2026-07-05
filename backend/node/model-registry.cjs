@@ -77,6 +77,221 @@ const REQUIRED_MODEL_ASSETS = [
   },
 ]
 
+const GGUF_EXTENSION = ".gguf"
+const HF_CACHE_MODEL_PREFIX = "models--"
+
+function getHuggingFaceCacheRoots() {
+  const roots = []
+  const configuredHubCacheAlias = process.env.HF_HUB_CACHE
+  const configuredHubCache = process.env.HUGGINGFACE_HUB_CACHE
+  const configuredHome = process.env.HF_HOME
+
+  if (configuredHubCacheAlias) {
+    roots.push(configuredHubCacheAlias)
+  }
+
+  if (configuredHubCache) {
+    roots.push(configuredHubCache)
+  }
+
+  if (configuredHome) {
+    roots.push(path.join(configuredHome, "hub"))
+  }
+
+  roots.push(path.join(os.homedir(), ".cache", "huggingface", "hub"))
+
+  return Array.from(new Set(roots.map((root) => path.resolve(root))))
+}
+
+function getRepoCacheDirectory(repo, cacheRoot) {
+  return path.join(cacheRoot, `${HF_CACHE_MODEL_PREFIX}${repo.replace("/", "--")}`)
+}
+
+function readDirectoryEntries(directory) {
+  try {
+    return fs.readdirSync(directory, { withFileTypes: true })
+  } catch {
+    return []
+  }
+}
+
+function repoCacheHasBlobContent(repoDirectory) {
+  const blobsDirectory = path.join(repoDirectory, "blobs")
+
+  for (const entry of readDirectoryEntries(blobsDirectory)) {
+    if (isCachedFileEntry(entry)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function isCachedFileEntry(entry) {
+  return entry.isFile() || entry.isSymbolicLink()
+}
+
+function isChatGgufCandidate(repo, filename) {
+  const value = `${repo}/${filename}`.toLowerCase()
+
+  return (
+    filename.toLowerCase().endsWith(GGUF_EXTENSION) &&
+    !value.includes("mmproj") &&
+    !value.includes("title") &&
+    !value.includes("bge-")
+  )
+}
+
+function findCachedRepoFiles(repo, predicate) {
+  const matches = []
+
+  for (const cacheRoot of getHuggingFaceCacheRoots()) {
+    const snapshotsRoot = path.join(getRepoCacheDirectory(repo, cacheRoot), "snapshots")
+
+    for (const snapshot of readDirectoryEntries(snapshotsRoot)) {
+      if (!snapshot.isDirectory()) {
+        continue
+      }
+
+      const snapshotRoot = path.join(snapshotsRoot, snapshot.name)
+      const stack = [snapshotRoot]
+
+      while (stack.length > 0) {
+        const currentDirectory = stack.pop()
+
+        for (const entry of readDirectoryEntries(currentDirectory)) {
+          const entryPath = path.join(currentDirectory, entry.name)
+
+          if (entry.isDirectory()) {
+            stack.push(entryPath)
+            continue
+          }
+
+          if (isCachedFileEntry(entry) && predicate(entry.name, entryPath)) {
+            matches.push(entryPath)
+          }
+        }
+      }
+    }
+  }
+
+  return matches
+}
+
+function findCachedModelPath(model) {
+  if (!model.repo || !model.filename) {
+    return null
+  }
+
+  return findCachedRepoFiles(
+    model.repo,
+    (filename) => filename.toLowerCase() === model.filename.toLowerCase(),
+  )[0] ?? null
+}
+
+function labelFromCachedGguf(repo, filename) {
+  const baseName = filename.replace(/\.gguf$/i, "").replace(/[._-]+/g, " ").trim()
+  const repoName = repo.split("/").at(-1)?.replace(/[._-]+/g, " ") ?? repo
+
+  return baseName || repoName
+}
+
+function createChatModelFromCachedGguf(repo, filePath) {
+  const filename = path.basename(filePath)
+  const id = `${repo}/${filename}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+  const mmprojPath =
+    findCachedRepoFiles(repo, (candidateFilename) => candidateFilename.toLowerCase().includes("mmproj"))[0] ?? null
+
+  return {
+    ...CHAT_MODEL,
+    id,
+    label: labelFromCachedGguf(repo, filename),
+    repo,
+    filename,
+    path: filePath,
+    mmprojPath,
+    capabilities: {
+      vision: Boolean(mmprojPath),
+    },
+    source: "huggingface-cache",
+  }
+}
+
+function discoverCachedChatModels() {
+  const modelsByPath = new Map()
+
+  for (const cacheRoot of getHuggingFaceCacheRoots()) {
+    for (const repoEntry of readDirectoryEntries(cacheRoot)) {
+      if (!repoEntry.isDirectory() || !repoEntry.name.startsWith(HF_CACHE_MODEL_PREFIX)) {
+        continue
+      }
+
+      const repoDirectory = path.join(cacheRoot, repoEntry.name)
+
+      if (!repoCacheHasBlobContent(repoDirectory)) {
+        continue
+      }
+
+      const repo = repoEntry.name
+        .slice(HF_CACHE_MODEL_PREFIX.length)
+        .replace(/--/g, "/")
+      const snapshotsRoot = path.join(repoDirectory, "snapshots")
+
+      for (const snapshot of readDirectoryEntries(snapshotsRoot)) {
+        if (!snapshot.isDirectory()) {
+          continue
+        }
+
+        const snapshotRoot = path.join(snapshotsRoot, snapshot.name)
+        const stack = [snapshotRoot]
+
+        while (stack.length > 0) {
+          const currentDirectory = stack.pop()
+
+          for (const entry of readDirectoryEntries(currentDirectory)) {
+            const entryPath = path.join(currentDirectory, entry.name)
+
+            if (entry.isDirectory()) {
+              stack.push(entryPath)
+              continue
+            }
+
+            if (isCachedFileEntry(entry) && isChatGgufCandidate(repo, entry.name)) {
+              modelsByPath.set(entryPath, createChatModelFromCachedGguf(repo, entryPath))
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return Array.from(modelsByPath.values()).sort((a, b) => a.label.localeCompare(b.label))
+}
+
+function resolveDefaultChatModel() {
+  const cachedModelPath = findCachedModelPath(CHAT_MODEL)
+
+  if (cachedModelPath) {
+    return {
+      ...CHAT_MODEL,
+      path: cachedModelPath,
+      mmprojPath: null,
+      capabilities: {
+        vision: false,
+      },
+      source: "huggingface-cache",
+    }
+  }
+
+  return {
+    ...CHAT_MODEL,
+    mmprojPath: null,
+    capabilities: {
+      vision: false,
+    },
+  }
+}
+
 const REQUIRED_SPEECH_ASSETS = [
   {
     key: "tts-model",
@@ -168,6 +383,25 @@ function resolveModelPath(model, resourceRoot = resolveResourceRoot()) {
 
   if (explicitPath) {
     return explicitPath
+  }
+
+  if (model.path) {
+    return model.path
+  }
+
+  const cachedPath = findCachedModelPath(model)
+
+  if (cachedPath) {
+    return cachedPath
+  }
+
+  if (model.role === "chat") {
+    return path.join(
+      getRepoCacheDirectory(model.repo, getHuggingFaceCacheRoots()[0]),
+      "snapshots",
+      "missing",
+      model.filename,
+    )
   }
 
   return path.join(resourceRoot, "models", model.role, model.filename)
@@ -283,6 +517,9 @@ function getThreadCount() {
 
 module.exports = {
   CHAT_MODEL,
+  discoverCachedChatModels,
+  findCachedModelPath,
+  getHuggingFaceCacheRoots,
   REQUIRED_MODEL_ASSETS,
   REQUIRED_SPEECH_ASSETS,
   SPEECH_STT_MODEL,
@@ -295,6 +532,7 @@ module.exports = {
   hasBundledVulkanRuntime,
   getLlamaServerName,
   resolveLlamaServerPath,
+  resolveDefaultChatModel,
   resolveModelPath,
   resolveResourceRoot,
   resolveSpeechSttModel,

@@ -1,10 +1,35 @@
 export type ChatRole = "user" | "assistant"
 
+export type DocumentAttachment = {
+  id: string
+  kind: "document"
+  name: string
+  filePath: string
+  mimeType: string
+  textContent: string
+  truncated: boolean
+  wordCount: number
+  createdAt: string
+}
+
+export type ImageAttachment = {
+  id: string
+  kind: "image"
+  name: string
+  filePath: string
+  mimeType: string
+  dataUrl: string
+  createdAt: string
+}
+
+export type ChatAttachment = DocumentAttachment | ImageAttachment
+
 export type ChatMessage = {
   id: string
   role: ChatRole
   content: string
   createdAt: string
+  attachments?: ChatAttachment[]
   reasoningDurationMs?: number | null
   tokensPerSecond?: number | null
 }
@@ -18,7 +43,14 @@ export type Conversation = {
   updatedAt: string
 }
 
-export type ChatCompletionMessage = Pick<ChatMessage, "role" | "content">
+export type ChatCompletionContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } }
+
+export type ChatCompletionMessage = {
+  role: ChatRole
+  content: string | ChatCompletionContentPart[]
+}
 
 export type SpeechPlaybackState = {
   currentTime: number

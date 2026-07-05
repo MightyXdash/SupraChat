@@ -2,6 +2,34 @@ import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import { ChatCompletionMessage, Conversation } from "@/features/chat/types"
 import type { Hyperparameters } from "@/features/chat/config/hyperparameters"
 
+export type RuntimeModelCapabilities = {
+  vision: boolean
+}
+
+export type RuntimeChatModel = {
+  id: string
+  role: "chat"
+  provider: string
+  label: string
+  repo: string
+  filename?: string
+  contextWindowTokens?: number
+  maxTokens?: number
+  path: string
+  installed: boolean
+  sizeBytes: number | null
+  source?: string
+  capabilities?: RuntimeModelCapabilities
+  mmprojPath?: string | null
+}
+
+export type RuntimeChatModelsPayload = {
+  ok: true
+  activeModelId: string
+  cacheOnly: boolean
+  models: RuntimeChatModel[]
+}
+
 type StreamChatCompletionOptions = {
   displayTokensPerSecondCap?: number | null
   hyperparameters?: Hyperparameters
@@ -96,6 +124,30 @@ export async function fetchConversations() {
   )
   const data = await readJson<{ conversations: Conversation[] }>(response)
   return data.conversations
+}
+
+export async function fetchRuntimeChatModels() {
+  const response = await fetchWithRetry(
+    `${chatRuntimeConfig.apiBaseUrl}/runtime/chat-models`,
+    withLocalApiHeaders(),
+  )
+
+  return readJson<RuntimeChatModelsPayload>(response)
+}
+
+export async function selectRuntimeChatModel(modelId: string) {
+  const response = await fetchWithRetry(
+    `${chatRuntimeConfig.apiBaseUrl}/runtime/chat-model`,
+    withLocalApiHeaders({
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ modelId }),
+    }),
+  )
+
+  return readJson<{ ok: true; activeModelId: string; model: RuntimeChatModel }>(response)
 }
 
 export async function createStoredConversation(conversation: Conversation) {

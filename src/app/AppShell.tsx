@@ -13,12 +13,19 @@ import { ConversationSearchDialog } from "@/features/chat/components/Conversatio
 import { ChatWorkspace } from "@/features/chat/components/ChatWorkspace"
 import { useAutoScroll } from "@/features/chat/hooks/useAutoScroll"
 import { speechTextFromAssistantMessage } from "@/features/chat/lib/message-content"
-import { synthesizeSpeech } from "@/features/chat/services/chat-service"
-import { ChatMessage, SpeechPlaybackState } from "@/features/chat/types"
 import {
-  PlaygroundWorkspace,
-  type PlaygroundView,
-} from "@/features/playground/components/PlaygroundWorkspace"
+  fetchRuntimeChatModels,
+  selectRuntimeChatModel,
+  synthesizeSpeech,
+  type RuntimeChatModel,
+} from "@/features/chat/services/chat-service"
+import {
+  mergeComposerAttachments,
+  pickDocumentAttachments,
+  pickImageAttachments,
+} from "@/features/chat/services/attachment-service"
+import { ChatAttachment, ChatMessage, SpeechPlaybackState } from "@/features/chat/types"
+import { PlaygroundWorkspace } from "@/features/playground/components/PlaygroundWorkspace"
 import { SettingsDialog } from "@/features/settings/components/SettingsDialog"
 import { useSettingsStore } from "@/features/settings/store/use-settings-store"
 import { UpdateInstallPrompt } from "@/features/updates/components/UpdateInstallPrompt"
@@ -80,12 +87,17 @@ export function AppShell() {
   const [draft, setDraft] = useState("")
   const [draftRevealKey, setDraftRevealKey] = useState(0)
   const [shouldRevealDraft, setShouldRevealDraft] = useState(false)
+  const [composerAttachments, setComposerAttachments] = useState<ChatAttachment[]>([])
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [activePanel, setActivePanel] = useState<AppPanel>(() => useSettingsStore.getState().defaultWorkspace)
-  const [playgroundView, setPlaygroundView] = useState<PlaygroundView>("featured")
+
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [runtimeModels, setRuntimeModels] = useState<RuntimeChatModel[]>([])
+  const [activeRuntimeModelId, setActiveRuntimeModelId] = useState<string | null>(null)
+  const [isLoadingRuntimeModels, setIsLoadingRuntimeModels] = useState(true)
+  const [isSelectingRuntimeModel, setIsSelectingRuntimeModel] = useState(false)
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [speechPlayback, setSpeechPlayback] = useState<SpeechPlaybackState>({
     currentTime: 0,
@@ -165,6 +177,32 @@ export function AppShell() {
   useEffect(() => {
     void initialize()
   }, [initialize])
+
+  useEffect(() => {
+    let isMounted = true
+
+    void fetchRuntimeChatModels()
+      .then((payload) => {
+        if (!isMounted) {
+          return
+        }
+
+        setRuntimeModels(payload.models)
+        setActiveRuntimeModelId(payload.activeModelId)
+      })
+      .catch((error) => {
+        console.error("Unable to load runtime chat models.", error)
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingRuntimeModels(false)
+        }
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -382,19 +420,20 @@ export function AppShell() {
   async function handleSubmit() {
     const message = draft.trim()
 
-    if (!message || isGenerating) {
+    if ((!message && composerAttachments.length === 0) || isGenerating) {
       return
     }
 
     setDraft("")
     setShouldRevealDraft(false)
+    setComposerAttachments([])
     try {
       if (editingMessageId) {
         const messageId = editingMessageId
         setEditingMessageId(null)
-        await editUserMessage(messageId, message)
+        await editUserMessage(messageId, message, composerAttachments)
       } else {
-        await sendMessage(message, { beforeGeneration: scrollLatestUserTurnIntoView })
+        await sendMessage(message, composerAttachments, { beforeGeneration: scrollLatestUserTurnIntoView })
       }
     } finally {
       clearSubmitScrollSpace()
@@ -409,18 +448,60 @@ export function AppShell() {
     setActivePanel("chat")
     setEditingMessageId(message.id)
     setDraft(message.content)
+    setComposerAttachments(message.attachments ?? [])
     setShouldRevealDraft(false)
   }
 
   function handleCancelEdit() {
     setEditingMessageId(null)
     setDraft("")
+    setComposerAttachments([])
     setShouldRevealDraft(false)
   }
 
   function handleDraftChange(value: string) {
     setShouldRevealDraft(false)
     setDraft(value)
+  }
+
+  async function handleAddDocuments() {
+    if (isGenerating) {
+      return
+    }
+
+    try {
+      const attachments = await pickDocumentAttachments()
+
+      if (attachments.length === 0) {
+        return
+      }
+
+      setComposerAttachments((current) => mergeComposerAttachments(current, attachments))
+    } catch (error) {
+      console.error("Unable to add documents.", error)
+    }
+  }
+
+  async function handleAddImages() {
+    if (isGenerating) {
+      return
+    }
+
+    try {
+      const attachments = await pickImageAttachments()
+
+      if (attachments.length === 0) {
+        return
+      }
+
+      setComposerAttachments((current) => mergeComposerAttachments(current, attachments))
+    } catch (error) {
+      console.error("Unable to add images.", error)
+    }
+  }
+
+  function handleRemoveComposerAttachment(attachmentId: string) {
+    setComposerAttachments((current) => current.filter((attachment) => attachment.id !== attachmentId))
   }
 
   function handleVoiceVadStart() {
@@ -491,7 +572,7 @@ export function AppShell() {
       audio.muted = false
       audio.autoplay = true
       audio.preload = "auto"
-      audio.src = resolvedClip.url
+      audio.src = resolvedClip!.url
       audio.currentTime = 0
       audio.load()
 
@@ -580,6 +661,7 @@ export function AppShell() {
     setActivePanel("chat")
     setEditingMessageId(null)
     setDraft("")
+    setComposerAttachments([])
     setShouldRevealDraft(false)
     return createConversation()
   }
@@ -588,8 +670,33 @@ export function AppShell() {
     setActivePanel("chat")
     setEditingMessageId(null)
     setDraft("")
+    setComposerAttachments([])
     setShouldRevealDraft(false)
     setActiveConversation(conversationId)
+  }
+
+  async function handleSelectRuntimeModel(modelId: string) {
+    if (!modelId || modelId === activeRuntimeModelId || isGenerating) {
+      return
+    }
+
+    setIsSelectingRuntimeModel(true)
+
+    try {
+      const payload = await selectRuntimeChatModel(modelId)
+      setActiveRuntimeModelId(payload.activeModelId)
+      setRuntimeModels((models) => {
+        if (models.some((model) => model.id === payload.model.id)) {
+          return models
+        }
+
+        return [...models, payload.model]
+      })
+    } catch (error) {
+      console.error("Unable to select runtime chat model.", error)
+    } finally {
+      setIsSelectingRuntimeModel(false)
+    }
   }
 
   async function handleInstallDownloadedUpdate() {
@@ -619,6 +726,8 @@ export function AppShell() {
     const status = await dismissReadyUpdateState()
     setUpdaterStatus(status)
   }
+
+  const activeRuntimeModel = runtimeModels.find((model) => model.id === activeRuntimeModelId) ?? null
 
   return (
     <main
@@ -655,7 +764,7 @@ export function AppShell() {
           onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
         />
         {activePanel === "playground" ? (
-          <PlaygroundWorkspace view={playgroundView} onViewChange={setPlaygroundView} />
+          <PlaygroundWorkspace />
         ) : (
           <ChatWorkspace
             conversation={activeConversation}
@@ -667,6 +776,15 @@ export function AppShell() {
             isGenerating={isGenerating}
             isJumpToLatestVisible={isJumpToLatestVisible}
             generationTokensPerSecond={generationTokensPerSecond}
+            composerAttachments={composerAttachments}
+            modelSelector={{
+              activeModelId: activeRuntimeModelId,
+              isLoading: isLoadingRuntimeModels,
+              isSelecting: isSelectingRuntimeModel,
+              models: runtimeModels,
+              onSelectModel: (modelId) => void handleSelectRuntimeModel(modelId),
+            }}
+            activeRuntimeModel={activeRuntimeModel}
             scrollRef={scrollRef}
             speechPlayback={speechPlayback}
             showAverageTps={showAverageTps}
@@ -675,8 +793,11 @@ export function AppShell() {
             voiceWaveformData={voiceWaveformData}
             hasActiveVoiceHotkey={isVoiceHotkeyActive}
             onCancelEdit={handleCancelEdit}
+            onAddDocuments={() => void handleAddDocuments()}
+            onAddImages={() => void handleAddImages()}
             onDraftChange={handleDraftChange}
             onEditUserMessage={handleEditUserMessage}
+            onRemoveAttachment={handleRemoveComposerAttachment}
             onRegenerateAssistantMessage={regenerateAssistantMessage}
             onSeekSpeech={seekSpeechPlayback}
             onSpeakAssistantMessage={playSpeechClip}

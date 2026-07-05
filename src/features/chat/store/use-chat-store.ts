@@ -9,6 +9,10 @@ import {
   titleFromMessage,
 } from "@/features/chat/lib/chat-records"
 import {
+  buildCompletionMessage,
+  buildMessageTextPayload,
+} from "@/features/chat/lib/message-attachments"
+import {
   ChatServiceError,
   createStoredConversation,
   deleteStoredConversation,
@@ -17,7 +21,7 @@ import {
   streamChatCompletion,
   updateStoredConversation,
 } from "@/features/chat/services/chat-service"
-import { ChatMessage, Conversation } from "@/features/chat/types"
+import { ChatAttachment, ChatMessage, Conversation } from "@/features/chat/types"
 import { useSettingsStore } from "@/features/settings/store/use-settings-store"
 
 const TITLE_RETRY_MAX_ATTEMPTS = 12
@@ -188,7 +192,7 @@ function titleContextFromTurns(messages: ChatMessage[], maxTurns: number) {
   }
 
   return selectedMessages
-    .map((message) => message.content.trim())
+    .map((message) => buildMessageTextPayload(message))
     .filter(Boolean)
     .join("\n\n")
 }
@@ -199,7 +203,7 @@ function titleContextFromRecentMessages(messages: ChatMessage[], maxWords: numbe
 
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
-    const words = message.content.trim().split(/\s+/).filter(Boolean)
+    const words = buildMessageTextPayload(message).trim().split(/\s+/).filter(Boolean)
 
     if (words.length === 0) {
       continue
@@ -222,7 +226,8 @@ function userTurnCount(messages: ChatMessage[]) {
 }
 
 function firstUserMessageContent(messages: ChatMessage[]) {
-  return messages.find((message) => message.role === "user")?.content.trim() ?? ""
+  const firstUserMessage = messages.find((message) => message.role === "user")
+  return firstUserMessage ? buildMessageTextPayload(firstUserMessage).trim() : ""
 }
 
 function firstAssistantMessageContent(messages: ChatMessage[]) {
@@ -260,10 +265,14 @@ type ChatState = {
   renameConversation: (conversationId: string, title: string) => Promise<boolean>
   regenerateConversationTitle: (conversationId: string) => Promise<boolean>
   regenerateAssistantMessage: (messageId: string) => Promise<void>
-  editUserMessage: (messageId: string, content: string) => Promise<void>
+  editUserMessage: (messageId: string, content: string, attachments?: ChatAttachment[]) => Promise<void>
   deleteConversation: (conversationId: string) => Promise<boolean>
   deleteAllConversations: () => Promise<boolean>
-  sendMessage: (content: string, options?: { beforeGeneration?: () => Promise<void> | void }) => Promise<void>
+  sendMessage: (
+    content: string,
+    attachments?: ChatAttachment[],
+    options?: { beforeGeneration?: () => Promise<void> | void },
+  ) => Promise<void>
   stopGeneration: () => void
   setActiveConversation: (conversationId: string) => void
 }
@@ -532,10 +541,7 @@ export const useChatStore = create<ChatState>((set) => ({
       await streamChatCompletion({
         displayTokensPerSecondCap: useSettingsStore.getState().streamingTpsCap,
         hyperparameters: useSettingsStore.getState().hyperparameters,
-        messages: priorMessages.map((message) => ({
-          role: message.role,
-          content: message.content,
-        })),
+        messages: priorMessages.map((message) => buildCompletionMessage(message)),
         onChunk: appendAssistantChunk,
         onRawChunk: throughputTracker.recordChunk,
         signal: generationController.signal,
@@ -598,11 +604,11 @@ export const useChatStore = create<ChatState>((set) => ({
       }
     }
   },
-  editUserMessage: async (messageId, content) => {
+  editUserMessage: async (messageId, content, attachments = []) => {
     const trimmedContent = content.trim()
     const stateBeforeEdit = useChatStore.getState()
 
-    if (!trimmedContent || stateBeforeEdit.isGenerating) {
+    if ((!trimmedContent && attachments.length === 0) || stateBeforeEdit.isGenerating) {
       return
     }
 
@@ -623,7 +629,7 @@ export const useChatStore = create<ChatState>((set) => ({
     activeGenerationController = generationController
     const updatedAt = new Date().toISOString()
     const promptMessages = activeConversation.messages.slice(0, messageIndex + 1).map((message) =>
-      message.id === messageId ? { ...message, content: trimmedContent } : message,
+      message.id === messageId ? { ...message, content: trimmedContent, attachments } : message,
     )
 
     set((state) => ({
@@ -680,8 +686,7 @@ export const useChatStore = create<ChatState>((set) => ({
         displayTokensPerSecondCap: useSettingsStore.getState().streamingTpsCap,
         hyperparameters: useSettingsStore.getState().hyperparameters,
         messages: promptMessages.map((message) => ({
-          role: message.role,
-          content: message.content,
+          ...buildCompletionMessage(message),
         })),
         onChunk: appendAssistantChunk,
         onRawChunk: throughputTracker.recordChunk,
@@ -1081,10 +1086,10 @@ export const useChatStore = create<ChatState>((set) => ({
   setActiveConversation: (conversationId) => {
     set({ activeConversationId: conversationId, error: null })
   },
-  sendMessage: async (content, options = {}) => {
+  sendMessage: async (content, attachments = [], options = {}) => {
     const trimmedContent = content.trim()
 
-    if (!trimmedContent) {
+    if (!trimmedContent && attachments.length === 0) {
       return
     }
 
@@ -1094,7 +1099,7 @@ export const useChatStore = create<ChatState>((set) => ({
       await stateBeforeSend.initialize()
     }
 
-    const userMessage = createMessage("user", trimmedContent)
+    const userMessage = createMessage("user", trimmedContent, attachments)
     const assistantMessage = createMessage("assistant", "")
     const conversationId = useChatStore.getState().activeConversationId
     const generationController = new AbortController()
@@ -1103,7 +1108,8 @@ export const useChatStore = create<ChatState>((set) => ({
     let shouldGenerateTitle = false
     const autoTitleConversations = useSettingsStore.getState().autoTitleConversations
     let generatedTitlePayload = ""
-    const shouldDeferTitleGeneration = shouldDeferInitialTitleGeneration(trimmedContent)
+    const titleSeedContent = buildMessageTextPayload(userMessage)
+    const shouldDeferTitleGeneration = shouldDeferInitialTitleGeneration(titleSeedContent)
     let promptPreviewTitle = ""
 
     set((state) => {
@@ -1114,7 +1120,7 @@ export const useChatStore = create<ChatState>((set) => ({
         autoTitleConversations && activeConversation && activeConversation.messages.length === 0,
       )
       promptPreviewTitle = activeConversation && !autoTitleConversations && activeConversation.messages.length === 0
-        ? titleFromPromptPreview(trimmedContent)
+        ? titleFromPromptPreview(titleSeedContent)
         : ""
 
       return {
@@ -1197,7 +1203,7 @@ export const useChatStore = create<ChatState>((set) => ({
 
     const appendTitleChunk = (chunk: string) => {
       generatedTitlePayload = `${generatedTitlePayload}${chunk}`
-      const title = safeTitleFromGeneratedPayload(generatedTitlePayload, trimmedContent)
+      const title = safeTitleFromGeneratedPayload(generatedTitlePayload, titleSeedContent)
 
       if (!title || generatedTitlePayload.trim().startsWith("{")) {
         return
@@ -1224,7 +1230,7 @@ export const useChatStore = create<ChatState>((set) => ({
           updateConversationById(state.conversations, conversationId, (conversation) => {
             const title =
               safeTitleFromGeneratedPayload(generatedTitlePayload, titleReferenceText) ||
-              titleFromMessage(trimmedContent)
+              titleFromMessage(titleSeedContent)
 
             return {
               ...conversation,
@@ -1272,10 +1278,7 @@ export const useChatStore = create<ChatState>((set) => ({
         messages:
           activeConversation?.messages
             .filter((message) => message.id !== assistantMessage.id)
-            .map((message: ChatMessage) => ({
-              role: message.role,
-              content: message.content,
-            })) ?? [],
+            .map((message: ChatMessage) => buildCompletionMessage(message)) ?? [],
         onChunk: appendAssistantChunk,
         onRawChunk: throughputTracker.recordChunk,
         signal: generationController.signal,
@@ -1284,7 +1287,7 @@ export const useChatStore = create<ChatState>((set) => ({
         ? shouldDeferTitleGeneration
           ? Promise.resolve()
           : streamConversationTitle({
-            userMessage: trimmedContent,
+            userMessage: titleSeedContent,
             onChunk: appendTitleChunk,
             signal: generationController.signal,
           })
@@ -1326,7 +1329,7 @@ export const useChatStore = create<ChatState>((set) => ({
         .conversations.find((c) => c.id === conversationId)
 
       if (conversationAfterResponse) {
-        const titleReferenceText = firstUserMessageContent(conversationAfterResponse.messages) || trimmedContent
+        const titleReferenceText = firstUserMessageContent(conversationAfterResponse.messages) || titleSeedContent
         const firstTurnContext = titleContextFromTurns(conversationAfterResponse.messages, 1)
 
         if (shouldGenerateTitle && shouldDeferTitleGeneration) {
@@ -1334,7 +1337,7 @@ export const useChatStore = create<ChatState>((set) => ({
 
           try {
             await streamConversationTitle({
-              userMessage: trimContentToWordLimit(firstTurnContext || trimmedContent, TITLE_CONTENT_MAX_WORDS),
+              userMessage: trimContentToWordLimit(firstTurnContext || titleSeedContent, TITLE_CONTENT_MAX_WORDS),
               onChunk: (chunk) => {
                 generatedTitlePayload = `${generatedTitlePayload}${chunk}`
               },
@@ -1411,7 +1414,7 @@ export const useChatStore = create<ChatState>((set) => ({
           }
 
           const firstRetryTitle = shouldGenerateTitle
-            ? await tryTitleRetries(firstTurnContext || trimmedContent)
+            ? await tryTitleRetries(firstTurnContext || titleSeedContent)
             : currentTitle
 
           if (shouldRetryGeneratedTitle(firstRetryTitle, titleReferenceText) && userTurnCount(conversationAfterResponse.messages) > 1) {

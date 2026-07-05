@@ -76,6 +76,10 @@ contextBridge.exposeInMainWorld("suprachat", {
     setTrack: (track) => ipcRenderer.invoke("updates:set-track", track),
   },
   rendererReady: () => ipcRenderer.send("renderer:ready"),
+  attachments: {
+    pickDocuments: () => ipcRenderer.invoke("attachments:pick-documents"),
+    pickImages: () => ipcRenderer.invoke("attachments:pick-images"),
+  },
   windowControls: {
     close: () => ipcRenderer.invoke("window:close"),
     minimize: () => ipcRenderer.invoke("window:minimize"),

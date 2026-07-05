@@ -3,9 +3,11 @@ import { AnimatePresence, motion } from "framer-motion"
 import { ArrowDown } from "lucide-react"
 import { ChatBubble } from "@/features/chat/components/ChatBubble"
 import { ChatComposer } from "@/features/chat/components/ChatComposer"
+import { ModelSelector } from "@/features/chat/components/ModelSelector"
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import { useScrollVisibility } from "@/features/chat/hooks/useScrollVisibility"
-import { ChatMessage, Conversation, SpeechPlaybackState } from "@/features/chat/types"
+import type { RuntimeChatModel } from "@/features/chat/services/chat-service"
+import { ChatAttachment, ChatMessage, Conversation, SpeechPlaybackState } from "@/features/chat/types"
 
 type ChatWorkspaceProps = {
   conversation?: Conversation
@@ -17,6 +19,15 @@ type ChatWorkspaceProps = {
   generationTokensPerSecond: number | null
   isGenerating: boolean
   isJumpToLatestVisible: boolean
+  composerAttachments: ChatAttachment[]
+  activeRuntimeModel: RuntimeChatModel | null
+  modelSelector: {
+    activeModelId: string | null
+    isLoading: boolean
+    isSelecting: boolean
+    models: RuntimeChatModel[]
+    onSelectModel: (modelId: string) => void
+  }
   scrollRef: RefObject<HTMLDivElement | null>
   speechPlayback: SpeechPlaybackState
   showAverageTps: boolean
@@ -25,8 +36,11 @@ type ChatWorkspaceProps = {
   voiceWaveformData: Uint8Array | null
   hasActiveVoiceHotkey: boolean
   onCancelEdit: () => void
+  onAddDocuments: () => void
+  onAddImages: () => void
   onDraftChange: (value: string) => void
   onEditUserMessage: (message: ChatMessage) => void
+  onRemoveAttachment: (attachmentId: string) => void
   onRegenerateAssistantMessage: (messageId: string) => Promise<void> | void
   onSeekSpeech: (value: number) => void
   onSpeakAssistantMessage: (message: ChatMessage) => Promise<void> | void
@@ -49,6 +63,9 @@ export function ChatWorkspace({
   generationTokensPerSecond,
   isGenerating,
   isJumpToLatestVisible,
+  composerAttachments,
+  activeRuntimeModel,
+  modelSelector,
   scrollRef,
   speechPlayback,
   showAverageTps,
@@ -57,8 +74,11 @@ export function ChatWorkspace({
   voiceWaveformData,
   hasActiveVoiceHotkey,
   onCancelEdit,
+  onAddDocuments,
+  onAddImages,
   onDraftChange,
   onEditUserMessage,
+  onRemoveAttachment,
   onRegenerateAssistantMessage,
   onSeekSpeech,
   onSpeakAssistantMessage,
@@ -75,7 +95,22 @@ export function ChatWorkspace({
   const messageCount = conversation?.messages.length ?? 0
   const userTokens =
     conversation?.messages.reduce(
-      (total, message) => total + (message.role === "user" ? Math.ceil(message.content.length / 4) : 0),
+      (total, message) =>
+        total +
+        (message.role === "user"
+          ? Math.ceil(
+            (
+              message.content +
+              (message.attachments?.reduce((attachmentTotal, attachment) => {
+                if (attachment.kind === "document") {
+                  return attachmentTotal + attachment.textContent.length
+                }
+
+                return attachmentTotal + attachment.name.length
+              }, 0) ?? 0)
+            ).length / 4,
+          )
+          : 0),
       0,
     ) ?? 0
   const assistantTokens =
@@ -106,6 +141,17 @@ export function ChatWorkspace({
 
   return (
     <section className="relative flex min-h-0 flex-col bg-[var(--surface)]">
+      <div className="chat-workspace-header">
+        <ModelSelector
+          activeModelId={modelSelector.activeModelId}
+          disabled={isGenerating}
+          isLoading={modelSelector.isLoading}
+          isSelecting={modelSelector.isSelecting}
+          models={modelSelector.models}
+          onSelectModel={modelSelector.onSelectModel}
+        />
+      </div>
+
       <div
         ref={scrollRef}
         className="chat-workspace-scroll scrollbar-reveal min-h-0 flex-1 overflow-y-auto px-6 pb-40 max-[780px]:px-4 max-[780px]:pb-36"
@@ -166,6 +212,8 @@ export function ChatWorkspace({
         data-position="bottom"
       >
         <ChatComposer
+          activeModelSupportsVision={Boolean(activeRuntimeModel?.capabilities?.vision)}
+          attachments={composerAttachments}
           draft={draft}
           draftRevealKey={draftRevealKey}
           shouldRevealDraft={shouldRevealDraft}
@@ -186,7 +234,10 @@ export function ChatWorkspace({
           voiceWaveformData={voiceWaveformData}
           hasActiveVoiceHotkey={hasActiveVoiceHotkey}
           onCancelEdit={onCancelEdit}
+          onAddDocuments={onAddDocuments}
+          onAddImages={onAddImages}
           onDraftChange={onDraftChange}
+          onRemoveAttachment={onRemoveAttachment}
           onSeekSpeech={onSeekSpeech}
           onStopSpeech={onStopSpeech}
           onStopGeneration={onStopGeneration}

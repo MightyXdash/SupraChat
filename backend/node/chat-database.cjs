@@ -32,6 +32,7 @@ function createChatDatabase(databasePath) {
       conversation_id TEXT NOT NULL,
       role TEXT NOT NULL,
       content TEXT NOT NULL,
+      attachments_json TEXT,
       created_at TEXT NOT NULL,
       tokens_per_second REAL,
       position INTEGER NOT NULL,
@@ -54,9 +55,14 @@ function createChatDatabase(databasePath) {
 
   const messageTableInfo = db.prepare("PRAGMA table_info(messages)").all()
   const hasTokensPerSecond = messageTableInfo.some((col) => col.name === "tokens_per_second")
+  const hasAttachmentsJson = messageTableInfo.some((col) => col.name === "attachments_json")
 
   if (!hasTokensPerSecond) {
     db.exec(`ALTER TABLE messages ADD COLUMN tokens_per_second REAL`)
+  }
+
+  if (!hasAttachmentsJson) {
+    db.exec(`ALTER TABLE messages ADD COLUMN attachments_json TEXT`)
   }
 
   const listConversationsStatement = db.prepare(`
@@ -69,6 +75,7 @@ function createChatDatabase(databasePath) {
       messages.id AS message_id,
       messages.role AS message_role,
       messages.content AS message_content,
+      messages.attachments_json AS message_attachments_json,
       messages.created_at AS message_created_at,
       messages.tokens_per_second AS message_tokens_per_second
     FROM conversations
@@ -88,8 +95,8 @@ function createChatDatabase(databasePath) {
   `)
 
   const insertMessageStatement = db.prepare(`
-    INSERT INTO messages (id, conversation_id, role, content, created_at, tokens_per_second, position)
-    VALUES (@id, @conversation_id, @role, @content, @created_at, @tokens_per_second, @position)
+    INSERT INTO messages (id, conversation_id, role, content, attachments_json, created_at, tokens_per_second, position)
+    VALUES (@id, @conversation_id, @role, @content, @attachments_json, @created_at, @tokens_per_second, @position)
   `)
 
   const updateConversationStatement = db.prepare(`
@@ -129,6 +136,7 @@ function createChatDatabase(databasePath) {
         conversation_id: conversation.id,
         role: message.role,
         content: message.content,
+        attachments_json: message.attachments?.length ? JSON.stringify(message.attachments) : null,
         created_at: message.createdAt,
         tokens_per_second: message.tokensPerSecond ?? null,
         position: index,
@@ -151,6 +159,7 @@ function createChatDatabase(databasePath) {
         conversation_id: conversation.id,
         role: message.role,
         content: message.content,
+        attachments_json: message.attachments?.length ? JSON.stringify(message.attachments) : null,
         created_at: message.createdAt,
         tokens_per_second: message.tokensPerSecond ?? null,
         position: index,
@@ -204,6 +213,7 @@ function createChatDatabase(databasePath) {
           id: row.message_id,
           role: row.message_role,
           content: row.message_content,
+          attachments: row.message_attachments_json ? JSON.parse(row.message_attachments_json) : [],
           createdAt: row.message_created_at,
           tokensPerSecond: row.message_tokens_per_second,
         })

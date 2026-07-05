@@ -1071,7 +1071,7 @@ export function MarkdownMessage({
       thinkingStartedAtRef.current = null
     }
 
-    wasThinkingRef.current = isThinking
+    wasThinkingRef.current = !!isThinking
   }, [reasoning, isGenerating, hasAnswerStarted])
 
   useEffect(() => {
@@ -1118,7 +1118,7 @@ export function MarkdownMessage({
 
     function handlePointerDown(event: PointerEvent) {
       if (!rootRef.current?.contains(event.target as Node)) {
-        closeMenu(openTableMenu)
+        closeMenu(openTableMenu!)
       }
     }
 

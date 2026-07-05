@@ -4,6 +4,7 @@ const fs = require("node:fs")
 const net = require("node:net")
 const path = require("node:path")
 const { startServer, stopServer, warmupModels } = require("../backend/node/server.cjs")
+const { pickDocumentAttachments, pickImageAttachments } = require("./attachment-service.cjs")
 const { createUpdateService } = require("./updater/index.cjs")
 
 let backendPort = null
@@ -682,6 +683,16 @@ ipcMain.handle("window:toggle-maximize", () => {
 
 ipcMain.handle("window:close", () => {
   getFocusedWindow()?.close()
+})
+
+ipcMain.handle("attachments:pick-documents", async () => {
+  const window = getFocusedWindow() ?? mainWindow
+  return pickDocumentAttachments(dialog, window)
+})
+
+ipcMain.handle("attachments:pick-images", async () => {
+  const window = getFocusedWindow() ?? mainWindow
+  return pickImageAttachments(dialog, window)
 })
 
 ipcMain.on("startup:progress", (event, payload) => {

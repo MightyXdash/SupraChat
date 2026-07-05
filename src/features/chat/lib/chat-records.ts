@@ -2,7 +2,7 @@ import {
   DEFAULT_CONVERSATION_TITLE,
   TITLE_MAX_VISIBLE_CHARACTERS,
 } from "@/features/chat/config/ui"
-import { ChatMessage, ChatRole, Conversation } from "@/features/chat/types"
+import { ChatAttachment, ChatMessage, ChatRole, Conversation } from "@/features/chat/types"
 
 const GENERATED_TITLE_DISALLOWED_CHARACTERS = /[^A-Za-z0-9\s.,!?;:'"()\-/+*=<>%&$#@]/g
 const GENERATED_TITLE_TRAILING_PUNCTUATION = /[.,!?;:]+$/u
@@ -11,11 +11,12 @@ function makeId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
 }
 
-export function createMessage(role: ChatRole, content: string): ChatMessage {
+export function createMessage(role: ChatRole, content: string, attachments: ChatAttachment[] = []): ChatMessage {
   return {
     id: makeId(role),
     role,
     content,
+    attachments,
     createdAt: new Date().toISOString(),
   }
 }

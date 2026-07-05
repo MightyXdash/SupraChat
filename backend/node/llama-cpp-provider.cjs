@@ -8,6 +8,7 @@ const {
   getAccelerationMode,
   getHardwareAccelerationArgs,
   getThreadCount,
+  resolveDefaultChatModel,
   resolveLlamaServerPath,
   resolveModelPath,
 } = require("./model-registry.cjs")
@@ -147,6 +148,11 @@ class LlamaCppWorker {
       "1",
       ...getHardwareAccelerationArgs({ mode }),
     ]
+
+    if (this.model.mmprojPath) {
+      assertReadableFile(this.model.mmprojPath, `${this.model.label} multimodal projector`)
+      args.push("--mmproj", this.model.mmprojPath)
+    }
 
     this.process = spawn(llamaServerPath, args, {
       env: buildRuntimeEnvironment(process.env),
@@ -325,12 +331,25 @@ function pipeOpenAiSseStream(providerStream, res, thinking = true) {
 }
 
 function createLlamaCppProvider() {
-  const chatWorker = new LlamaCppWorker({ model: CHAT_MODEL, portStart: 31200 })
+  let activeChatModel = resolveDefaultChatModel()
+  let chatWorker = new LlamaCppWorker({ model: activeChatModel, portStart: 31200 })
   const titleWorker = new LlamaCppWorker({ model: TITLE_MODEL, portStart: 31300 })
 
   return {
-    chatModel: CHAT_MODEL,
+    get chatModel() {
+      return activeChatModel
+    },
     titleModel: TITLE_MODEL,
+    setChatModel(model) {
+      if (model.id === activeChatModel.id && model.path === activeChatModel.path) {
+        return activeChatModel
+      }
+
+      chatWorker.stop()
+      activeChatModel = model
+      chatWorker = new LlamaCppWorker({ model: activeChatModel, portStart: 31200 })
+      return activeChatModel
+    },
     async warmup(onProgress) {
       onProgress?.({
         id: "title-model",
@@ -346,13 +365,13 @@ function createLlamaCppProvider() {
 
       onProgress?.({
         id: "chat-model",
-        label: `Loading ${CHAT_MODEL.label}`,
+        label: `Loading ${activeChatModel.label}`,
         progress: 0.68,
       })
       await chatWorker.ensureReady()
       onProgress?.({
         id: "chat-model",
-        label: `${CHAT_MODEL.label} ready`,
+        label: `${activeChatModel.label} ready`,
         progress: 0.82,
       })
     },

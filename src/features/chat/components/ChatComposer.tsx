@@ -1,9 +1,10 @@
-import { CSSProperties, FormEvent, KeyboardEvent, useLayoutEffect, useRef, useState } from "react"
-import { ArrowUp, Loader2, Pause, Pencil, Play, Square, X } from "lucide-react"
+import { CSSProperties, FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { ArrowUp, FileText, ImagePlus, Loader2, Pause, Pencil, Play, Plus, Square, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VoiceButton } from "@/features/voice/components/VoiceButton"
 import { VoiceDictationSurface } from "@/features/voice/components/VoiceDictationSurface"
-import { SpeechPlaybackState } from "@/features/chat/types"
+import { attachmentSummaryLabel } from "@/features/chat/lib/message-attachments"
+import { ChatAttachment, SpeechPlaybackState } from "@/features/chat/types"
 
 export type ContextUsageSummary = {
   estimatedTokens: number
@@ -13,6 +14,8 @@ export type ContextUsageSummary = {
 }
 
 type ChatComposerProps = {
+  activeModelSupportsVision: boolean
+  attachments: ChatAttachment[]
   draft: string
   draftRevealKey: number
   shouldRevealDraft: boolean
@@ -28,7 +31,10 @@ type ChatComposerProps = {
   voiceWaveformData: Uint8Array | null
   hasActiveVoiceHotkey: boolean
   onCancelEdit: () => void
+  onAddDocuments: () => void
+  onAddImages: () => void
   onDraftChange: (value: string) => void
+  onRemoveAttachment: (attachmentId: string) => void
   onSeekSpeech: (value: number) => void
   onStopSpeech: () => void
   onStopGeneration: () => void
@@ -39,6 +45,8 @@ type ChatComposerProps = {
 }
 
 export function ChatComposer({
+  activeModelSupportsVision,
+  attachments,
   draft,
   draftRevealKey,
   shouldRevealDraft,
@@ -54,7 +62,10 @@ export function ChatComposer({
   voiceWaveformData,
   hasActiveVoiceHotkey,
   onCancelEdit,
+  onAddDocuments,
+  onAddImages,
   onDraftChange,
+  onRemoveAttachment,
   onSeekSpeech,
   onStopSpeech,
   onStopGeneration,
@@ -64,9 +75,26 @@ export function ChatComposer({
   onVoiceFinish,
 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const attachmentMenuRef = useRef<HTMLDivElement | null>(null)
   const [composerSize, setComposerSize] = useState<"small" | "small-medium" | "medium-long" | "long">("small")
+  const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false)
   const activeVoiceState = voiceState === "idle" ? null : voiceState
   const isVoiceActive = activeVoiceState !== null
+
+  useEffect(() => {
+    if (!isAttachmentMenuOpen) {
+      return
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!attachmentMenuRef.current?.contains(event.target as Node)) {
+        setIsAttachmentMenuOpen(false)
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    return () => document.removeEventListener("pointerdown", handlePointerDown)
+  }, [isAttachmentMenuOpen])
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current
@@ -93,9 +121,10 @@ export function ChatComposer({
     const maxStep = Math.round(lineHeight * 12 + verticalPadding)
     const scrollHeight = textarea.scrollHeight
     const isEmptyDraft = draft.length === 0
+    const hasAttachments = attachments.length > 0
     const hasExpandedContent = !isEmptyDraft && (draft.includes("\n") || scrollHeight > firstStep)
 
-    const nextSize = isEmptyDraft || !hasExpandedContent
+    const nextSize = (!hasAttachments && (isEmptyDraft || !hasExpandedContent))
       ? "small"
       : scrollHeight <= secondStep
         ? "small-medium"
@@ -113,7 +142,7 @@ export function ChatComposer({
 
     textarea.style.height = `${nextHeight}px`
     setComposerSize(nextSize)
-  }, [draft])
+  }, [attachments.length, draft])
 
   function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -212,6 +241,47 @@ export function ChatComposer({
             </button>
           </div>
         ) : null}
+        {attachments.length > 0 ? (
+          <div className="chat-composer-attachments">
+            {attachments.map((attachment) => (
+              attachment.kind === "image" ? (
+                <div className="chat-composer-image-chip" key={attachment.id}>
+                  <img alt={attachment.name} className="chat-composer-image-chip-preview" src={attachment.dataUrl} />
+                  <div className="chat-composer-image-chip-copy">
+                    <span title={attachment.name}>{attachment.name}</span>
+                    <small>{attachmentSummaryLabel(attachment)}</small>
+                  </div>
+                  <button
+                    aria-label={`Remove ${attachment.name}`}
+                    className="chat-composer-attachment-remove"
+                    type="button"
+                    onClick={() => onRemoveAttachment(attachment.id)}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="chat-composer-attachment-chip" key={attachment.id}>
+                  <span className="chat-composer-attachment-icon">
+                    <FileText className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="chat-composer-attachment-copy">
+                    <strong title={attachment.name}>{attachment.name}</strong>
+                    <small>{attachmentSummaryLabel(attachment)}</small>
+                  </span>
+                  <button
+                    aria-label={`Remove ${attachment.name}`}
+                    className="chat-composer-attachment-remove"
+                    type="button"
+                    onClick={() => onRemoveAttachment(attachment.id)}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )
+            ))}
+          </div>
+        ) : null}
         <div className="chat-composer-main">
           <div
             className="chat-composer-text-reveal-shell"
@@ -245,6 +315,48 @@ export function ChatComposer({
 
         <div className="chat-composer-footer">
           <div className="chat-composer-footer-start">
+            {!isVoiceActive ? (
+              <div className="chat-composer-attachment-menu-shell" ref={attachmentMenuRef}>
+                <button
+                  aria-expanded={isAttachmentMenuOpen}
+                  aria-haspopup="menu"
+                  aria-label="Add attachment"
+                  className="chat-composer-round-button"
+                  type="button"
+                  onClick={() => setIsAttachmentMenuOpen((current) => !current)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+                {isAttachmentMenuOpen ? (
+                  <div className="chat-composer-attachment-menu" role="menu" aria-label="Add attachment">
+                    <button
+                      className="chat-composer-attachment-menu-item"
+                      type="button"
+                      onClick={() => {
+                        setIsAttachmentMenuOpen(false)
+                        void onAddDocuments()
+                      }}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      <span>Add document</span>
+                    </button>
+                    <button
+                      className="chat-composer-attachment-menu-item"
+                      data-disabled={!activeModelSupportsVision || undefined}
+                      disabled={!activeModelSupportsVision}
+                      type="button"
+                      onClick={() => {
+                        setIsAttachmentMenuOpen(false)
+                        void onAddImages()
+                      }}
+                    >
+                      <ImagePlus className="h-3.5 w-3.5" />
+                      <span>Add images</span>
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             {showContextMeter ? (
               <div
                 aria-label={`Context length: ${contextTooltip}`}

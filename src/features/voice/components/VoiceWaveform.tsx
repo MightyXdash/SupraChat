@@ -63,21 +63,24 @@ export function VoiceWaveform({
       return 1 + c3 * Math.pow(clamped - 1, 3) + c1 * Math.pow(clamped - 1, 2)
     }
 
+    const canvasEl = canvas
+    const ctx2d = ctx
+
     function draw(history: Array<WaveformBar | null>, now: number) {
       const dpr = window.devicePixelRatio || 1
-      const styles = window.getComputedStyle(canvas)
+      const styles = window.getComputedStyle(canvasEl)
       const configuredWaveColor = styles.getPropertyValue("--voice-wave-color").trim()
       const resolvedWaveColor =
         configuredWaveColor && !configuredWaveColor.includes("var(")
           ? configuredWaveColor
           : styles.getPropertyValue("--info").trim() || "#5b7da8"
 
-      canvas.width = Math.round(width * dpr)
-      canvas.height = Math.round(height * dpr)
-      canvas.style.width = `${width}px`
-      canvas.style.height = `${height}px`
+      canvasEl.width = Math.round(width * dpr)
+      canvasEl.height = Math.round(height * dpr)
+      canvasEl.style.width = `${width}px`
+      canvasEl.style.height = `${height}px`
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx2d.clearRect(0, 0, canvasEl.width, canvasEl.height)
 
       const barW = Math.min(MAX_BAR_WIDTH, Math.max(1, (width - (barCount - 1) * BAR_GAP) / barCount))
       const totalBarWidth = barCount * barW + (barCount - 1) * BAR_GAP
@@ -94,10 +97,10 @@ export function VoiceWaveform({
         const x = startX + i * (barW + BAR_GAP)
         const y = mid - barH / 2
 
-        ctx.fillStyle = resolvedWaveColor
-        ctx.beginPath()
-        ctx.roundRect(x * dpr, y * dpr, barW * dpr, barH * dpr, 2 * dpr)
-        ctx.fill()
+        ctx2d.fillStyle = resolvedWaveColor
+        ctx2d.beginPath()
+        ctx2d.roundRect(x * dpr, y * dpr, barW * dpr, barH * dpr, 2 * dpr)
+        ctx2d.fill()
       }
 
     }
