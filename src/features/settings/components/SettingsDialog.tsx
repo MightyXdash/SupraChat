@@ -7,6 +7,7 @@ import { SettingsBadge, SettingsPath, SettingsRangeControl, SettingsSegmentedCon
 import { SettingsNav } from "@/features/settings/components/SettingsNav"
 import { SettingsRow } from "@/features/settings/components/SettingsRow"
 import { SettingsSection } from "@/features/settings/components/SettingsSection"
+import { CloudModelsTab } from "@/features/cloud-models/components/CloudModelsTab"
 import {
   customHyperparameters,
   getHyperparameterPresetId,
@@ -639,6 +640,8 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                     </SettingsSection>
                   </>
                 ) : null}
+
+                {activeTab === "cloud-models" ? <CloudModelsTab /> : null}
 
                 {activeTab === "models" ? (
                   <SettingsSection title="Bundled Models" description={`Resource root: ${dataState.models?.resourceRoot ?? "Loading"}`}>

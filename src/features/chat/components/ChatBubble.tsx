@@ -1,7 +1,7 @@
 import { memo, useState } from "react"
 import { motion } from "framer-motion"
 import { Check, Copy, Loader2, Pencil, RotateCcw, Volume2 } from "lucide-react"
-import { attachmentSummaryLabel } from "@/features/chat/lib/message-attachments"
+import { attachmentSummaryLabel, buildMessageTextPayload } from "@/features/chat/lib/message-attachments"
 import { MarkdownMessage } from "@/features/chat/components/MarkdownMessage"
 import { ChatMessage } from "@/features/chat/types"
 import { cn } from "@/lib/utils"
@@ -24,7 +24,7 @@ export const ChatBubble = memo(function ChatBubble({ message, canEdit, isGenerat
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(message.content)
+      await navigator.clipboard.writeText(buildMessageTextPayload(message))
       setHasCopied(true)
       window.setTimeout(() => setHasCopied(false), 1400)
     } catch {

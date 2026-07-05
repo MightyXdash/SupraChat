@@ -7,7 +7,13 @@ import { ModelSelector } from "@/features/chat/components/ModelSelector"
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import { useScrollVisibility } from "@/features/chat/hooks/useScrollVisibility"
 import type { RuntimeChatModel } from "@/features/chat/services/chat-service"
+import type { ReasoningEffort } from "@/features/cloud-models/lib/reasoning"
 import { ChatAttachment, ChatMessage, Conversation, SpeechPlaybackState } from "@/features/chat/types"
+
+type CloudModelSelection = {
+  instanceId: string
+  modelId: string
+}
 
 type ChatWorkspaceProps = {
   conversation?: Conversation
@@ -23,10 +29,17 @@ type ChatWorkspaceProps = {
   activeRuntimeModel: RuntimeChatModel | null
   modelSelector: {
     activeModelId: string | null
+    activeCloudModel: CloudModelSelection | null
     isLoading: boolean
     isSelecting: boolean
     models: RuntimeChatModel[]
     onSelectModel: (modelId: string) => void
+    onSelectCloudModel: (selection: CloudModelSelection) => void
+  }
+  reasoningControl: {
+    visible: boolean
+    effort: ReasoningEffort
+    onChange: (effort: ReasoningEffort) => void
   }
   scrollRef: RefObject<HTMLDivElement | null>
   speechPlayback: SpeechPlaybackState
@@ -66,6 +79,7 @@ export function ChatWorkspace({
   composerAttachments,
   activeRuntimeModel,
   modelSelector,
+  reasoningControl,
   scrollRef,
   speechPlayback,
   showAverageTps,
@@ -144,11 +158,13 @@ export function ChatWorkspace({
       <div className="chat-workspace-header">
         <ModelSelector
           activeModelId={modelSelector.activeModelId}
+          activeCloudModel={modelSelector.activeCloudModel}
           disabled={isGenerating}
           isLoading={modelSelector.isLoading}
           isSelecting={modelSelector.isSelecting}
           models={modelSelector.models}
           onSelectModel={modelSelector.onSelectModel}
+          onSelectCloudModel={modelSelector.onSelectCloudModel}
         />
       </div>
 
@@ -227,6 +243,7 @@ export function ChatWorkspace({
             state: tokenState,
           }}
           isEditing={Boolean(editingMessageId)}
+          reasoningControl={reasoningControl}
           speechPlayback={speechPlayback}
           showAverageTps={showAverageTps}
           showContextMeter={showContextMeter}

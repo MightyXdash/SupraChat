@@ -1,10 +1,11 @@
 import { CSSProperties, FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react"
-import { ArrowUp, FileText, ImagePlus, Loader2, Pause, Pencil, Play, Plus, Square, X } from "lucide-react"
+import { ArrowUp, Brain, FileText, ImagePlus, Loader2, Pause, Pencil, Play, Plus, Square, X, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VoiceButton } from "@/features/voice/components/VoiceButton"
 import { VoiceDictationSurface } from "@/features/voice/components/VoiceDictationSurface"
 import { attachmentSummaryLabel } from "@/features/chat/lib/message-attachments"
 import { ChatAttachment, SpeechPlaybackState } from "@/features/chat/types"
+import type { ReasoningEffort } from "@/features/cloud-models/lib/reasoning"
 
 export type ContextUsageSummary = {
   estimatedTokens: number
@@ -30,6 +31,11 @@ type ChatComposerProps = {
   voiceState: "idle" | "recording" | "processing"
   voiceWaveformData: Uint8Array | null
   hasActiveVoiceHotkey: boolean
+  reasoningControl: {
+    visible: boolean
+    effort: ReasoningEffort
+    onChange: (effort: ReasoningEffort) => void
+  }
   onCancelEdit: () => void
   onAddDocuments: () => void
   onAddImages: () => void
@@ -61,6 +67,7 @@ export function ChatComposer({
   voiceState,
   voiceWaveformData,
   hasActiveVoiceHotkey,
+  reasoningControl,
   onCancelEdit,
   onAddDocuments,
   onAddImages,
@@ -357,6 +364,45 @@ export function ChatComposer({
                 ) : null}
               </div>
             ) : null}
+            {reasoningControl.visible ? (
+              <div className="chat-composer-reasoning-control" data-active={reasoningControl.effort !== "instant" || undefined}>
+                {reasoningControl.effort === "instant" ? (
+                  <Zap className="h-3.5 w-3.5 chat-composer-reasoning-icon" aria-hidden="true" />
+                ) : (
+                  <Brain className="h-3.5 w-3.5 chat-composer-reasoning-icon" aria-hidden="true" />
+                )}
+                <div className="chat-composer-reasoning-segments">
+                  <button
+                    className={reasoningControl.effort === "instant" ? "active" : ""}
+                    type="button"
+                    onClick={() => reasoningControl.onChange("instant")}
+                  >
+                    Instant
+                  </button>
+                  <button
+                    className={reasoningControl.effort === "low" ? "active" : ""}
+                    type="button"
+                    onClick={() => reasoningControl.onChange("low")}
+                  >
+                    Low
+                  </button>
+                  <button
+                    className={reasoningControl.effort === "medium" ? "active" : ""}
+                    type="button"
+                    onClick={() => reasoningControl.onChange("medium")}
+                  >
+                    Medium
+                  </button>
+                  <button
+                    className={reasoningControl.effort === "high" ? "active" : ""}
+                    type="button"
+                    onClick={() => reasoningControl.onChange("high")}
+                  >
+                    High
+                  </button>
+                </div>
+              </div>
+            ) : null}
             {showContextMeter ? (
               <div
                 aria-label={`Context length: ${contextTooltip}`}
@@ -390,7 +436,7 @@ export function ChatComposer({
               <Button
                 aria-label={isGenerating ? "Stop response" : "Send message"}
                 className="chat-composer-voice-button"
-                disabled={!draft.trim() && !isGenerating}
+                disabled={(!draft.trim() && attachments.length === 0) && !isGenerating}
                 size="icon"
                 type="submit"
                 variant="ghost"

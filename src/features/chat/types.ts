@@ -24,6 +24,15 @@ export type ImageAttachment = {
 
 export type ChatAttachment = DocumentAttachment | ImageAttachment
 
+export type ReasoningBlock = {
+  title: string
+  sub_title: string
+  summary: string
+  cur_task: string
+  startedAt?: number
+  completedAt?: number
+}
+
 export type ChatMessage = {
   id: string
   role: ChatRole
@@ -32,6 +41,7 @@ export type ChatMessage = {
   attachments?: ChatAttachment[]
   reasoningDurationMs?: number | null
   tokensPerSecond?: number | null
+  reasoningBlocks?: ReasoningBlock[]
 }
 
 export type Conversation = {

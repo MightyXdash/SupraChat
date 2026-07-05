@@ -6,6 +6,19 @@ function ensureDatabaseDirectory(databasePath) {
   fs.mkdirSync(path.dirname(databasePath), { recursive: true })
 }
 
+function parseAttachmentsJson(value) {
+  if (!value) {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 function createChatDatabase(databasePath) {
   ensureDatabaseDirectory(databasePath)
 
@@ -213,7 +226,7 @@ function createChatDatabase(databasePath) {
           id: row.message_id,
           role: row.message_role,
           content: row.message_content,
-          attachments: row.message_attachments_json ? JSON.parse(row.message_attachments_json) : [],
+          attachments: parseAttachmentsJson(row.message_attachments_json),
           createdAt: row.message_created_at,
           tokensPerSecond: row.message_tokens_per_second,
         })

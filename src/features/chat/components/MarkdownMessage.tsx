@@ -1,51 +1,9 @@
 import { ReactNode, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { ChevronRight, Copy, Download, Ellipsis, Lightbulb, Zap } from "lucide-react"
+import katex from "katex"
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import { cn } from "@/lib/utils"
-
-const greekSymbols: Record<string, string> = {
-  alpha: "α",
-  beta: "β",
-  gamma: "γ",
-  delta: "δ",
-  epsilon: "ε",
-  theta: "θ",
-  lambda: "λ",
-  mu: "μ",
-  pi: "π",
-  rho: "ρ",
-  sigma: "σ",
-  tau: "τ",
-  phi: "φ",
-  omega: "ω",
-  Gamma: "Γ",
-  Delta: "Δ",
-  Theta: "Θ",
-  Lambda: "Λ",
-  Pi: "Π",
-  Sigma: "Σ",
-  Phi: "Φ",
-  Omega: "Ω",
-}
-
-const latexSymbols: Record<string, string> = {
-  ...greekSymbols,
-  ast: "*",
-  cdot: "·",
-  degree: "°",
-  times: "×",
-  div: "÷",
-  pm: "±",
-  leq: "≤",
-  geq: "≥",
-  neq: "≠",
-  approx: "≈",
-  rightarrow: "→",
-  to: "→",
-  leftarrow: "←",
-  leftrightarrow: "↔",
-}
 
 type StreamAnimationRange = {
   end: number
@@ -73,15 +31,13 @@ function renderText(
       return []
     }
 
-    return characterOffset >= animatedFrom ? (
+    return (
       <span
-        className="markdown-stream-character"
+        className={characterOffset >= animatedFrom ? "markdown-stream-character" : undefined}
         key={`stream-char-${characterOffset}`}
       >
         {character}
       </span>
-    ) : (
-      character
     )
   })
 }
@@ -108,137 +64,25 @@ function isHeadingLine(line: string) {
   return parseHeading(line) !== null
 }
 
-function readLatexGroup(source: string, startIndex: number) {
-  if (source[startIndex] !== "{") {
-    return null
+function renderLatexWithKatex(source: string, display: boolean): string {
+  try {
+    return katex.renderToString(source, {
+      displayMode: display,
+      throwOnError: false,
+      output: "html",
+    })
+  } catch {
+    return `<span class="latex-katex-error">${source}</span>`
   }
-
-  let depth = 0
-  for (let index = startIndex; index < source.length; index += 1) {
-    const character = source[index]
-
-    if (character === "{") {
-      depth += 1
-    } else if (character === "}") {
-      depth -= 1
-
-      if (depth === 0) {
-        return {
-          body: source.slice(startIndex + 1, index),
-          endIndex: index + 1,
-        }
-      }
-    }
-  }
-
-  return null
-}
-
-function readLatexArgument(source: string, startIndex: number) {
-  if (source[startIndex] === "{") {
-    return readLatexGroup(source, startIndex)
-  }
-
-  if (startIndex < source.length) {
-    return {
-      body: source[startIndex],
-      endIndex: startIndex + 1,
-    }
-  }
-
-  return null
-}
-
-function renderLatex(source: string, keyPrefix: string): ReactNode[] {
-  const nodes: ReactNode[] = []
-  let index = 0
-
-  while (index < source.length) {
-    if (source.startsWith("\\frac", index)) {
-      const numerator = readLatexArgument(source, index + 5)
-      const denominator = numerator ? readLatexArgument(source, numerator.endIndex) : null
-
-      if (numerator && denominator) {
-        nodes.push(
-          <span className="latex-fraction" key={`${keyPrefix}-frac-${index}`}>
-            <span className="latex-fraction-top">{renderLatex(numerator.body, `${keyPrefix}-n-${index}`)}</span>
-            <span className="latex-fraction-bottom">
-              {renderLatex(denominator.body, `${keyPrefix}-d-${index}`)}
-            </span>
-          </span>,
-        )
-        index = denominator.endIndex
-        continue
-      }
-    }
-
-    if (source.startsWith("\\sqrt", index)) {
-      const radicand = readLatexArgument(source, index + 5)
-
-      if (radicand) {
-        nodes.push(
-          <span className="latex-root" key={`${keyPrefix}-sqrt-${index}`}>
-            <span className="latex-root-symbol">√</span>
-            <span className="latex-root-body">{renderLatex(radicand.body, `${keyPrefix}-r-${index}`)}</span>
-          </span>,
-        )
-        index = radicand.endIndex
-        continue
-      }
-    }
-
-    if (source.startsWith("\\text", index) || source.startsWith("\\mathrm", index)) {
-      const commandLength = source.startsWith("\\mathrm", index) ? 7 : 5
-      const textArgument = readLatexArgument(source, index + commandLength)
-
-      if (textArgument) {
-        nodes.push(
-          <span className="latex-text" key={`${keyPrefix}-text-${index}`}>
-            {renderText(textArgument.body)}
-          </span>,
-        )
-        index = textArgument.endIndex
-        continue
-      }
-    }
-
-    if (source[index] === "^" || source[index] === "_") {
-      const argument = readLatexArgument(source, index + 1)
-
-      if (argument) {
-        const Tag = source[index] === "^" ? "sup" : "sub"
-        nodes.push(
-          <Tag key={`${keyPrefix}-${source[index]}-${index}`}>
-            {renderLatex(argument.body, `${keyPrefix}-script-${index}`)}
-          </Tag>,
-        )
-        index = argument.endIndex
-        continue
-      }
-    }
-
-    if (source[index] === "\\") {
-      const command = /^[A-Za-z]+/.exec(source.slice(index + 1))
-
-      if (command) {
-        nodes.push(latexSymbols[command[0]] ?? `\\${command[0]}`)
-        index += command[0].length + 1
-        continue
-      }
-    }
-
-    nodes.push(source[index])
-    index += 1
-  }
-
-  return nodes
 }
 
 function MathExpression({ display = false, source }: { display?: boolean; source: string }) {
+  const html = renderLatexWithKatex(source, display)
   return (
-    <span className={cn("latex-expression", display && "latex-expression-display")}>
-      {renderLatex(source.trim(), display ? "display-math" : "inline-math")}
-    </span>
+    <span
+      className={display ? "latex-katex-display" : "latex-katex"}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   )
 }
 
@@ -308,10 +152,15 @@ type InlineMarkdownToken =
         | "inlineMath"
         | "strong"
         | "emphasis"
+        | "strikethrough"
+        | "link"
+        | "image"
         | "plainStrongCandidate"
         | "plainEmphasisCandidate"
     }
   | { end: number; start: number; type: "break" }
+
+type LinkTokenData = { end: number; start: number; text: string; url: string }
 
 function findClosingMarker(source: string, marker: string, startIndex: number) {
   let cursor = startIndex
@@ -337,6 +186,56 @@ function canOpenEmphasis(source: string, start: number, markerLength: number) {
   const nextCharacter = source[start + markerLength]
 
   return !!nextCharacter && !/\s/.test(nextCharacter)
+}
+
+function readLinkOrImageToken(source: string, start: number, isImage: boolean): LinkTokenData | null {
+  const bracketStart = start + (isImage ? 2 : 1)
+  let depth = 1
+  let bracketEnd = -1
+
+  for (let index = bracketStart; index < source.length; index += 1) {
+    const character = source[index]
+
+    if (character === "\\") {
+      index += 1
+      continue
+    }
+
+    if (character === "[") {
+      depth += 1
+    } else if (character === "]") {
+      depth -= 1
+
+      if (depth === 0) {
+        bracketEnd = index
+        break
+      }
+    }
+  }
+
+  if (bracketEnd === -1) {
+    return null
+  }
+
+  if (source[bracketEnd + 1] !== "(") {
+    return null
+  }
+
+  const parenEnd = findClosingMarker(source, ")", bracketEnd + 2)
+
+  if (parenEnd === -1) {
+    return null
+  }
+
+  const text = source.slice(bracketStart, bracketEnd)
+  const url = source.slice(bracketEnd + 2, parenEnd)
+
+  return {
+    end: parenEnd + 1,
+    start,
+    text,
+    url,
+  }
 }
 
 function readInlineMarkdownToken(source: string, start: number): InlineMarkdownToken | null {
@@ -385,6 +284,30 @@ function readInlineMarkdownToken(source: string, start: number): InlineMarkdownT
     return end === -1
       ? null
       : { body: source.slice(start + 2, end), end: end + 2, start, type: "inlineMath" }
+  }
+
+  if (source.startsWith("~~", start) && canOpenEmphasis(source, start, 2)) {
+    const end = findClosingMarker(source, "~~", start + 2)
+
+    return end === -1
+      ? null
+      : { body: source.slice(start + 2, end), end: end + 2, start, type: "strikethrough" }
+  }
+
+  if (source.startsWith("![", start)) {
+    const linkData = readLinkOrImageToken(source, start, true)
+
+    if (linkData) {
+      return { body: linkData.text, end: linkData.end, start, type: "image", url: linkData.url } as InlineMarkdownToken & { url: string }
+    }
+  }
+
+  if (source[start] === "[" && !source.startsWith("![", start)) {
+    const linkData = readLinkOrImageToken(source, start, false)
+
+    if (linkData) {
+      return { body: linkData.text, end: linkData.end, start, type: "link", url: linkData.url } as InlineMarkdownToken & { url: string }
+    }
   }
 
   if (source.startsWith("**", start) && canOpenEmphasis(source, start, 2)) {
@@ -484,6 +407,38 @@ function renderInlineMarkdown(
           {renderInlineMarkdown(token.body, tokenOffset + 1, innerAnimatedFrom, visibleUntil)}
         </em>,
       )
+    } else if (token.type === "strikethrough") {
+      const innerAnimatedFrom = animatedFrom === Number.POSITIVE_INFINITY ? animatedFrom : Math.min(animatedFrom, tokenOffset + 2)
+      nodes.push(
+        <del key={`del-${tokenOffset}`}>
+          {renderInlineMarkdown(token.body, tokenOffset + 2, innerAnimatedFrom, visibleUntil)}
+        </del>,
+      )
+    } else if (token.type === "image") {
+      const linkToken = token as InlineMarkdownToken & { url: string }
+      if (token.end + offset <= visibleUntil) {
+        nodes.push(
+          <img
+            alt={token.body}
+            className="markdown-image"
+            key={`img-${tokenOffset}`}
+            src={linkToken.url}
+          />,
+        )
+      }
+    } else if (token.type === "link") {
+      const linkToken = token as InlineMarkdownToken & { url: string }
+      nodes.push(
+        <a
+          className="markdown-link"
+          href={linkToken.url}
+          key={`link-${tokenOffset}`}
+          rel="noreferrer"
+          target="_blank"
+        >
+          {renderInlineMarkdown(token.body, tokenOffset + 1, animatedFrom, visibleUntil)}
+        </a>,
+      )
     } else {
       const markerLength = token.type === "plainStrongCandidate" ? 2 : 1
       const innerAnimatedFrom = animatedFrom === Number.POSITIVE_INFINITY
@@ -573,6 +528,24 @@ function isOrderedListItem(line: string) {
 
 function isUnorderedListItem(line: string) {
   return /^\s*[-*]\s+/.test(line)
+}
+
+function isTaskListItem(line: string) {
+  return /^\s*[-*]\s+\[[ xX]\]\s+/.test(line)
+}
+
+function parseTaskListItem(line: string): { checked: boolean; text: string; markerLength: number } | null {
+  const match = /^\s*[-*]\s+\[([ xX])\]\s+(.+)$/.exec(line)
+
+  if (!match) {
+    return null
+  }
+
+  return {
+    checked: match[1] !== " ",
+    markerLength: match[0].length - match[2].length,
+    text: match[2],
+  }
 }
 
 function splitOnThinking(content: string): { reasoning: string; answer: string } {
@@ -789,13 +762,32 @@ function buildMarkdownBlocks(
 
       while (lineIndex < lines.length && isUnorderedListItem(lines[lineIndex])) {
         const item = lines[lineIndex]
-        const marker = item.match(/^\s*[-*]\s+/)?.[0] ?? ""
+        const taskItem = isTaskListItem(item) ? parseTaskListItem(item) : null
 
-        items.push(
-          <li key={`li-${offset}`}>
-            {renderInlineMarkdown(item.slice(marker.length), offset + marker.length, animatedFrom, visibleUntil)}
-          </li>,
-        )
+        if (taskItem) {
+          items.push(
+            <li className="markdown-task-item" key={`li-${offset}`}>
+              <label className="markdown-task-label">
+                <input
+                  checked={taskItem.checked}
+                  className="markdown-task-checkbox"
+                  disabled
+                  readOnly
+                  type="checkbox"
+                />
+                <span>{renderInlineMarkdown(taskItem.text, offset + taskItem.markerLength, animatedFrom, visibleUntil)}</span>
+              </label>
+            </li>,
+          )
+        } else {
+          const marker = item.match(/^\s*[-*]\s+/)?.[0] ?? ""
+          items.push(
+            <li key={`li-${offset}`}>
+              {renderInlineMarkdown(item.slice(marker.length), offset + marker.length, animatedFrom, visibleUntil)}
+            </li>,
+          )
+        }
+
         offset += item.length + 1
         lineIndex += 1
       }

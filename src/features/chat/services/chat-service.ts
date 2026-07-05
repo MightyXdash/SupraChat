@@ -1,6 +1,8 @@
 import { chatRuntimeConfig } from "@/features/chat/config/runtime"
 import { ChatCompletionMessage, Conversation } from "@/features/chat/types"
 import type { Hyperparameters } from "@/features/chat/config/hyperparameters"
+import type { ReasoningEffort } from "@/features/cloud-models/lib/reasoning"
+import type { ReasoningBlock } from "@/features/chat/types"
 
 export type RuntimeModelCapabilities = {
   vision: boolean
@@ -34,6 +36,17 @@ type StreamChatCompletionOptions = {
   displayTokensPerSecondCap?: number | null
   hyperparameters?: Hyperparameters
   messages: ChatCompletionMessage[]
+  onChunk: (chunk: string) => void
+  onRawChunk?: (chunk: string) => void
+  signal?: AbortSignal
+}
+
+type StreamCloudChatCompletionOptions = {
+  apiKey: string
+  modelId: string
+  messages: ChatCompletionMessage[]
+  reasoningEffort: ReasoningEffort
+  hyperparameters?: Hyperparameters
   onChunk: (chunk: string) => void
   onRawChunk?: (chunk: string) => void
   signal?: AbortSignal
@@ -413,6 +426,78 @@ export async function streamChatCompletion({
   }
 }
 
+export async function streamCloudChatCompletion({
+  apiKey,
+  modelId,
+  messages,
+  reasoningEffort,
+  hyperparameters,
+  onChunk,
+  onRawChunk,
+  signal,
+}: StreamCloudChatCompletionOptions) {
+  const reasoningEnabled = reasoningEffort !== "instant"
+
+  const response = await fetchWithRetry(
+    `${chatRuntimeConfig.apiBaseUrl}/cloud/chat`,
+    withLocalApiHeaders({
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        apiKey,
+        modelId,
+        messages,
+        reasoning: reasoningEnabled
+          ? { effort: reasoningEffort }
+          : null,
+        ...(hyperparameters
+          ? {
+            temperature: hyperparameters.temperature,
+            max_tokens: hyperparameters.maxTokens,
+            top_p: hyperparameters.topP,
+          }
+          : {}),
+      }),
+      signal,
+    }),
+  )
+
+  if (!response.ok || !response.body) {
+    throw new Error(await readErrorDetail(response))
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+
+  while (true) {
+    if (signal?.aborted) {
+      throw new DOMException("Generation stopped.", "AbortError")
+    }
+
+    const { done, value } = await reader.read()
+
+    if (done) {
+      break
+    }
+
+    const chunk = decoder.decode(value, { stream: true })
+
+    if (chunk) {
+      onRawChunk?.(chunk)
+      onChunk(chunk)
+    }
+  }
+
+  const remaining = decoder.decode()
+
+  if (remaining) {
+    onRawChunk?.(remaining)
+    onChunk(remaining)
+  }
+}
+
 export async function streamConversationTitle({
   userMessage,
   onChunk,
@@ -460,5 +545,44 @@ export async function streamConversationTitle({
 
   if (remaining) {
     onChunk(remaining)
+  }
+}
+
+export async function summarizeReasoningText(
+  apiKey: string,
+  reasoningText: string,
+  signal?: AbortSignal,
+): Promise<ReasoningBlock | null> {
+  const response = await fetchWithRetry(
+    `${chatRuntimeConfig.apiBaseUrl}/cloud/summarize`,
+    withLocalApiHeaders({
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        apiKey,
+        reasoningText,
+        modelId: "inclusionai/ling-2.6-flash",
+      }),
+      signal,
+    }),
+  )
+
+  if (!response.ok) {
+    return null
+  }
+
+  const data = await response.json()
+
+  if (!data.ok || !data.result) {
+    return null
+  }
+
+  return {
+    title: data.result.title,
+    sub_title: data.result.sub_title,
+    summary: data.result.summary,
+    cur_task: data.result.cur_task,
   }
 }

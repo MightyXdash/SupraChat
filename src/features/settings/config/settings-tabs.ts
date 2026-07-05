@@ -1,5 +1,6 @@
 import {
   Bot,
+  Cloud,
   Database,
   Download,
   Palette,
@@ -8,7 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-export type SettingsTabId = "general" | "appearance" | "updates" | "models" | "hyperparameters" | "data"
+export type SettingsTabId = "general" | "appearance" | "updates" | "cloud-models" | "models" | "hyperparameters" | "data"
 
 export type SettingsTab = {
   group: "Desktop" | "Local"
@@ -39,6 +40,13 @@ export const settingsTabs: SettingsTab[] = [
     label: "Updates",
     description: "Release channel and installation preferences.",
     icon: Download,
+  },
+  {
+    group: "Desktop",
+    id: "cloud-models",
+    label: "Cloud Models",
+    description: "Cloud model provider instances and configuration.",
+    icon: Cloud,
   },
   {
     group: "Local",

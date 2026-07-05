@@ -39,6 +39,8 @@ import {
 } from "@/features/updates/services/update-service"
 import { useUpdaterStore } from "@/features/updates/store/use-updater-store"
 import { useVoiceStore } from "@/features/voice/store/use-voice-store"
+import { useCloudModelsStore } from "@/features/cloud-models/store/use-cloud-models-store"
+import { isReasoningCapableModel, type ReasoningEffort } from "@/features/cloud-models/lib/reasoning"
 
 type AppPanel = "chat" | "playground"
 
@@ -46,7 +48,36 @@ type CachedSpeechClip = {
   url: string
 }
 
+type PersistedComposerState = {
+  attachments: ChatAttachment[]
+  draft: string
+}
+
 let silentSpeechPrimerUrl: string | null = null
+const COMPOSER_DRAFT_STORAGE_KEY = "suprachat.chat-composer-drafts"
+
+function readPersistedComposerStates() {
+  try {
+    const raw = window.localStorage.getItem(COMPOSER_DRAFT_STORAGE_KEY)
+
+    if (!raw) {
+      return {} as Record<string, PersistedComposerState>
+    }
+
+    const parsed = JSON.parse(raw) as Record<string, PersistedComposerState>
+    return parsed && typeof parsed === "object" ? parsed : {}
+  } catch {
+    return {} as Record<string, PersistedComposerState>
+  }
+}
+
+function writePersistedComposerStates(nextState: Record<string, PersistedComposerState>) {
+  try {
+    window.localStorage.setItem(COMPOSER_DRAFT_STORAGE_KEY, JSON.stringify(nextState))
+  } catch {
+    // Ignore local draft persistence failures.
+  }
+}
 
 function getSilentSpeechPrimerUrl() {
   if (silentSpeechPrimerUrl) {
@@ -113,6 +144,7 @@ export function AppShell() {
   const speechRequestRef = useRef(0)
   const { confirm, confirmationDialog } = useConfirmationDialog()
   const hasAppliedInitialThemeRef = useRef(false)
+  const hydratedComposerConversationIdRef = useRef<string | null>(null)
   const themeRef = useRef<AppTheme>(theme)
   const conversations = useChatStore((state) => state.conversations)
   const activeConversationId = useChatStore((state) => state.activeConversationId)
@@ -155,6 +187,11 @@ export function AppShell() {
   const finishVoiceRecording = useVoiceStore((state) => state.finishRecording)
   const startVadRecording = useVoiceStore((state) => state.startVadRecording)
   const setHotkeyActive = useVoiceStore((state) => state.setHotkeyActive)
+  const cloudInstances = useCloudModelsStore((state) => state.instances)
+  const activeCloudModel = useCloudModelsStore((state) => state.activeCloudModel)
+  const setActiveCloudModel = useCloudModelsStore((state) => state.setActiveCloudModel)
+  const reasoningEffort = useCloudModelsStore((state) => state.reasoningEffort)
+  const setReasoningEffort = useCloudModelsStore((state) => state.setReasoningEffort)
   const activeConversation = conversations.find(
     (conversation) => conversation.id === activeConversationId,
   )
@@ -177,6 +214,38 @@ export function AppShell() {
   useEffect(() => {
     void initialize()
   }, [initialize])
+
+  useEffect(() => {
+    const persistedStates = readPersistedComposerStates()
+    const persistedComposer = persistedStates[activeConversationId]
+
+    hydratedComposerConversationIdRef.current = activeConversationId
+    setDraft(persistedComposer?.draft ?? "")
+    setComposerAttachments(persistedComposer?.attachments ?? [])
+    setShouldRevealDraft(false)
+  }, [activeConversationId])
+
+  useEffect(() => {
+    if (!activeConversationId || hydratedComposerConversationIdRef.current !== activeConversationId) {
+      return
+    }
+
+    const persistedStates = readPersistedComposerStates()
+
+    if (!draft.trim() && composerAttachments.length === 0) {
+      if (persistedStates[activeConversationId]) {
+        delete persistedStates[activeConversationId]
+        writePersistedComposerStates(persistedStates)
+      }
+      return
+    }
+
+    persistedStates[activeConversationId] = {
+      draft,
+      attachments: composerAttachments,
+    }
+    writePersistedComposerStates(persistedStates)
+  }, [activeConversationId, composerAttachments, draft])
 
   useEffect(() => {
     let isMounted = true
@@ -660,8 +729,6 @@ export function AppShell() {
   async function handleCreateConversation() {
     setActivePanel("chat")
     setEditingMessageId(null)
-    setDraft("")
-    setComposerAttachments([])
     setShouldRevealDraft(false)
     return createConversation()
   }
@@ -669,8 +736,6 @@ export function AppShell() {
   function handleSelectConversation(conversationId: string) {
     setActivePanel("chat")
     setEditingMessageId(null)
-    setDraft("")
-    setComposerAttachments([])
     setShouldRevealDraft(false)
     setActiveConversation(conversationId)
   }
@@ -697,6 +762,13 @@ export function AppShell() {
     } finally {
       setIsSelectingRuntimeModel(false)
     }
+  }
+
+  function handleSelectCloudModel(selection: { instanceId: string; modelId: string }) {
+    if (isGenerating) {
+      return
+    }
+    setActiveCloudModel(selection)
   }
 
   async function handleInstallDownloadedUpdate() {
@@ -728,6 +800,16 @@ export function AppShell() {
   }
 
   const activeRuntimeModel = runtimeModels.find((model) => model.id === activeRuntimeModelId) ?? null
+
+  const activeCloudModelSupportsReasoning = activeCloudModel
+    ? isReasoningCapableModel(activeCloudModel.modelId)
+    : false
+
+  const reasoningControl = {
+    visible: Boolean(activeCloudModel) && activeCloudModelSupportsReasoning,
+    effort: reasoningEffort,
+    onChange: (effort: ReasoningEffort) => setReasoningEffort(effort),
+  }
 
   return (
     <main
@@ -779,11 +861,14 @@ export function AppShell() {
             composerAttachments={composerAttachments}
             modelSelector={{
               activeModelId: activeRuntimeModelId,
+              activeCloudModel,
               isLoading: isLoadingRuntimeModels,
               isSelecting: isSelectingRuntimeModel,
               models: runtimeModels,
               onSelectModel: (modelId) => void handleSelectRuntimeModel(modelId),
+              onSelectCloudModel: (selection) => handleSelectCloudModel(selection),
             }}
+            reasoningControl={reasoningControl}
             activeRuntimeModel={activeRuntimeModel}
             scrollRef={scrollRef}
             speechPlayback={speechPlayback}
